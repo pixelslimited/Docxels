@@ -34,14 +34,25 @@ jobs:
       - name: Unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+      # Release build: shrunk (R8), not debuggable (faster image processing), arm64 only.
+      - name: Build release APK
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Size breakdown
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          {
+            echo "APK size: $(du -h "$APK" | cut -f1)"
+            echo
+            echo "Largest parts (compressed bytes, file):"
+            unzip -v "$APK" | awk 'NR>3 && NF>=8 {print $3, $8}' | sort -rn | head -12
+          } | tee size.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DocScan-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: DocScan-apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
       # Publishes the APK on the repo's Releases page (marked "Latest"), replacing the previous one.
@@ -50,11 +61,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DocScan-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk DocScan.apk
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest DocScan-debug.apk \
+          {
+            echo "Built from commit ${GITHUB_SHA::7}. Download DocScan.apk on your phone and install it (allow installs from unknown sources)."
+            echo
+            echo '```'
+            cat size.txt
+            echo '```'
+          } > notes.md
+          gh release create latest DocScan.apk \
             --title "DocScan (latest build)" \
-            --notes "Debug APK built from commit ${GITHUB_SHA::7}. Download DocScan-debug.apk on your phone and install it (allow installs from unknown sources)." \
+            --notes-file notes.md \
             --target "$GITHUB_SHA" \
             --latest
 

@@ -4,7 +4,7 @@ Offline document scanner for Android (Kotlin, Jetpack Compose, Material 3). Phot
 
 ## Status
 
-- **Verified by CI (GitHub Actions, run 38363819812):** the project compiles, the unit tests for the pure-logic code pass, and a debug APK is produced.
+- **Verified by CI (GitHub Actions, run 38363819812):** the project compiles, the unit tests for the pure-logic code pass, and an APK is produced.
 - **Not yet verified:** behaviour on a real phone. Camera capture, edge detection, filters, hand removal, OCR/table reading and the exported PDF/Word/Excel files have not been run or opened by anyone yet. Expect to find bugs and quality issues when you first try it on real documents; report them and they can be fixed one by one.
 
 ## Features (implemented in code, unverified on a device)
@@ -32,7 +32,7 @@ Everything runs on the phone. No account, no internet, only the camera permissio
 
 ## Get the APK from GitHub (no Android Studio needed)
 
-Every push to `main` runs the **Build APK** workflow (`.github/workflows/build-apk.yml`): it runs the unit tests, builds a debug APK and uploads it. The APK is published on the repo's **Releases** page as `DocScan-debug.apk` (release "latest"), so you can download it directly on your phone. It is also kept as the `DocScan-debug-apk` artifact on the run page in the **Actions** tab (a zip containing `app-debug.apk`). Copy the APK to your phone and install it (allow "install unknown apps" for your file manager or browser). If the run is red, open it and read the failing step; the first run is expected to need a few fixes (see status above).
+Every push to `main` runs the **Build APK** workflow (`.github/workflows/build-apk.yml`): it runs the unit tests, builds a shrunk release APK (arm64 only, signed with the fixed sideload key in `app/sideload.jks`, so each build installs over the last) and uploads it. The APK is published on the repo's **Releases** page as `DocScan.apk` (release "latest"), so you can download it directly on your phone. It is also kept as the `DocScan-apk` artifact on the run page in the **Actions** tab (a zip containing `app-release.apk`). Copy the APK to your phone and install it (allow "install unknown apps" for your file manager or browser). If the run is red, open it and read the failing step; the first run is expected to need a few fixes (see status above).
 
 ## Build locally
 

@@ -10,3 +10,6 @@
 .cxx/
 *.jks
 *.keystore
+
+# Fixed key for sideloaded builds (private repo). Use a different, secret key for Play Store releases.
+!app/sideload.jks

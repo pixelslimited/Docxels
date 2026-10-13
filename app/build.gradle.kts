@@ -14,16 +14,32 @@ android {
         // minSdk 29 lets us save to Pictures/Downloads through MediaStore with no storage permission.
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
+        // CI bumps this on every build so each new APK installs over the previous one.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = "0.1.0"
-        // OpenCV ships native libraries per ABI; keep the APK to the ABIs real phones/emulators use.
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+        // OpenCV and ML Kit ship native libraries per ABI, and that is most of the app's size.
+        // Every phone made in the last ~8 years is arm64; add "armeabi-v7a" back only for very old phones.
+        ndk { abiFilters += listOf("arm64-v8a") }
+    }
+
+    signingConfigs {
+        // One fixed key so every build (local or CI) can be installed over the previous one.
+        // This is for sideloading only; Play Store uploads need their own secret key.
+        create("sideload") {
+            storeFile = file("sideload.jks")
+            storePassword = "docscan"
+            keyAlias = "docscan"
+            keyPassword = "docscan"
+        }
     }
 
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("sideload") }
         release {
-            // Turn minification on (and add keep rules for OpenCV/ML Kit) before a Play Store release.
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("sideload")
         }
     }
 
@@ -33,7 +49,11 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
-    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
+    packaging {
+        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+        // Compress native libraries inside the APK (much smaller download than the uncompressed default).
+        jniLibs { useLegacyPackaging = true }
+    }
 }
 
 dependencies {
