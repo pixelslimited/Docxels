@@ -13,9 +13,9 @@ Offline document scanner for Android (Kotlin, Jetpack Compose, Material 3). Phot
 | --- | --- |
 | Capture | CameraX live preview with a **live page outline**, flash, batch capture, import from gallery (system photo picker, no permission) |
 | Edges | **Auto** detection (OpenCV: Canny + contour quad, with an Otsu fallback) and **manual** editing: 4 corner handles + 4 side handles that move a whole edge |
-| Straighten | Perspective warp to a flat rectangle, rotate in 90° steps |
+| Straighten | Perspective warp to a flat rectangle, text-tilt levelling, **curled/wavy paper flattening** (needs several text lines), rotate in 90° steps |
 | Look | Original / **Color** (enhances without shifting colours: lightness-only CLAHE + sharpen) / Gray / **B&W** (adaptive threshold); shadow and uneven-light removal; auto levels; brightness and contrast sliders; apply one look to all pages |
-| Hand removal | **Auto** (skin-colour blobs touching the page edge, then inpainting) and **brush** (paint over anything the auto mode missed) |
+| Clean-up | **Auto-clean** removes hands/fingers, pens and other objects, staple pins and folded corners/edges (filled with the surrounding paper colour) and **brush** (paint over anything it missed) |
 | Arrange | **Manual**: move earlier/later, rotate, delete. **Auto**: fixes upright orientation by OCR and sorts by printed page numbers when most pages have one |
 | Export | Whole document to **PDF** (A4 or fit-width), **Word** (editable text read by OCR), **JPEG/PNG** per page. Share sheet or save to Downloads/Pictures |
 | Tables | Finds ruled tables, reads cell text (OCR), lets you correct cells, exports to **Excel (.xlsx)**, **Word table**, **PDF** or **image** |

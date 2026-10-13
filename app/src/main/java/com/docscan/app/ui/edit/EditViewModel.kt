@@ -145,9 +145,9 @@ class EditViewModel(
     fun autoRemoveHand() {
         val p = page.value ?: return
         viewModelScope.launch {
-            _busyLabel.value = "Looking for a hand…"
-            val outcome = clean(p) { base ->
-                val detection = HandRemover.detectSkinMask(base)
+            _busyLabel.value = "Cleaning the page…"
+            val outcome = clean(p, repair = HandRemover::fillPaper) { base ->
+                val detection = HandRemover.detectJunkMask(base)
                 if (detection.coverage < MIN_HAND_COVERAGE) {
                     detection.mask.release()
                     null
@@ -155,7 +155,11 @@ class EditViewModel(
                     detection.mask
                 }
             }
-            finishClean(p, outcome, "Hand removed.", "No hand found at the page edge. Paint over it with the brush instead.")
+            finishClean(
+                p, outcome,
+                "Cleaned: hands, objects, staples and folded edges removed.",
+                "Nothing found to remove. Paint over it with the brush instead.",
+            )
         }
     }
 
@@ -177,13 +181,17 @@ class EditViewModel(
         viewModelScope.launch { repo.setCleaned(p, null) }
     }
 
-    private suspend fun clean(p: PageEntity, makeMask: (Mat) -> Mat?): CleanOutcome =
+    private suspend fun clean(
+        p: PageEntity,
+        repair: (Mat, Mat) -> Mat = HandRemover::inpaint,
+        makeMask: (Mat) -> Mat?,
+    ): CleanOutcome =
         withContext(Dispatchers.Default) {
             val base = container.renderer.warpedBase(p, CLEAN_SIDE) ?: return@withContext CleanOutcome.Failed
             try {
                 val mask = makeMask(base) ?: return@withContext CleanOutcome.NothingFound
                 try {
-                    val repaired = HandRemover.inpaint(base, mask)
+                    val repaired = repair(base, mask)
                     try {
                         CleanOutcome.Done(repaired.toBitmap())
                     } finally {

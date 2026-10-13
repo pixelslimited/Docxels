@@ -239,13 +239,13 @@ private fun CleanTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
         }
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(
-                "Auto-remove looks for a hand at the page edge. If it misses, paint over the hand or finger with your finger, then tap Remove painted area.",
+                "Auto-clean removes hands and fingers, pens and other objects, staple pins and folded corners at the page edge. If it misses something, paint over it with your finger, then tap Remove painted area.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Text("Brush size", style = MaterialTheme.typography.labelMedium)
             Slider(value = brush, onValueChange = { brush = it }, valueRange = 0.01f..0.08f)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = vm::autoRemoveHand, modifier = Modifier.weight(1f)) { Text("Auto-remove hand") }
+                Button(onClick = vm::autoRemoveHand, modifier = Modifier.weight(1f)) { Text("Auto-clean") }
                 Button(
                     onClick = {
                         vm.removePainted(strokes, brush)

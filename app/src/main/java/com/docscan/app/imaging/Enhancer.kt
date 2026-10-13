@@ -13,7 +13,7 @@ enum class DocMode(val label: String) {
     ORIGINAL("Original"),
     COLOR("Color"),
     GRAYSCALE("Gray"),
-    BLACK_WHITE("B&W"),
+    BLACK_WHITE("B&W copy"),
 }
 
 data class EnhanceSettings(
@@ -37,15 +37,18 @@ object Enhancer {
             cur = next
         }
 
-        if (s.removeShadows) swap(flattenIllumination(cur))
+        // The photocopy filter estimates the paper itself, so the shadow step is only for the other looks.
+        if (s.removeShadows && s.mode != DocMode.BLACK_WHITE) swap(flattenIllumination(cur))
         when (s.mode) {
             DocMode.ORIGINAL -> Unit
             DocMode.COLOR -> swap(enhanceColor(cur))
             DocMode.GRAYSCALE -> swap(toGrayRgb(cur))
-            DocMode.BLACK_WHITE -> swap(binarize(cur))
+            DocMode.BLACK_WHITE -> swap(binarize(cur, s.brightness))
         }
         if (s.autoLevels && s.mode != DocMode.BLACK_WHITE) swap(autoLevels(cur))
-        if (s.brightness != 0 || s.contrast != 1f) swap(brightnessContrast(cur, s.brightness, s.contrast))
+        if (s.mode != DocMode.BLACK_WHITE && (s.brightness != 0 || s.contrast != 1f)) {
+            swap(brightnessContrast(cur, s.brightness, s.contrast))
+        }
         return cur
     }
 
@@ -128,21 +131,72 @@ object Enhancer {
         return out
     }
 
-    /** Crisp black text on white using a local (adaptive) threshold. */
-    fun binarize(rgb: Mat): Mat {
+    /**
+     * Photocopy look: pure white paper, solid black ink, no speckle, no shadows or page-edge dark lines.
+     * The paper brightness is estimated per area and divided out, so a shaded corner is cut exactly like
+     * a bright one. Large dark areas (bands, stamps) stay solid black, like on a real copier.
+     * [brightness] (-100..100) moves the cut: positive = lighter copy (fainter marks disappear).
+     */
+    fun binarize(rgb: Mat, brightness: Int = 0): Mat {
         val gray = Mat()
         Imgproc.cvtColor(rgb, gray, Imgproc.COLOR_RGB2GRAY)
-        Imgproc.medianBlur(gray, gray, 3)
-        var block = (min(gray.cols(), gray.rows()) / 25).coerceIn(15, 61)
-        if (block % 2 == 0) block += 1
-        val bw = Mat()
-        Imgproc.adaptiveThreshold(
-            gray, bw, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY, block, 14.0,
-        )
+        val g32 = Mat()
+        gray.convertTo(g32, CvType.CV_32F)
+
+        val small = Mat()
+        Imgproc.resize(g32, small, Size(), 0.125, 0.125, Imgproc.INTER_AREA)
+        var k = (min(small.cols(), small.rows()) * 0.06).toInt().coerceAtLeast(7)
+        if (k % 2 == 0) k += 1
+        Imgproc.dilate(small, small, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(k.toDouble(), k.toDouble())))
+        Imgproc.GaussianBlur(small, small, Size(0.0, 0.0), k / 2.5)
+        val paperLevel = Core.minMaxLoc(small).maxVal
+        val background = Mat()
+        Imgproc.resize(small, background, g32.size(), 0.0, 0.0, Imgproc.INTER_CUBIC)
+        Core.max(background, Scalar.all(max(40.0, 0.6 * paperLevel)), background)
+
+        // 1.0 = paper. Scaled so paper sits at 200 in an 8-bit image.
+        val ratio = Mat()
+        Core.divide(g32, background, ratio, 200.0)
+        val r8 = Mat()
+        ratio.convertTo(r8, CvType.CV_8U)
+
+        val scratch = Mat()
+        val otsu = Imgproc.threshold(r8, scratch, 0.0, 255.0, Imgproc.THRESH_BINARY or Imgproc.THRESH_OTSU)
+        val cut = (otsu.coerceIn(110.0, 175.0) + brightness * 0.4).coerceIn(60.0, 200.0)
+        // A touch of blur before the cut makes strokes solid instead of jagged.
+        Imgproc.GaussianBlur(r8, r8, Size(0.0, 0.0), 0.8)
+        val ink = Mat()
+        Imgproc.threshold(r8, ink, cut, 255.0, Imgproc.THRESH_BINARY_INV)
+
+        // Drop specks (dust, sensor noise) smaller than a printed dot.
+        val w = ink.cols()
+        val h = ink.rows()
+        val labels = Mat()
+        val stats = Mat()
+        val centroids = Mat()
+        val count = Imgproc.connectedComponentsWithStats(ink, labels, stats, centroids, 8, CvType.CV_32S)
+        val statData = IntArray(count * 5)
+        stats.get(0, 0, statData)
+        val minArea = max(6, (10.0 * (w / 2000.0) * (w / 2000.0)).toInt())
+        val keep = BooleanArray(count) { it > 0 && statData[it * 5 + Imgproc.CC_STAT_AREA] >= minArea }
+        val labelData = IntArray(w * h)
+        labels.get(0, 0, labelData)
+        val pixels = ByteArray(w * h)
+        for (i in pixels.indices) pixels[i] = if (keep[labelData[i]]) 0.toByte() else 255.toByte()
+
+        // The outermost strip is page edge and table shadow, never content.
+        val border = max(2, (min(w, h) * 0.006).toInt())
+        for (y in 0 until h) {
+            val inBand = y < border || y >= h - border
+            for (x in 0 until w) {
+                if (inBand || x < border || x >= w - border) pixels[y * w + x] = 255.toByte()
+            }
+        }
+        val bw = Mat(h, w, CvType.CV_8UC1)
+        bw.put(0, 0, pixels)
         val out = Mat()
         Imgproc.cvtColor(bw, out, Imgproc.COLOR_GRAY2RGB)
-        gray.release()
-        bw.release()
+        listOf(gray, g32, small, background, ratio, r8, scratch, ink, labels, stats, centroids, bw).forEach { it.release() }
         return out
     }
 
