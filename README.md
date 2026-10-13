@@ -2,9 +2,10 @@
 
 Offline document scanner for Android (Kotlin, Jetpack Compose, Material 3). Photograph or import a page, straighten it, clean it up, then share it as PDF, Word, image, or pull a table out into Excel/Word.
 
-## Status: written, NOT yet built or run
+## Status
 
-This code was written in an environment with no Android SDK, no Gradle plugin downloads and no device, so **nothing here has been compiled, tested or run**. Treat it as a complete first draft that needs its first build. Expect to fix a few compile errors or version mismatches on the first sync (see "First build" below). Dependency versions were chosen from memory and are not verified against the current Maven repositories.
+- **Verified by CI (GitHub Actions, run 38363819812):** the project compiles, the unit tests for the pure-logic code pass, and a debug APK is produced.
+- **Not yet verified:** behaviour on a real phone. Camera capture, edge detection, filters, hand removal, OCR/table reading and the exported PDF/Word/Excel files have not been run or opened by anyone yet. Expect to find bugs and quality issues when you first try it on real documents; report them and they can be fixed one by one.
 
 ## Features (implemented in code, unverified on a device)
 
