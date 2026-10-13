@@ -244,9 +244,10 @@ private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean
             }
             when (options.format) {
                 DocFormat.PDF -> SwitchRow("Fit pages to A4", options.a4) { options = options.copy(a4 = it) }
-                DocFormat.WORD -> SwitchRow("Editable text (OCR) instead of page pictures", options.editableText) {
-                    options = options.copy(editableText = it)
-                }
+                DocFormat.WORD -> Text(
+                    "Text is read from each page (OCR) so you can edit it in Word.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 else -> Text("One image file per page.", style = MaterialTheme.typography.bodySmall)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {

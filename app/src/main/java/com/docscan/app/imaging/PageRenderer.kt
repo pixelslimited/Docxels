@@ -51,7 +51,10 @@ class PageRenderer(private val store: FileStore) {
             if (source == null) original.recycle()
             val warped = Warper.warp(mat, page.cornerList(), maxSide)
             mat.release()
-            warped
+            // Level any remaining tilt of the text lines after the perspective fix.
+            val level = Deskew.apply(warped)
+            warped.release()
+            level
         }
 
     /** Small cached rendering for lists and grids. */

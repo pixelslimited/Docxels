@@ -19,7 +19,6 @@ import com.docscan.app.imaging.PageRenderer
 import com.docscan.app.ocr.OcrEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
@@ -43,8 +42,6 @@ data class ExportOptions(
     val format: DocFormat = DocFormat.PDF,
     /** PDF only: fit pages onto A4 sheets instead of using the scan's own proportions. */
     val a4: Boolean = true,
-    /** Word only: recognised, editable text (OCR) instead of page pictures. */
-    val editableText: Boolean = false,
 )
 
 class ExportResult(val files: List<File>, val mime: String)
@@ -62,8 +59,8 @@ class ExportManager(
         val base = safeName(name)
         return when (options.format) {
             DocFormat.PDF -> ExportResult(listOf(pdf(pages, base, options.a4)), Mime.PDF)
-            DocFormat.WORD ->
-                ExportResult(listOf(if (options.editableText) wordText(pages, base) else wordImages(pages, base)), Mime.DOCX)
+            // Word is always recognised, editable text (OCR); page pictures are what PDF and image export are for.
+            DocFormat.WORD -> ExportResult(listOf(wordText(pages, base)), Mime.DOCX)
             DocFormat.JPEG -> ExportResult(images(pages, base, png = false), Mime.JPEG)
             DocFormat.PNG -> ExportResult(images(pages, base, png = true), Mime.PNG)
         }
@@ -104,17 +101,6 @@ class ExportManager(
         canvas.drawBitmap(bitmap, null, RectF(left, top, left + w, top + h), Paint(Paint.FILTER_BITMAP_FLAG))
         document.finishPage(page)
     }
-
-    private suspend fun wordImages(pages: List<PageEntity>, base: String): File =
-        withContext(Dispatchers.IO) {
-            val docx = DocxBuilder()
-            for (page in pages) {
-                val bitmap = renderer.render(page, WORD_SIDE)
-                docx.addImagePage(jpegBytes(bitmap, 85), bitmap.width, bitmap.height, "jpg")
-                bitmap.recycle()
-            }
-            File(dir, "$base.docx").also { file -> FileOutputStream(file).use { docx.writeTo(it) } }
-        }
 
     private suspend fun wordText(pages: List<PageEntity>, base: String): File =
         withContext(Dispatchers.IO) {
@@ -215,15 +201,11 @@ class ExportManager(
         dir.listFiles()?.forEach { it.delete() }
     }
 
-    private fun jpegBytes(bitmap: Bitmap, quality: Int): ByteArray =
-        ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, quality, it) }.toByteArray()
-
     private fun safeName(name: String): String =
         name.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Scan" }
 
     private companion object {
         const val EXPORT_SIDE = 2400
-        const val WORD_SIDE = 2000
         const val OCR_SIDE = 2200
     }
 }

@@ -1,7 +1,9 @@
 package com.docscan.app.imaging
 
 import org.opencv.core.Core
+import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import kotlin.math.max
@@ -58,16 +60,28 @@ object Enhancer {
         Core.split(lab, channels)
         val lightness = channels[0]
 
+        val small8 = Mat()
+        Imgproc.resize(lightness, small8, Size(), 0.125, 0.125, Imgproc.INTER_AREA)
         val small = Mat()
-        Imgproc.resize(lightness, small, Size(), 0.125, 0.125, Imgproc.INTER_AREA)
-        // Max filter removes thin dark text from the estimate; blur smooths the result.
-        Imgproc.dilate(small, small, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(5.0, 5.0)))
-        Imgproc.GaussianBlur(small, small, Size(9.0, 9.0), 0.0)
+        small8.convertTo(small, CvType.CV_32F)
+        // The max filter must be wider than thin text but not so wide that it ignores real shadows.
+        var k = (min(small.cols(), small.rows()) * 0.12).toInt().coerceAtLeast(7)
+        if (k % 2 == 0) k += 1
+        Imgproc.dilate(small, small, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(k.toDouble(), k.toDouble())))
+        Imgproc.GaussianBlur(small, small, Size(0.0, 0.0), k / 2.5)
         val background = Mat()
-        Imgproc.resize(small, background, lightness.size(), 0.0, 0.0, Imgproc.INTER_LINEAR)
+        Imgproc.resize(small, background, lightness.size(), 0.0, 0.0, Imgproc.INTER_CUBIC)
+        // Floor the paper estimate: large dark areas (colour bands, photos, logos) must keep their colour
+        // instead of being "corrected" to white, while ordinary shadows are still lifted.
+        val paperLevel = Core.minMaxLoc(small).maxVal
+        Core.max(background, Scalar.all(max(60.0, 0.6 * paperLevel)), background)
 
+        val lightness32 = Mat()
+        lightness.convertTo(lightness32, CvType.CV_32F)
+        val ratio = Mat()
+        Core.divide(lightness32, background, ratio, 255.0)
         val flattened = Mat()
-        Core.divide(lightness, background, flattened, 255.0)
+        ratio.convertTo(flattened, CvType.CV_8U)
         flattened.copyTo(channels[0])
 
         val merged = Mat()
@@ -75,7 +89,7 @@ object Enhancer {
         val out = Mat()
         Imgproc.cvtColor(merged, out, Imgproc.COLOR_Lab2RGB)
 
-        listOf(lab, small, background, flattened, merged).forEach { it.release() }
+        listOf(lab, small8, small, background, lightness32, ratio, flattened, merged).forEach { it.release() }
         channels.forEach { it.release() }
         return out
     }
