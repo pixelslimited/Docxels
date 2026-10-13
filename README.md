@@ -32,7 +32,7 @@ Everything runs on the phone. No account, no internet, only the camera permissio
 
 ## Get the APK from GitHub (no Android Studio needed)
 
-Every push to `main` runs the **Build APK** workflow (`.github/workflows/build-apk.yml`): it runs the unit tests, builds a debug APK and uploads it. Open the repo's **Actions** tab, pick the latest run, and download the `DocScan-debug-apk` artifact (a zip containing `app-debug.apk`). Copy the APK to your phone and install it (allow "install unknown apps" for your file manager or browser). If the run is red, open it and read the failing step; the first run is expected to need a few fixes (see status above).
+Every push to `main` runs the **Build APK** workflow (`.github/workflows/build-apk.yml`): it runs the unit tests, builds a debug APK and uploads it. The APK is published on the repo's **Releases** page as `DocScan-debug.apk` (release "latest"), so you can download it directly on your phone. It is also kept as the `DocScan-debug-apk` artifact on the run page in the **Actions** tab (a zip containing `app-debug.apk`). Copy the APK to your phone and install it (allow "install unknown apps" for your file manager or browser). If the run is red, open it and read the failing step; the first run is expected to need a few fixes (see status above).
 
 ## Build locally
 
