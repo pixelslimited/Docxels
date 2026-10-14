@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app has no internet permission today; if networking is ever added it must use HTTPS with system-trusted certificates. -->
+<!-- Networking is used only by the update checker. HTTPS only, system-trusted certificates. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>

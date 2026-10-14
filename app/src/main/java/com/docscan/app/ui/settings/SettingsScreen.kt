@@ -147,8 +147,8 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             HorizontalDivider()
             InfoRow(
                 "How your documents are protected",
-                "Pages are encrypted on this phone with a key held in the Android Keystore. Docxels has no internet " +
-                    "permission, so nothing is uploaded. Backups of app data are switched off. This keeps casual access " +
+                "Pages are encrypted on this phone with a key held in the Android Keystore. Docxels never uploads your documents: " +
+                    "its only network use is the update check you start yourself. Backups of app data are switched off. This keeps casual access " +
                     "and stolen-storage attacks out; it can't protect a phone that is already unlocked, rooted or infected.",
             )
 
@@ -158,11 +158,14 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 Text("Clear temporary files")
             }
 
+            Section("App updates")
+            UpdatePanel()
+
             Section("About")
             InfoRow("Docxels", "Version ${versionName(context)} · by Pixels Limited")
             InfoRow(
                 "Privacy",
-                "Scanning, text recognition and exports all run on this phone. Files you export or share leave the app only where you send them.",
+                "Scanning, text recognition and exports all run on this phone. Files you export or share leave the app only where you send them. The only network use is checking for and downloading app updates when you ask.",
             )
         }
     }

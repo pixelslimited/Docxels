@@ -16,7 +16,7 @@ android {
         targetSdk = 35
         // CI bumps this on every build so each new APK installs over the previous one.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-        versionName = "0.1.0"
+        versionName = "0.2." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
         // OpenCV and ML Kit ship native libraries per ABI, and that is most of the app's size.
         // Every phone made in the last ~8 years is arm64; add "armeabi-v7a" back only for very old phones.
         ndk { abiFilters += listOf("arm64-v8a") }

@@ -128,3 +128,9 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | PDF viewer (scroll, page counter, share) | IMPLEMENTED — NOT VERIFIED | `PdfRenderer`; no pinch-zoom, no text search, no annotation yet. |
 | Merge / Split / Rotate / Reorder / Protect screens | IMPLEMENTED — NOT VERIFIED | Results are shared or saved to Downloads/DocScan. Not stored in the library yet. |
 | Compress, PDF to Word, sign, fill form, annotate | NOT STARTED | Still marked Soon. |
+
+## In-app updates (added)
+| Feature | Status | Notes |
+|---|---|---|
+| Settings > App updates: check, download, verify SHA-256, install | IMPLEMENTED — NOT VERIFIED | `update/Updater.kt`. Parsing and host allow-list tested (`UpdateInfoTest`). Install flow needs a phone. Adds INTERNET + REQUEST_INSTALL_PACKAGES; CI now only checks networking code stays inside `update/`. Privacy policy updated. |
+| Automatic publishing of each build to the update feed | BLOCKED | Needs repo secret `SITE_TOKEN`; until then `scripts/publish-update.sh` is run manually. |

@@ -80,11 +80,11 @@ jobs:
             unzip -v "$APK" | awk 'NR>3 && NF>=8 {print $3, $8}' | sort -rn | head -12
           } | tee size.txt
 
-      # Docxels promises "no internet access". Fail the build if a library sneaks the permission back in.
-      - name: Check the APK has no network permission
+      # Networking is allowed only for the user-initiated update check. Fail if network code appears anywhere else.
+      - name: Check networking is confined to the updater
         run: |
-          if "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest permissions app/build/outputs/apk/release/app-release.apk | grep -q "INTERNET"; then
-            echo "::error::The APK requests INTERNET, but the app promises to work offline only."
+          if grep -rEl "HttpURLConnection|java\.net\.URL|okhttp3|openConnection" app/src/main/java | grep -v "/update/"; then
+            echo "::error::Network code found outside com.docscan.app.update."
             exit 1
           fi
 
@@ -115,6 +115,16 @@ jobs:
             --notes-file notes.md \
             --target "$GITHUB_SHA" \
             --latest
+
+      # Publishes the APK + update.json on the public site repo so the app's "Check for updates" can find it.
+      # Needs a repository secret SITE_TOKEN (a token with write access to iCode010101/docxels-site). Skipped if absent.
+      - name: Publish update for the in-app updater
+        if: github.event_name != 'pull_request' && env.SITE_TOKEN != ''
+        env:
+          SITE_TOKEN: ${{ secrets.SITE_TOKEN }}
+          GH_TOKEN: ${{ secrets.SITE_TOKEN }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: bash scripts/publish-update.sh Docxels.apk "$RUN_NUMBER"
 
       - name: Upload test reports
         if: always()

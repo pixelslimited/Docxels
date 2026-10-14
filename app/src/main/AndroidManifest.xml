@@ -5,9 +5,10 @@
     <!-- Only permission needed: live camera. Gallery import uses the system photo picker (no permission),
          and saving uses MediaStore (no storage permission on Android 10+). -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Docxels works fully offline. Libraries (ML Kit / Play services) ask for network access by default; remove it
-         so nothing can be sent off the phone. Re-add deliberately if an online feature is ever built. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- Network is used for exactly one thing: the user-initiated "Check for updates" in Settings (see update/Updater.kt).
+         Scanning, OCR, editing and exports never touch the network. CI fails if networking code appears outside update/. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
     <uses-feature
         android:name="android.hardware.camera"
