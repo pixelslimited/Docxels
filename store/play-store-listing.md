@@ -8,7 +8,7 @@ Only publish claims that are true of the build you upload. Items marked (soon) m
 
 **Category:** Business (alternative: Productivity)
 **Tags to pick in Play Console:** Document scanner, Productivity, Business tools
-**Contact details required by Play:** support email, website (the docs/ site), privacy policy URL (docs/privacy.html)
+**Contact details required by Play:** support email (docxels@pixelslimited.ng), website (the docs/ site), privacy policy URL (docs/privacy.html)
 
 ## Full description (4000 max)
 
