@@ -152,6 +152,19 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                     "and stolen-storage attacks out; it can't protect a phone that is already unlocked, rooted or infected.",
             )
 
+            Section("Device check")
+            val findings = remember { com.docscan.app.security.DeviceIntegrity.check(context) }
+            if (findings.isEmpty()) {
+                InfoRow("No warning signs", "No root tools or debugging were detected. This check is a hint, not a guarantee.")
+            } else {
+                findings.forEach { InfoRow("Warning", it) }
+                Text(
+                    "On a rooted or modified phone, other apps may be able to read Docxels data. Avoid keeping sensitive documents here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
             Section("Storage")
             InfoRow("Used by Docxels", usage ?: "Calculating…")
             OutlinedButton(onClick = { confirmClear = true }, modifier = Modifier.padding(top = 4.dp)) {

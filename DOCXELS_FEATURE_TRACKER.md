@@ -134,3 +134,11 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 |---|---|---|
 | Settings > App updates: check, download, verify SHA-256, install | IMPLEMENTED — NOT VERIFIED | `update/Updater.kt`. Parsing and host allow-list tested (`UpdateInfoTest`). Install flow needs a phone. Adds INTERNET + REQUEST_INSTALL_PACKAGES; CI now only checks networking code stays inside `update/`. Privacy policy updated. |
 | Automatic publishing of each build to the update feed | BLOCKED | Needs repo secret `SITE_TOKEN`; until then `scripts/publish-update.sh` is run manually. |
+
+## Security hardening (added)
+| Feature | Status | Notes |
+|---|---|---|
+| Update APK must match SHA-256 AND the installed app's signing certificate | IMPLEMENTED — NOT VERIFIED | Needs a real update to prove. |
+| Wipe PDF working copies and old updates (on leaving a tool and at start-up) | IMPLEMENTED — NOT VERIFIED | |
+| Device check (root tools, test-keys, debugger) shown in Settings | IMPLEMENTED — NOT VERIFIED | Heuristic only; logic tested in `DeviceIntegrityTest`. Bypassable. |
+| Replace committed signing key with a private CI secret | NOT STARTED | Required before Google Play; anyone with repo access can sign an app as Docxels today. |

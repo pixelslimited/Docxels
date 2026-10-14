@@ -223,6 +223,6 @@ class PdfViewModel(private val container: AppContainer, appContext: Context) : V
     }
 
     override fun onCleared() {
-        work.listFiles()?.forEach { it.delete() }
+        work.listFiles()?.forEach { com.docscan.app.security.SecureFiles.wipe(it) }
     }
 }

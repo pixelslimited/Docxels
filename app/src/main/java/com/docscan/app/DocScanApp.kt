@@ -35,6 +35,8 @@ class DocScanApp : Application() {
             SecureFiles.migrate(File(filesDir, "docs"))
             cacheDir.listFiles()?.filter { it.isFile && it.name.startsWith("capture") }?.forEach { SecureFiles.wipe(it) }
             container.exporter.clearCache()
+            // Unlocked/working copies of PDFs and old downloaded updates must not outlive the session.
+            listOf("pdfwork", "updates").forEach { n -> File(cacheDir, n).listFiles()?.forEach { SecureFiles.wipe(it) } }
         }
     }
 

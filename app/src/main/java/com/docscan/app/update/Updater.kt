@@ -56,9 +56,24 @@ class Updater(private val context: Context) {
         val hex = digest.digest().joinToString("") { "%02x".format(it) }
         if (hex != info.sha256 || out.length() != info.size) {
             out.delete()
-            error("The downloaded file did not match, so it was discarded.")
+            error("The download did not match its fingerprint, so it was discarded.")
+        }
+        if (!sameSigner(out)) {
+            out.delete()
+            error("The downloaded file is not signed by Pixels Limited, so it was discarded.")
         }
         out
+    }
+
+    /** The downloaded APK must carry exactly the signing certificate of the installed app. */
+    private fun sameSigner(apk: File): Boolean {
+        val pm = context.packageManager
+        val flags = android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+        val mine = pm.getPackageInfo(context.packageName, flags).signingInfo?.apkContentsSigners ?: return false
+        val theirs = pm.getPackageArchiveInfo(apk.absolutePath, flags)?.signingInfo?.apkContentsSigners ?: return false
+        val a = mine.map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).toList() }.toSet()
+        val b = theirs.map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).toList() }.toSet()
+        return a.isNotEmpty() && a == b
     }
 
     /** True if Android lets Docxels start an install. If not, opens the settings page where the user allows it. */
