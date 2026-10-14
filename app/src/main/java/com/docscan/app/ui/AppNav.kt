@@ -85,6 +85,7 @@ fun AppNav(container: AppContainer) {
                 onBack = { nav.popBackStack() },
                 onAddPages = { nav.navigate("scan/$docId") },
                 onEditPage = { pageId -> nav.navigate("edit/$docId/$pageId") },
+                onOpenWord = { id -> nav.navigate("write/$id") },
             )
         }
         composable(EDIT) { entry ->

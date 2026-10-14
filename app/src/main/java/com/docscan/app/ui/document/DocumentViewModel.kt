@@ -91,6 +91,24 @@ class DocumentViewModel(private val container: AppContainer, private val docId: 
         }
     }
 
+    /** OCRs every page into an editable Word document and opens it in the editor. */
+    fun convertToWord(onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            val current = repo.pages(docId)
+            val name = document.value?.name ?: "Scan"
+            runCatching {
+                container.scanToWord.convert(current, name) { n, total -> _busyLabel.value = "Reading page $n of $total…" }
+            }.onSuccess { doc ->
+                val id = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { container.words.add(doc) }
+                _busyLabel.value = null
+                onDone(id)
+            }.onFailure {
+                _busyLabel.value = null
+                events.send(UiEvent.Message("Could not convert to a Word document."))
+            }
+        }
+    }
+
     fun export(options: ExportOptions, save: Boolean) {
         viewModelScope.launch {
             val current = repo.pages(docId)

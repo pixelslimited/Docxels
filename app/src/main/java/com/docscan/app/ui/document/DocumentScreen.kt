@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.RotateRight
@@ -69,6 +70,7 @@ fun DocumentScreen(
     onBack: () -> Unit,
     onAddPages: () -> Unit,
     onEditPage: (String) -> Unit,
+    onOpenWord: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val document by vm.document.collectAsState()
@@ -104,6 +106,9 @@ fun DocumentScreen(
                 actions = {
                     IconButton(onClick = vm::autoArrange, enabled = pages.isNotEmpty()) {
                         Icon(Icons.Default.AutoFixHigh, contentDescription = "Auto-arrange pages")
+                    }
+                    IconButton(onClick = { vm.convertToWord(onOpenWord) }, enabled = pages.isNotEmpty() && busyLabel == null) {
+                        Icon(Icons.Default.Description, contentDescription = "Convert to an editable Word document")
                     }
                     IconButton(onClick = { showExport = true }, enabled = pages.isNotEmpty()) {
                         Icon(Icons.Default.Share, contentDescription = "Export or share")

@@ -78,5 +78,13 @@ class WordStore(context: Context) {
         id
     }
 
+    /** Stores a document built in memory (for example from a scan). */
+    fun add(doc: WordDoc): String = synchronized(lock) {
+        val id = UUID.randomUUID().toString()
+        SecureFiles.write(file(id), DocxWriter.toBytes(doc))
+        writeIndex(_items.value + WordItem(id, doc.title, System.currentTimeMillis()))
+        id
+    }
+
     fun docxBytes(id: String): ByteArray? = SecureFiles.read(file(id))
 }
