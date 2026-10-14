@@ -702,8 +702,51 @@ object ChipLimits {
 class BlockChipSpan(
     val index: Int,
     val label: String,
-    val block: com.docscan.app.core.word.Block? = null,
+    /** Mutable so a floating picture or shape can be dragged without rebuilding the text. */
+    var block: com.docscan.app.core.word.Block? = null,
 ) : android.text.style.ReplacementSpan() {
+    /** True for pictures and shapes set to "in front of" / "behind" the text: they float freely and take no room. */
+    val floating: Boolean get() = when (val b = block) {
+        is com.docscan.app.core.word.Block.Image -> b.image.wrap.floating
+        is com.docscan.app.core.word.Block.Shape -> b.shape.wrap.floating
+        else -> false
+    }
+
+    val behindText: Boolean get() = when (val b = block) {
+        is com.docscan.app.core.word.Block.Image -> b.image.wrap == com.docscan.app.core.word.ImageWrap.BEHIND
+        is com.docscan.app.core.word.Block.Shape -> b.shape.wrap == com.docscan.app.core.word.ImageWrap.BEHIND
+        else -> false
+    }
+
+    /** Offset from the left margin / anchor line, in twips. */
+    fun offsetTwips(): Pair<Int, Int> = when (val b = block) {
+        is com.docscan.app.core.word.Block.Image -> b.image.offsetXTwips to b.image.offsetYTwips
+        is com.docscan.app.core.word.Block.Shape -> b.shape.offsetXTwips to b.shape.offsetYTwips
+        else -> 0 to 0
+    }
+
+    fun withOffset(x: Int, y: Int): com.docscan.app.core.word.Block? = when (val b = block) {
+        is com.docscan.app.core.word.Block.Image -> com.docscan.app.core.word.Block.Image(b.image.copy(offsetXTwips = x, offsetYTwips = y))
+        is com.docscan.app.core.word.Block.Shape -> com.docscan.app.core.word.Block.Shape(b.shape.copy(offsetXTwips = x, offsetYTwips = y))
+        else -> null
+    }
+
+    fun floatSizePx(paint: Paint): Pair<Int, Int>? {
+        val w = widthPx(paint) ?: return null
+        val h = heightPx(paint) ?: return null
+        return w to h
+    }
+
+    fun drawFloating(c: Canvas, left: Float, top: Float, paint: Paint) {
+        val (w, h) = floatSizePx(paint) ?: return
+        when (val b = block) {
+            is com.docscan.app.core.word.Block.Image -> drawImage(c, b.image, left, top.toInt(), (top + h).toInt(), paint)
+            is com.docscan.app.core.word.Block.Shape ->
+                com.docscan.app.export.ShapeDraw.draw(c, b.shape, android.graphics.RectF(left, top, left + w, top + h), pxPerTwip(paint) * 20f)
+            else -> {}
+        }
+    }
+
     private var bitmap: android.graphics.Bitmap? = null
     private var decoded = false
 
@@ -749,6 +792,11 @@ class BlockChipSpan(
     private fun widthPx(paint: Paint): Int? = naturalWidthTwips()?.let { (it * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8) }
 
     override fun getSize(paint: Paint, text: CharSequence?, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
+        if (floating) {
+            // The anchor of a floating object is a hairline: it takes no visible room in the text.
+            if (fm != null) { fm.ascent = -1; fm.top = -1; fm.descent = 0; fm.bottom = 0 }
+            return 1
+        }
         val h = heightPx(paint)
         if (h != null && fm != null) {
             fm.ascent = -h
@@ -760,6 +808,7 @@ class BlockChipSpan(
     }
 
     override fun draw(c: Canvas, text: CharSequence?, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
+        if (floating) return
         when (val b = block) {
             is com.docscan.app.core.word.Block.Image -> drawImage(c, b.image, x, top, bottom, paint)
             is com.docscan.app.core.word.Block.Shape -> {

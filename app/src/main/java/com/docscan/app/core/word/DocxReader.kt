@@ -683,6 +683,23 @@ object DocxReader {
                 }
             }
 
+            /** Offsets of a floating object from the left margin and the anchor paragraph's top, in twips. */
+            fun offsetsOf(drawing: XNode, wTwips: Int): Pair<Int, Int> {
+                val anchor = drawing.find("anchor") ?: return 0 to 0
+                fun emu(n: XNode?): Int? = n?.text?.toString()?.trim()?.toLongOrNull()?.let { (it / Twips.EMU_PER_TWIP).toInt() }
+                val ph = anchor.child("positionH")
+                val pv = anchor.child("positionV")
+                val content = page.contentWidthTwips
+                val x = emu(ph?.child("posOffset"))?.let { off -> if (ph?.attr("relativeFrom") == "page") off - page.marginLeftTwips else off }
+                    ?: when (ph?.child("align")?.text?.toString()?.trim()) {
+                        "center" -> (content - wTwips) / 2
+                        "right" -> content - wTwips
+                        else -> 0
+                    }
+                val y = emu(pv?.child("posOffset"))?.let { off -> if (pv?.attr("relativeFrom") == "page") off - page.marginTopTwips else off } ?: 0
+                return x to y
+            }
+
             fun readShape(drawing: XNode, wsp: XNode) {
                 val extent = drawing.find("extent")
                 val cx = extent?.attr("cx")?.toLongOrNull() ?: 0L
@@ -706,6 +723,8 @@ object DocxReader {
                         widthTwips = (cx / Twips.EMU_PER_TWIP).toInt().coerceAtLeast(120),
                         heightTwips = (cy / Twips.EMU_PER_TWIP).toInt().coerceAtLeast(0),
                         fill = fill, lineColor = lineColor, lineWidthPt = lineW, align = base.align, wrap = wrapOf(drawing),
+                        offsetXTwips = offsetsOf(drawing, (cx / Twips.EMU_PER_TWIP).toInt()).first,
+                        offsetYTwips = offsetsOf(drawing, (cx / Twips.EMU_PER_TWIP).toInt()).second,
                     ),
                 )
                 emitted = true
@@ -727,7 +746,8 @@ object DocxReader {
                 val h = if (cy != null && cy > 0) (cy / Twips.EMU_PER_TWIP).toInt() else 3240
                 val wrap = wrapOf(drawing)
                 flush(false)
-                out += Block.Image(ImageBlock(bytes, ext, w.coerceAtLeast(120), h.coerceAtLeast(120), base.align, wrap))
+                val off = if (wrap.floating) offsetsOf(drawing, w) else (0 to 0)
+                out += Block.Image(ImageBlock(bytes, ext, w.coerceAtLeast(120), h.coerceAtLeast(120), base.align, wrap, off.first, off.second))
                 emitted = true
             }
 

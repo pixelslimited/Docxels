@@ -242,6 +242,13 @@ object WordPdf {
                 var h = img.heightTwips / 20f * ZOOM
                 if (w > contentW) { h *= contentW / w; w = contentW }
                 if (h > contentH) { w *= contentH / h; h = contentH }
+                if (img.wrap.floating) {
+                    // Floats where it was dropped, relative to its anchor line, and takes no room in the text.
+                    val fx = (img.offsetXTwips / 20f * ZOOM).coerceIn(0f, maxOf(0f, contentW - w))
+                    val fy = (y + img.offsetYTwips / 20f * ZOOM).coerceIn(0f, maxOf(0f, contentH - h))
+                    inContent(fy) { drawBitmap(bmp, null, RectF(fx, 0f, fx + w, h), Paint(Paint.FILTER_BITMAP_FLAG)) }
+                    return
+                }
                 if (y + h > contentH && y > 0f) newPage()
                 val x = when (img.align) {
                     Align.CENTER -> (contentW - w) / 2f
@@ -262,6 +269,12 @@ object WordPdf {
             var h = (if (com.docscan.app.core.word.ShapePresets.isLine(sh.preset)) 4 else sh.heightTwips) / 20f * ZOOM
             if (w > contentW) { h *= contentW / w; w = contentW }
             if (h > contentH) { w *= contentH / h; h = contentH }
+            if (sh.wrap.floating) {
+                val fx = (sh.offsetXTwips / 20f * ZOOM).coerceIn(0f, maxOf(0f, contentW - w))
+                val fy = (y + sh.offsetYTwips / 20f * ZOOM).coerceIn(0f, maxOf(0f, contentH - h))
+                inContent(fy) { ShapeDraw.draw(this, sh, RectF(fx, 0f, fx + w, h), ZOOM) }
+                return
+            }
             if (y + h > contentH && y > 0f) newPage()
             val x = when (sh.align) {
                 Align.CENTER -> (contentW - w) / 2f

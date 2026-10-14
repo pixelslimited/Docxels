@@ -1,5 +1,6 @@
 package com.docscan.app.ui.write
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -336,9 +337,11 @@ fun ImageEditorDialog(
                         FilterChip(wrap == w, { wrap = w }, label = { Text(w.label) })
                     }
                 }
-                if (wrap != com.docscan.app.core.word.ImageWrap.IN_LINE) {
+                if (wrap.floating) {
+                    Text("Drag the picture anywhere on the page with your finger. Tap it to come back here.", style = MaterialTheme.typography.bodySmall)
+                } else if (wrap != com.docscan.app.core.word.ImageWrap.IN_LINE) {
                     Text(
-                        "Saved in the .docx so Word wraps text around the picture. Here the picture is shown on its own line.",
+                        "Saved in the .docx so Word wraps text around the picture. Here the picture is shown on its own line. Choose In front of text to drag it freely.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -428,9 +431,11 @@ fun ShapeEditorDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                     com.docscan.app.core.word.ImageWrap.entries.forEach { w -> FilterChip(wrap == w, { wrap = w }, label = { Text(w.label) }) }
                 }
-                if (wrap != com.docscan.app.core.word.ImageWrap.IN_LINE) {
+                if (wrap.floating) {
+                    Text("Drag the shape anywhere on the page with your finger. Tap it to come back here.", style = MaterialTheme.typography.bodySmall)
+                } else if (wrap != com.docscan.app.core.word.ImageWrap.IN_LINE) {
                     Text(
-                        "Saved in the .docx so Word wraps text around the shape. Here it is shown on its own line.",
+                        "Saved in the .docx so Word wraps text around the shape. Here it is shown on its own line. Choose In front of text to drag it freely.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -516,5 +521,72 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
                 androidx.compose.material3.TextButton(onClick = onDismiss) { androidx.compose.material3.Text("Cancel") }
             }
         },
+    )
+}
+
+
+/**
+ * One-tap table insertion: a grid of cells; tap (or drag over and release) the corner cell of the size you want.
+ * "Custom size" opens the number steppers for bigger tables.
+ */
+@androidx.compose.runtime.Composable
+fun TablePickerDialog(onPick: (rows: Int, cols: Int, header: Boolean) -> Unit, onCustom: () -> Unit, onDismiss: () -> Unit) {
+    val maxRows = 8
+    val maxCols = 6
+    var hot by remember { mutableStateOf(0 to 0) }
+    var header by remember { mutableStateOf(true) }
+    var boxSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
+    fun cellAt(p: androidx.compose.ui.geometry.Offset): Pair<Int, Int> {
+        val c = (p.x / boxSize.width * maxCols).toInt().coerceIn(0, maxCols - 1) + 1
+        val r = (p.y / boxSize.height * maxRows).toInt().coerceIn(0, maxRows - 1) + 1
+        return r to c
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (hot.first == 0) "Insert table" else "${hot.first} rows × ${hot.second} columns") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Tap the size you want.", style = MaterialTheme.typography.bodyMedium)
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(260.dp)
+                        .onSizeChanged { boxSize = it }
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { p -> val (r, c) = cellAt(p); onPick(r, c, header) })
+                        }
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { hot = cellAt(it) },
+                                onDrag = { change, _ -> change.consume(); hot = cellAt(change.position) },
+                                onDragEnd = { val (r, c) = hot; if (r > 0) onPick(r, c, header) },
+                                onDragCancel = { hot = 0 to 0 },
+                            )
+                        },
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    for (r in 1..maxRows) {
+                        Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            for (c in 1..maxCols) {
+                                val on = r <= hot.first && c <= hot.second
+                                Box(
+                                    Modifier.weight(1f).fillMaxSize()
+                                        .background(
+                                            if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                            androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                        ),
+                                )
+                            }
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(header, { header = it })
+                    Text("Header row")
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onCustom) { Text("Custom size…") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

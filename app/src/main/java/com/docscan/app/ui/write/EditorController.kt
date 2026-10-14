@@ -118,13 +118,22 @@ class RichEditText(context: Context) : EditText(context) {
         }
     }
 
+    private fun drawFloating(canvas: android.graphics.Canvas, behind: Boolean) {
+        for (h in floatingHits()) {
+            if (h.span.behindText != behind) continue
+            h.span.drawFloating(canvas, h.left, h.top, paint)
+        }
+    }
+
     override fun onDraw(canvas: android.graphics.Canvas) {
+        drawFloating(canvas, true)
         val dd = decor
         if (dd != null && (dd.headerPics.isNotEmpty() || dd.footerPics.isNotEmpty())) {
             drawPics(canvas, dd.headerPics, true, dd, false)
             drawPics(canvas, dd.footerPics, true, dd, true)
         }
         super.onDraw(canvas)
+        drawFloating(canvas, false)
         val d = decor ?: return
         drawPics(canvas, d.headerPics, false, d, false)
         drawPics(canvas, d.footerPics, false, d, true)
@@ -173,7 +182,78 @@ class RichEditText(context: Context) : EditText(context) {
         }
     })
 
+    // -- floating pictures and shapes: drawn over / under the text and dragged with a finger --
+
+    /** Called with (block index, new block) while a floating object is dragged and when it is dropped (final = true). */
+    var onFloatMoved: ((Int, com.docscan.app.core.word.Block, Boolean) -> Unit)? = null
+
+    private class Hit(val span: BlockChipSpan, val left: Float, val top: Float, val w: Float, val h: Float)
+
+    private fun floatingHits(): List<Hit> {
+        val l = layout ?: return emptyList()
+        val t = text
+        val k = paint.density * ZOOM / 20f
+        val out = ArrayList<Hit>()
+        for (span in t.getSpans(0, t.length, BlockChipSpan::class.java)) {
+            if (!span.floating) continue
+            val (w, h) = span.floatSizePx(paint) ?: continue
+            val (ox, oy) = span.offsetTwips()
+            val line = l.getLineForOffset(t.getSpanStart(span))
+            out += Hit(span, paddingLeft + ox * k, totalPaddingTop + l.getLineTop(line) + oy * k, w.toFloat(), h.toFloat())
+        }
+        return out
+    }
+
+    private var dragHit: Hit? = null
+    private var dragStartX = 0f
+    private var dragStartY = 0f
+    private var dragBaseX = 0
+    private var dragBaseY = 0
+    private var dragMoved = false
+
     override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (!readOnly) {
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    val hit = floatingHits().lastOrNull { event.x >= it.left && event.x <= it.left + it.w && event.y >= it.top && event.y <= it.top + it.h }
+                    if (hit != null) {
+                        dragHit = hit
+                        dragStartX = event.x
+                        dragStartY = event.y
+                        val (ox, oy) = hit.span.offsetTwips()
+                        dragBaseX = ox
+                        dragBaseY = oy
+                        dragMoved = false
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                        return true
+                    }
+                }
+                android.view.MotionEvent.ACTION_MOVE -> dragHit?.let { h ->
+                    val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+                    // Keep the object inside the page.
+                    val dx = (h.left + event.x - dragStartX).coerceIn(0f, maxOf(0f, width - h.w)) - h.left
+                    val dy = (h.top + event.y - dragStartY).coerceIn(0f, maxOf(0f, height - h.h)) - h.top
+                    if (!dragMoved && kotlin.math.abs(event.x - dragStartX) < slop && kotlin.math.abs(event.y - dragStartY) < slop) return true
+                    dragMoved = true
+                    val k = paint.density * ZOOM / 20f
+                    val nb = h.span.withOffset(dragBaseX + (dx / k).toInt(), dragBaseY + (dy / k).toInt())
+                    if (nb != null) {
+                        h.span.block = nb
+                        onFloatMoved?.invoke(h.span.index, nb, false)
+                        invalidate()
+                    }
+                    return true
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> dragHit?.let { h ->
+                    dragHit = null
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                    val b = h.span.block
+                    if (dragMoved && b != null) onFloatMoved?.invoke(h.span.index, b, true)
+                    else if (event.actionMasked == android.view.MotionEvent.ACTION_UP) onChipTap?.invoke(h.span.index)
+                    return true
+                }
+            }
+        }
         taps.onTouchEvent(event)
         return super.onTouchEvent(event)
     }
@@ -236,6 +316,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
 
     fun attach(v: RichEditText) {
         view = v
+        v.onFloatMoved = { i, b, fin -> floatMoved(i, b, fin) }
         v.setText(initialText, android.widget.TextView.BufferType.EDITABLE)
         v.setTextSize(TypedValue.COMPLEX_UNIT_PX, StyleDefaults.BODY_SIZE_PT * ZOOM * density)
         v.setTextColor(0xFF1B1B1F.toInt())
@@ -544,6 +625,16 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
     }
 
     fun blockAt(index: Int): Block? = originals.getOrNull(index)
+
+    /** Index of the block inserted last (for opening it right after inserting). */
+    fun lastBlockIndex(): Int? = originals.indices.lastOrNull()
+
+    /** A floating object was dragged: remember its new position (and, once dropped, save). */
+    fun floatMoved(index: Int, block: Block, final: Boolean) {
+        if (index !in originals.indices) return
+        originals = originals.toMutableList().also { it[index] = block }
+        if (final) changed()
+    }
 
     /** Replaces an existing table / image (edited in its own dialog). */
     fun replaceBlock(index: Int, block: Block) {

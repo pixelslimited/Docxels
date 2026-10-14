@@ -189,6 +189,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     val snackbar = remember { SnackbarHostState() }
     var tableOpen by remember { mutableStateOf(false) }
+    var tableCustom by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Int?>(null) }
     val photo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -198,10 +199,10 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     val bmp = ImageIO.decodeUri(context, uri, 1600) ?: error("unreadable")
                     val out = java.io.ByteArrayOutputStream()
                     bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
-                    val w = page.contentWidthTwips
+                    val w = (page.contentWidthTwips * 0.5f).toInt()
                     val h = (w.toLong() * bmp.height / bmp.width.coerceAtLeast(1)).toInt()
                     bmp.recycle()
-                    ImageBlock(out.toByteArray(), "jpg", w, h)
+                    ImageBlock(out.toByteArray(), "jpg", w, h, wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT)
                 }.getOrNull()
             }
             if (block == null) snackbar.showSnackbar("Could not read that picture.") else controller.insertBlock(Block.Image(block))
@@ -416,7 +417,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onShape = { preset ->
                     val w = (page.contentWidthTwips * 0.45f).toInt()
-                    controller.insertBlock(Block.Shape(com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = if (preset == "line") 0 else w / 2)))
+                    controller.insertBlock(Block.Shape(com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = if (preset == "line") 0 else w / 2, wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT)))
                 },
                 onPageBreak = { controller.insertPageBreak() },
                 onPageSetup = { pageOpen = true },
@@ -458,12 +459,21 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             renaming = false
         }, onDismiss = { renaming = false })
     }
-    if (tableOpen) InsertTableDialog(
-        onInsert = { r, c, h ->
-            tableOpen = false
-            controller.insertBlock(Block.Table(newTable(r, c, h, page.contentWidthTwips)))
-        },
+    fun insertTable(r: Int, c: Int, h: Boolean) {
+        tableOpen = false
+        tableCustom = false
+        controller.insertBlock(Block.Table(newTable(r, c, h, page.contentWidthTwips)))
+        // Open it straight away so the cells can be filled in.
+        controller.lastBlockIndex()?.let { editing = it }
+    }
+    if (tableOpen && !tableCustom) TablePickerDialog(
+        onPick = { r, c, h -> insertTable(r, c, h) },
+        onCustom = { tableCustom = true },
         onDismiss = { tableOpen = false },
+    )
+    if (tableOpen && tableCustom) InsertTableDialog(
+        onInsert = { r, c, h -> insertTable(r, c, h) },
+        onDismiss = { tableOpen = false; tableCustom = false },
     )
     editing?.let { idx ->
         when (val b = controller.blockAt(idx)) {

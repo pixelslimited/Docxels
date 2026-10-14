@@ -106,6 +106,10 @@ enum class ImageWrap(val label: String) {
     TOP_BOTTOM("Top and bottom"),
     BEHIND("Behind text"),
     IN_FRONT("In front of text"),
+    ;
+
+    /** Free-floating: placed by an offset from its anchor paragraph and draggable, taking no room in the text. */
+    val floating: Boolean get() = this == BEHIND || this == IN_FRONT
 }
 
 data class ImageBlock(
@@ -116,10 +120,14 @@ data class ImageBlock(
     val heightTwips: Int,
     val align: Align = Align.LEFT,
     val wrap: ImageWrap = ImageWrap.IN_LINE,
+    /** For floating pictures: distance from the left margin and from the top of the anchor paragraph. */
+    val offsetXTwips: Int = 0,
+    val offsetYTwips: Int = 0,
 ) {
     override fun equals(other: Any?): Boolean =
         other is ImageBlock && extension == other.extension && widthTwips == other.widthTwips &&
-            heightTwips == other.heightTwips && align == other.align && wrap == other.wrap && bytes.contentEquals(other.bytes)
+            heightTwips == other.heightTwips && align == other.align && wrap == other.wrap &&
+            offsetXTwips == other.offsetXTwips && offsetYTwips == other.offsetYTwips && bytes.contentEquals(other.bytes)
 
     override fun hashCode(): Int = bytes.contentHashCode() * 31 + widthTwips
 }
@@ -135,6 +143,8 @@ data class ShapeBlock(
     val lineWidthPt: Float = 1.5f,
     val align: Align = Align.LEFT,
     val wrap: ImageWrap = ImageWrap.IN_LINE,
+    val offsetXTwips: Int = 0,
+    val offsetYTwips: Int = 0,
 )
 
 object ShapePresets {
