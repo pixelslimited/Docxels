@@ -154,6 +154,9 @@ object StyleDefaults {
     const val BODY_FONT = "Calibri"
     const val BODY_SIZE_PT = 11f
 
+    /** Default line spacing used by the styles written to .docx (259/240 = Word's "1.08"). */
+    const val LINE_SPACING = 259f / 240f
+
     fun sizePt(style: ParaStyle): Float = when (style) {
         ParaStyle.NORMAL, ParaStyle.QUOTE -> BODY_SIZE_PT
         ParaStyle.TITLE -> 26f

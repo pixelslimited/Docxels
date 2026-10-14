@@ -215,6 +215,7 @@ object DocxWriter {
             else if (p.indentFirstTwips > 0) pPr.append(" w:firstLine=\"${p.indentFirstTwips}\"")
             pPr.append("/>")
         }
+        if (p.list != ListKind.NONE) pPr.append("<w:contextualSpacing/>")
         jc(p.align)?.let { pPr.append("<w:jc w:val=\"$it\"/>") }
         if (pPr.isNotEmpty()) sb.append("<w:pPr>").append(pPr).append("</w:pPr>")
         for (run in p.runs) writeRun(run, sb)
