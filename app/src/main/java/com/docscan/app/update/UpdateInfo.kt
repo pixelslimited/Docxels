@@ -10,7 +10,11 @@ data class UpdateInfo(
     val size: Long,
     val apkUrl: String,
     val notes: String,
+    /** Optional small patch that turns the build [Patch.fromVersionCode] into this one. */
+    val patch: Patch? = null,
 ) {
+    data class Patch(val fromVersionCode: Long, val url: String, val sha256: String, val size: Long)
+
     companion object {
         const val MANIFEST_URL = "https://github.com/iCode010101/docxels-site/releases/latest/download/update.json"
 
@@ -37,7 +41,19 @@ data class UpdateInfo(
             val parsed = java.net.URI(url)
             val ok = parsed.scheme == "https" && hostAllowed(parsed.host) &&
                 Regex("[0-9a-f]{64}").matches(sha) && info.size in 1..MAX_APK_BYTES && info.versionCode > 0
-            if (ok) info else null
+            // A malformed or unsafe patch entry is simply ignored; the full download still works.
+            val patch = o.optJSONObject("patch")?.let { p ->
+                runCatching {
+                    val pu = p.getString("url")
+                    val ps = p.getString("sha256").lowercase()
+                    val pj = java.net.URI(pu)
+                    val candidate = Patch(p.getLong("fromVersionCode"), pu, ps, p.getLong("size"))
+                    if (pj.scheme == "https" && hostAllowed(pj.host) && Regex("[0-9a-f]{64}").matches(ps) &&
+                        candidate.size in 1..MAX_APK_BYTES && candidate.fromVersionCode > 0
+                    ) candidate else null
+                }.getOrNull()
+            }
+            if (ok) info.copy(patch = patch) else null
         } catch (e: Exception) {
             null
         }

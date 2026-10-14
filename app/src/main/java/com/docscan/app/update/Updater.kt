@@ -32,9 +32,72 @@ class Updater(private val context: Context) {
         if (info.isNewerThan(installedCode())) info else null
     }
 
-    /** Downloads and verifies the APK. [progress] gets 0..1. Returns the file, or throws. */
+    /**
+     * Gets the new APK. If a patch for exactly the installed build exists and is clearly smaller, only the patch is
+     * downloaded and the APK is rebuilt on the phone; otherwise (or if anything about the patch looks wrong) the full
+     * APK is downloaded. The result is always checked against the published fingerprint and signing certificate.
+     * [progress] gets 0..1.
+     */
     suspend fun download(info: UpdateInfo, progress: (Float) -> Unit): File = withContext(Dispatchers.IO) {
         dir.listFiles()?.forEach { it.delete() }
+        val p = info.patch
+        if (p != null && p.fromVersionCode == installedCode() && p.size * 10 < info.size * 8) {
+            val rebuilt = runCatching { downloadViaPatch(info, p, progress) }.getOrNull()
+            if (rebuilt != null) return@withContext rebuilt
+            dir.listFiles()?.forEach { it.delete() }
+            progress(0f)
+        }
+        downloadFull(info, progress)
+    }
+
+    /** True if the last [download] rebuilt the APK from a patch (for the status text). */
+    @Volatile var lastUsedPatch = false
+        private set
+
+    private fun downloadViaPatch(info: UpdateInfo, p: UpdateInfo.Patch, progress: (Float) -> Unit): File {
+        val patchFile = File(dir, "update.patch")
+        val digest = MessageDigest.getInstance("SHA-256")
+        open(p.url).use { (stream, length) ->
+            val total = if (length > 0) length else p.size
+            var done = 0L
+            patchFile.outputStream().use { o ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = stream.read(buf)
+                    if (n < 0) break
+                    done += n
+                    if (done > p.size + 1024) error("The patch is larger than expected.")
+                    digest.update(buf, 0, n)
+                    o.write(buf, 0, n)
+                    progress((done.toFloat() / total).coerceIn(0f, 1f) * 0.85f)
+                }
+            }
+        }
+        val hex = digest.digest().joinToString("") { "%02x".format(it) }
+        if (hex != p.sha256 || patchFile.length() != p.size) error("The patch did not match its fingerprint.")
+        progress(0.9f)
+        val out = File(dir, "Docxels-${info.versionCode}.apk")
+        DeltaPatch.apply(File(context.applicationInfo.sourceDir), patchFile.readBytes(), out)
+        patchFile.delete()
+        verify(out, info)
+        progress(1f)
+        lastUsedPatch = true
+        return out
+    }
+
+    private fun verify(out: File, info: UpdateInfo) {
+        val d = MessageDigest.getInstance("SHA-256")
+        out.inputStream().use { s ->
+            val buf = ByteArray(64 * 1024)
+            while (true) { val n = s.read(buf); if (n < 0) break; d.update(buf, 0, n) }
+        }
+        val hex = d.digest().joinToString("") { "%02x".format(it) }
+        if (hex != info.sha256 || out.length() != info.size) { out.delete(); error("The rebuilt update did not match its fingerprint.") }
+        if (!sameSigner(out)) { out.delete(); error("The update is not signed by Pixels Limited.") }
+    }
+
+    private fun downloadFull(info: UpdateInfo, progress: (Float) -> Unit): File {
+        lastUsedPatch = false
         val out = File(dir, "Docxels-${info.versionCode}.apk")
         val digest = MessageDigest.getInstance("SHA-256")
         open(info.apkUrl).use { (stream, length) ->
@@ -62,7 +125,7 @@ class Updater(private val context: Context) {
             out.delete()
             error("The downloaded file is not signed by Pixels Limited, so it was discarded.")
         }
-        out
+        return out
     }
 
     /** The downloaded APK must carry exactly the signing certificate of the installed app. */
@@ -85,7 +148,38 @@ class Updater(private val context: Context) {
         return false
     }
 
+    /**
+     * Hands the verified APK to Android's package installer from inside the app. Android still shows its own
+     * confirmation once; the app restarts when the install finishes.
+     */
     fun install(apk: File) {
+        runCatching { installWithSession(apk) }.onFailure { installWithIntent(apk) }
+    }
+
+    private fun installWithSession(apk: File) {
+        val installer = context.packageManager.packageInstaller
+        val params = android.content.pm.PackageInstaller.SessionParams(android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        params.setAppPackageName(context.packageName)
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            params.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+        }
+        val id = installer.createSession(params)
+        installer.openSession(id).use { session ->
+            apk.inputStream().use { input ->
+                session.openWrite("docxels.apk", 0, apk.length()).use { o ->
+                    input.copyTo(o, 64 * 1024)
+                    session.fsync(o)
+                }
+            }
+            val intent = Intent(context, InstallResultReceiver::class.java).setPackage(context.packageName)
+            val pending = android.app.PendingIntent.getBroadcast(
+                context, id, intent, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE,
+            )
+            session.commit(pending.intentSender)
+        }
+    }
+
+    private fun installWithIntent(apk: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
         val i = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, "application/vnd.android.package-archive")
