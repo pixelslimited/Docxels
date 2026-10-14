@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
@@ -207,6 +208,63 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         }
     }
 
+    // Letterhead: one picture, stretched to the paper, repeated behind the text of every page (or just the first).
+    var letterheadMode by remember { mutableStateOf("all") }
+    val letterheadPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val mode = letterheadMode
+        val setup = page
+        scope.launch {
+            val img = withContext(Dispatchers.IO) {
+                runCatching {
+                    val bmp = ImageIO.decodeUri(context, uri, 2000) ?: error("unreadable")
+                    val alpha = bmp.hasAlpha()
+                    val out = java.io.ByteArrayOutputStream()
+                    bmp.compress(if (alpha) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG, 88, out)
+                    val sw = setup.sheetWidthTwips
+                    val sh = setup.sheetHeightTwips
+                    val pageAspect = sh.toFloat() / sw
+                    val aspect = bmp.height.toFloat() / bmp.width.coerceAtLeast(1)
+                    // Close to the page shape: fill the sheet exactly. Otherwise fit the width and keep the proportions.
+                    val h = if (kotlin.math.abs(aspect - pageAspect) / pageAspect < 0.15f) sh else minOf(sh, (sw * aspect).toInt())
+                    bmp.recycle()
+                    com.docscan.app.core.word.PageImage(out.toByteArray(), if (alpha) "png" else "jpg", 0, 0, sw, h, behind = true)
+                }.getOrNull()
+            }
+            if (img == null) { snackbar.showSnackbar("Could not read that picture."); return@launch }
+            page = if (mode == "first") page.copy(differentFirstPage = true, firstHeaderImages = listOf(img))
+            else page.copy(headerImages = listOf(img), firstHeaderImages = if (page.differentFirstPage) listOf(img) else page.firstHeaderImages)
+            snackbar.showSnackbar(if (mode == "first") "Letterhead added to the first page." else "Letterhead added to every page.")
+        }
+    }
+    val signaturePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val block = withContext(Dispatchers.IO) {
+                runCatching {
+                    val bmp = ImageIO.decodeUri(context, uri, 1200) ?: error("unreadable")
+                    val w = bmp.width
+                    val h = bmp.height
+                    val px = IntArray(w * h)
+                    bmp.getPixels(px, 0, w, 0, 0, w, h)
+                    bmp.recycle()
+                    val ink = com.docscan.app.core.SignatureInk.whiteToAlpha(px)
+                    val b = com.docscan.app.core.SignatureInk.inkBounds(ink, w, h) ?: error("no ink")
+                    val cw = b[2] - b[0]
+                    val ch = b[3] - b[1]
+                    val crop = android.graphics.Bitmap.createBitmap(ink, w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                        .let { android.graphics.Bitmap.createBitmap(it, b[0], b[1], cw, ch) }
+                    val out = java.io.ByteArrayOutputStream()
+                    crop.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    val tw = 2800
+                    ImageBlock(out.toByteArray(), "png", tw, (tw.toLong() * ch / cw).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT)
+                }.getOrNull()
+            }
+            if (block == null) snackbar.showSnackbar("Could not find a signature in that picture.") else controller.insertBlock(Block.Image(block))
+        }
+    }
+    var signPad by remember { mutableStateOf(false) }
+
     fun saveNow() = vm.save(controller.toDoc(title, page))
 
     controller.onChanged = { tick++ }
@@ -342,6 +400,18 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onViewMode = { viewMode = it; container.ui.editorView = it.name },
                 onRead = { reading = true },
                 onPreview = { previewDoc = controller.toDoc(title, page) },
+                onLetterhead = { mode ->
+                    if (mode == "remove") {
+                        page = page.copy(headerImages = emptyList(), firstHeaderImages = emptyList())
+                    } else {
+                        letterheadMode = mode
+                        letterheadPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                },
+                onSignature = { mode ->
+                    if (mode == "draw") signPad = true
+                    else signaturePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
                 onTable = { tableOpen = true },
                 onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onShape = { preset ->
@@ -371,6 +441,16 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
 
     previewDoc?.let { d -> PagePreview(vm, d) { previewDoc = null } }
+    if (signPad) {
+        SignaturePadDialog(
+            onDone = { bytes, w, h ->
+                signPad = false
+                val tw = 2800
+                controller.insertBlock(Block.Image(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT)))
+            },
+            onDismiss = { signPad = false },
+        )
+    }
 
     if (renaming) {
         TextInputDialog("Rename document", title, "Rename", onConfirm = {
@@ -495,6 +575,8 @@ private fun Ribbon(
     onViewMode: (ViewMode) -> Unit,
     onRead: () -> Unit,
     onPreview: () -> Unit,
+    onLetterhead: (String) -> Unit,
+    onSignature: (String) -> Unit,
     onTable: () -> Unit,
     onPicture: () -> Unit,
     onShape: (String) -> Unit,
@@ -522,6 +604,8 @@ private fun Ribbon(
     var shadeMenu by remember { mutableStateOf(false) }
     var ulMenu by remember { mutableStateOf(false) }
     var shapeMenu by remember { mutableStateOf(false) }
+    var letterMenu by remember { mutableStateOf(false) }
+    var signMenu by remember { mutableStateOf(false) }
     val tabs = listOf("Home", "Insert", "Layout", "Review", "View")
     CustomColorDialogHost(customFor, { customFor = 0 }, c)
     var open by remember { mutableStateOf(false) }
@@ -650,6 +734,21 @@ private fun Ribbon(
                                 com.docscan.app.core.word.ShapePresets.INSERTABLE.forEach { (preset, label) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { shapeMenu = false; onShape(preset) })
                                 }
+                            }
+                        }
+                        Box {
+                            Btn("Letterhead", Icons.Default.Description) { letterMenu = true }
+                            DropdownMenu(expanded = letterMenu, onDismissRequest = { letterMenu = false }) {
+                                DropdownMenuItem(text = { Text("Every page (fits the paper)") }, onClick = { letterMenu = false; open = false; onLetterhead("all") })
+                                DropdownMenuItem(text = { Text("First page only") }, onClick = { letterMenu = false; open = false; onLetterhead("first") })
+                                DropdownMenuItem(text = { Text("Remove letterhead") }, onClick = { letterMenu = false; onLetterhead("remove") })
+                            }
+                        }
+                        Box {
+                            Btn("Signature", Icons.Default.Draw) { signMenu = true }
+                            DropdownMenu(expanded = signMenu, onDismissRequest = { signMenu = false }) {
+                                DropdownMenuItem(text = { Text("Draw with finger") }, onClick = { signMenu = false; open = false; onSignature("draw") })
+                                DropdownMenuItem(text = { Text("From a picture") }, onClick = { signMenu = false; open = false; onSignature("picture") })
                             }
                         }
                         Btn("Page break", Icons.Default.InsertPageBreak, close = true) { onPageBreak() }

@@ -1,5 +1,10 @@
 package com.docscan.app.ui.write
 
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.height
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
@@ -442,6 +447,73 @@ fun ShapeEditorDialog(
             Row {
                 TextButton(onClick = onRemove) { Text("Remove") }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+
+/** A pad to sign with a finger. Returns a transparent PNG of just the ink. */
+@androidx.compose.runtime.Composable
+fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> Unit) {
+    val strokes = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateListOf<List<androidx.compose.ui.geometry.Offset>>() }
+    var current by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<List<androidx.compose.ui.geometry.Offset>>(emptyList()) }
+    var size by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { androidx.compose.material3.Text("Sign here") },
+        text = {
+            androidx.compose.foundation.Canvas(
+                androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .background(androidx.compose.ui.graphics.Color.White)
+                    .onSizeChanged { size = it }
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { current = listOf(it) },
+                            onDrag = { change, _ -> change.consume(); current = current + change.position },
+                            onDragEnd = { if (current.size > 1) strokes.add(current); current = emptyList() },
+                            onDragCancel = { current = emptyList() },
+                        )
+                    },
+            ) {
+                for (st in strokes + listOf(current)) {
+                    for (i in 1 until st.size) {
+                        drawLine(androidx.compose.ui.graphics.Color(0xFF14213D), st[i - 1], st[i], strokeWidth = 5f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                enabled = strokes.isNotEmpty(),
+                onClick = {
+                    val w = size.width.coerceAtLeast(1)
+                    val h = size.height.coerceAtLeast(1)
+                    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                    val cv = android.graphics.Canvas(bmp)
+                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        color = 0xFF14213D.toInt(); strokeWidth = 5f; strokeCap = android.graphics.Paint.Cap.ROUND; style = android.graphics.Paint.Style.STROKE
+                    }
+                    for (st in strokes) for (i in 1 until st.size) cv.drawLine(st[i - 1].x, st[i - 1].y, st[i].x, st[i].y, paint)
+                    val px = IntArray(w * h)
+                    bmp.getPixels(px, 0, w, 0, 0, w, h)
+                    val b = com.docscan.app.core.SignatureInk.inkBounds(px, w, h)
+                    if (b != null) {
+                        val cropped = android.graphics.Bitmap.createBitmap(bmp, b[0], b[1], b[2] - b[0], b[3] - b[1])
+                        val out = java.io.ByteArrayOutputStream()
+                        cropped.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                        onDone(out.toByteArray(), cropped.width, cropped.height)
+                    } else onDismiss()
+                },
+            ) { androidx.compose.material3.Text("Use signature") }
+        },
+        dismissButton = {
+            androidx.compose.foundation.layout.Row {
+                androidx.compose.material3.TextButton(onClick = { strokes.clear(); current = emptyList() }) { androidx.compose.material3.Text("Clear") }
+                androidx.compose.material3.TextButton(onClick = onDismiss) { androidx.compose.material3.Text("Cancel") }
             }
         },
     )
