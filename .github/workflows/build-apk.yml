@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: write
+    env:
+      SITE_TOKEN: ${{ secrets.SITE_TOKEN }}
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -121,7 +123,6 @@ jobs:
       - name: Publish update for the in-app updater
         if: github.event_name != 'pull_request' && env.SITE_TOKEN != ''
         env:
-          SITE_TOKEN: ${{ secrets.SITE_TOKEN }}
           GH_TOKEN: ${{ secrets.SITE_TOKEN }}
           RUN_NUMBER: ${{ github.run_number }}
         run: bash scripts/publish-update.sh Docxels.apk "$RUN_NUMBER"
