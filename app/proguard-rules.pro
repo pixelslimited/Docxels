@@ -11,3 +11,11 @@
     public static int d(...);
     public static int i(...);
 }
+
+# PdfBox-Android: optional JPEG2000 decoder and desktop-only classes are not shipped.
+-dontwarn com.gemalto.jp2.**
+-dontwarn org.bouncycastle.**
+-dontwarn javax.imageio.**
+-dontwarn java.awt.**
+-keep class com.tom_roush.pdfbox.** { *; }
+-keep class com.tom_roush.fontbox.** { *; }
