@@ -21,3 +21,18 @@ class ParaShadingTest {
         assertNull(back.borderColor)
     }
 }
+
+class UnderlineStyleTest {
+    @Test fun doubleAndWavyUnderlinesSurvive() {
+        val p = Paragraph(
+            listOf(
+                Run("a", RunStyle(underline = true, underlineStyle = "double")),
+                Run("b", RunStyle(underline = true)),
+                Run("c", RunStyle(underline = true, underlineStyle = "wave")),
+            ),
+        )
+        val back = (DocxReader.read(DocxWriter.toBytes(WordDoc("T", listOf(Block.Para(p))))).blocks[0] as Block.Para).paragraph
+        assertEquals(listOf("double", null, "wave"), back.runs.map { it.style.underlineStyle })
+        assertEquals(true, back.runs.all { it.style.underline })
+    }
+}

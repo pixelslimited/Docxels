@@ -257,6 +257,9 @@ class FontNameSpan(val name: String) : MetricAffectingSpan() {
     }
 }
 
+/** Underline that remembers its Word style (double, dotted, wavy…) so it survives editing and saving. */
+class UnderlineStyleSpan(val word: String) : UnderlineSpan()
+
 /** A hyperlink: blue and underlined. The address travels with the text so it is saved to .docx and PDF. */
 class LinkSpan(val url: String) : CharacterStyle(), UpdateAppearance {
     override fun updateDrawState(tp: TextPaint) {
@@ -285,6 +288,8 @@ sealed interface CharAttr {
     data object Bold : CharAttr { override val kind = CharKind.BOLD }
     data object Italic : CharAttr { override val kind = CharKind.ITALIC }
     data object Underline : CharAttr { override val kind = CharKind.UNDERLINE }
+    /** An underline other than single: "double", "dotted", "dash", "wave", "thick" … (shown as a plain underline on screen, kept in .docx). */
+    data class UnderlineAs(val word: String) : CharAttr { override val kind = CharKind.UNDERLINE }
     data object Strike : CharAttr { override val kind = CharKind.STRIKE }
     data class Color(val rgb: Int) : CharAttr { override val kind = CharKind.COLOR }
     data class Highlight(val rgb: Int) : CharAttr { override val kind = CharKind.HIGHLIGHT }
@@ -318,6 +323,7 @@ object RichOps {
         CharAttr.Bold -> StyleSpan(Typeface.BOLD) to (CHAR_FLAGS or prio(1))
         CharAttr.Italic -> StyleSpan(Typeface.ITALIC) to (CHAR_FLAGS or prio(1))
         CharAttr.Underline -> UnderlineSpan() to (CHAR_FLAGS or prio(1))
+        is CharAttr.UnderlineAs -> UnderlineStyleSpan(a.word) to (CHAR_FLAGS or prio(1))
         CharAttr.Strike -> StrikethroughSpan() to (CHAR_FLAGS or prio(1))
         is CharAttr.Color -> ForegroundColorSpan(0xFF000000.toInt() or (a.rgb and 0xFFFFFF)) to (CHAR_FLAGS or prio(1))
         is CharAttr.Highlight -> BackgroundColorSpan(0xFF000000.toInt() or (a.rgb and 0xFFFFFF)) to (CHAR_FLAGS or prio(1))
@@ -329,6 +335,7 @@ object RichOps {
 
     private fun clone(span: Any): Any = when (span) {
         is StyleSpan -> StyleSpan(span.style)
+        is UnderlineStyleSpan -> UnderlineStyleSpan(span.word)
         is UnderlineSpan -> UnderlineSpan()
         is StrikethroughSpan -> StrikethroughSpan()
         is ForegroundColorSpan -> ForegroundColorSpan(span.foregroundColor)
@@ -601,7 +608,7 @@ object SpanBridge {
         }
         if (st.bold) put(CharAttr.Bold)
         if (st.italic) put(CharAttr.Italic)
-        if (st.underline) put(CharAttr.Underline)
+        if (st.underline) put(st.underlineStyle?.let { CharAttr.UnderlineAs(it) } ?: CharAttr.Underline)
         if (st.strike) put(CharAttr.Strike)
         st.color?.let { put(CharAttr.Color(it)) }
         st.highlight?.let { put(CharAttr.Highlight(it)) }
@@ -655,6 +662,7 @@ object SpanBridge {
                         bold = st.bold || (s.style and Typeface.BOLD != 0),
                         italic = st.italic || (s.style and Typeface.ITALIC != 0),
                     )
+                    is UnderlineStyleSpan -> st.copy(underline = true, underlineStyle = s.word)
                     is UnderlineSpan -> st.copy(underline = true)
                     is StrikethroughSpan -> st.copy(strike = true)
                     is ForegroundColorSpan -> st.copy(color = s.foregroundColor and 0xFFFFFF)

@@ -291,7 +291,7 @@ object DocxWriter {
             val half = (it * 2).toInt().coerceAtLeast(2)
             sb.append("<w:sz w:val=\"$half\"/><w:szCs w:val=\"$half\"/>")
         }
-        if (s.underline) sb.append("<w:u w:val=\"single\"/>")
+        if (s.underline) sb.append("<w:u w:val=\"${s.underlineStyle?.takeIf { it in DocxReader.UNDERLINE_WORDS } ?: "single"}\"/>")
         s.highlight?.let { sb.append("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"${hex(it)}\"/>") }
         when (s.vertical) {
             VerticalAlign.SUPERSCRIPT -> sb.append("<w:vertAlign w:val=\"superscript\"/>")

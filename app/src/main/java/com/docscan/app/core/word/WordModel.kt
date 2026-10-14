@@ -11,6 +11,8 @@ data class RunStyle(
     val bold: Boolean = false,
     val italic: Boolean = false,
     val underline: Boolean = false,
+    /** Word underline style other than single (e.g. "double", "dotted", "wave"); only meaningful when [underline] is true. */
+    val underlineStyle: String? = null,
     val strike: Boolean = false,
     val color: Int? = null,
     val highlight: Int? = null,
@@ -25,6 +27,7 @@ data class RunStyle(
         bold = bold || base.bold,
         italic = italic || base.italic,
         underline = underline || base.underline,
+        underlineStyle = underlineStyle ?: base.underlineStyle,
         strike = strike || base.strike,
         color = color ?: base.color,
         highlight = highlight ?: base.highlight,

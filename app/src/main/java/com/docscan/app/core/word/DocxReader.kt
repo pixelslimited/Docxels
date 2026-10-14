@@ -11,6 +11,12 @@ import java.util.zip.ZipInputStream
  * (comments, tracked changes, text boxes, fields) degrades to plain text instead of failing.
  */
 object DocxReader {
+    /** Underline styles kept as-is when a document is opened and saved again (single is the default and is not listed). */
+    val UNDERLINE_WORDS = setOf(
+        "double", "thick", "dotted", "dottedHeavy", "dash", "dashedHeavy", "dashLong", "dashLongHeavy",
+        "dotDash", "dashDotHeavy", "dotDotDash", "dashDotDotHeavy", "wave", "wavyHeavy", "wavyDouble", "words",
+    )
+
     class DocxException(message: String) : Exception(message)
 
     // Limits that keep a malicious or corrupt file (zip bomb, millions of entries) from exhausting memory.
@@ -317,7 +323,12 @@ object DocxReader {
             if (truthy(rPr.child("b"))) s = s.copy(bold = true)
             if (truthy(rPr.child("i"))) s = s.copy(italic = true)
             if (truthy(rPr.child("strike")) || truthy(rPr.child("dstrike"))) s = s.copy(strike = true)
-            rPr.child("u")?.let { if (truthy(it)) s = s.copy(underline = true) }
+            rPr.child("u")?.let {
+                if (truthy(it)) {
+                    val v = it.attr("val")
+                    s = s.copy(underline = true, underlineStyle = v?.takeIf { w -> w in UNDERLINE_WORDS })
+                }
+            }
             rPr.child("color")?.attr("val")?.let { v -> parseHex(v)?.let { s = s.copy(color = it) } }
             rPr.child("sz")?.attr("val")?.toIntOrNull()?.let { if (it > 0) s = s.copy(sizePt = it / 2f) }
             rPr.child("rFonts")?.let { f ->

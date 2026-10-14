@@ -448,6 +448,7 @@ private fun Ribbon(
     var fillMenu by remember { mutableStateOf(false) }
     var spacingMenu by remember { mutableStateOf(false) }
     var shadeMenu by remember { mutableStateOf(false) }
+    var ulMenu by remember { mutableStateOf(false) }
     val tabs = listOf("Home", "Insert", "Layout", "Review", "View")
     CustomColorDialogHost(customFor, { customFor = 0 }, c)
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -487,6 +488,21 @@ private fun Ribbon(
             Toggle(Icons.Default.FormatBold, "Bold", s.bold) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
             Toggle(Icons.Default.FormatItalic, "Italic", s.italic) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
             Toggle(Icons.Default.FormatUnderlined, "Underline", s.underline) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
+            Box {
+                TextButton(onClick = { ulMenu = true }) { Text("U▾") }
+                DropdownMenu(expanded = ulMenu, onDismissRequest = { ulMenu = false }) {
+                    listOf(
+                        "single" to "Single", "double" to "Double", "thick" to "Thick", "dotted" to "Dotted",
+                        "dash" to "Dashed", "wave" to "Wavy", "words" to "Words only",
+                    ).forEach { (w, label) ->
+                        DropdownMenuItem(text = { Text(label) }, onClick = {
+                            ulMenu = false
+                            if (w == "single") c.apply(CharAttr.Underline) else c.apply(CharAttr.UnderlineAs(w))
+                        })
+                    }
+                    DropdownMenuItem(text = { Text("No underline") }, onClick = { ulMenu = false; c.remove(CharKind.UNDERLINE) })
+                }
+            }
             Toggle(Icons.Default.StrikethroughS, "Strikethrough", s.strike) { c.toggle(CharKind.STRIKE, CharAttr.Strike) }
             Toggle(Icons.Default.Superscript, "Superscript", s.sup) { c.toggleVert(true) }
             Toggle(Icons.Default.Subscript, "Subscript", s.sub) { c.toggleVert(false) }
