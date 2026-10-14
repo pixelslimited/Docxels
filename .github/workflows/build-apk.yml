@@ -32,11 +32,28 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Unit tests
-        run: gradle :app:testDebugUnitTest --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest --stacktrace 2>&1 | tee build.log
 
       # Release build: shrunk (R8), not debuggable (faster image processing), arm64 only.
       - name: Build release APK
-        run: gradle :app:assembleRelease --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:assembleRelease --stacktrace 2>&1 | tee -a build.log
+
+      - name: Report build errors on the commit
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Build failed. Compiler / test errors:"
+            echo '```'
+            grep -E "^e: |error:|FAILED|What went wrong|Execution failed" -A2 build.log | head -80
+            echo '```'
+          } > err.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@err.md || true
 
       - name: Size breakdown
         run: |
