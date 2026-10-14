@@ -165,6 +165,45 @@ fun TableEditorDialog(
                         sel = sr to minOf(sc, n - 1)
                     }) { Text("Delete column") }
                 }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val (sr, sc) = sel
+                    val noVMerge = table.rows.none { r -> r.any { it.vMergeStart || it.vMergeContinue } }
+                    val cur = table.rows.getOrNull(sr)?.getOrNull(sc)
+                    OutlinedButton(enabled = !merged, onClick = {
+                        val cols = table.columnCount
+                        table = table.copy(rows = table.rows.toMutableList().also { it.add(sr, List(cols) { TableCell() }) })
+                    }) { Text("Row above") }
+                    OutlinedButton(enabled = noVMerge && cur != null && sc + 1 < table.rows[sr].size, onClick = {
+                        val row = table.rows[sr]
+                        val a = row[sc]
+                        val b = row[sc + 1]
+                        val joined = if (b.plain().isBlank()) a else a.withText((a.plain() + " " + b.plain()).trim())
+                        val newRow = row.toMutableList().also { it[sc] = joined.copy(colSpan = a.colSpan + b.colSpan); it.removeAt(sc + 1) }
+                        table = table.copy(rows = table.rows.mapIndexed { i, r -> if (i == sr) newRow else r })
+                    }) { Text("Merge right") }
+                    OutlinedButton(enabled = noVMerge && cur != null && cur.colSpan > 1, onClick = {
+                        val row = table.rows[sr]
+                        val a = row[sc]
+                        val newRow = row.toMutableList().also {
+                            it[sc] = a.copy(colSpan = 1)
+                            for (k in 1 until a.colSpan) it.add(sc + k, TableCell(shading = a.shading))
+                        }
+                        table = table.copy(rows = table.rows.mapIndexed { i, r -> if (i == sr) newRow else r })
+                    }) { Text("Split cell") }
+                    OutlinedButton(enabled = cur != null && !cur.vMergeContinue, onClick = {
+                        val c0 = table.rows[sr][sc]
+                        val allBold = c0.paragraphs.all { p -> p.runs.isNotEmpty() && p.runs.all { it.style.bold } }
+                        update(sr, sc, c0.copy(paragraphs = c0.paragraphs.map { p ->
+                            p.copy(runs = p.runs.map { it.copy(style = it.style.copy(bold = !allBold)) })
+                        }))
+                    }) { Text("Bold") }
+                    listOf(Align.LEFT to "Left", Align.CENTER to "Centre", Align.RIGHT to "Right").forEach { (al, label) ->
+                        OutlinedButton(enabled = cur != null && !cur.vMergeContinue, onClick = {
+                            val c0 = table.rows[sr][sc]
+                            update(sr, sc, c0.copy(paragraphs = c0.paragraphs.map { it.copy(align = al) }))
+                        }) { Text(label) }
+                    }
+                }
                 if (merged) Text("This table has merged cells, so rows and columns can't be added or removed here yet.", style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(table.headerRow, { table = table.copy(headerRow = it) })
