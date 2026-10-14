@@ -441,9 +441,8 @@ object RichOps {
     /** Changes the attributes of every paragraph touched by [from, to]. */
     fun updateParagraphs(text: Editable, from: Int, to: Int, density: Float, change: (ParaAttrs) -> ParaAttrs) {
         for (r in paragraphRanges(text)) {
-            if (r.full < from || r.start > to) continue
-            if (r.start == to && to > from && r.start != from) continue // selection ends right at a paragraph start
-            place(text, r, change(attrsOf(text, r)), density)
+            val hit = if (from == to) r.start <= from && from <= r.end else r.start < to && r.full > from
+            if (hit) place(text, r, change(attrsOf(text, r)), density)
         }
     }
 
