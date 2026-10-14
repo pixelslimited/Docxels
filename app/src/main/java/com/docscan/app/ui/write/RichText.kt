@@ -308,14 +308,30 @@ object RichOps {
         },
     ).second
 
-    /** Removes [kind] formatting from [from, to), keeping it on the parts of existing spans outside the range. */
+    private const val MASK = 0x33
+    private fun endInclusive(flags: Int): Boolean {
+        val f = flags and MASK
+        return f == Spanned.SPAN_EXCLUSIVE_INCLUSIVE || f == Spanned.SPAN_INCLUSIVE_INCLUSIVE
+    }
+
+    /**
+     * Removes [kind] formatting from [from, to), keeping it on the parts of existing spans outside the range.
+     * With a cursor (from == to) the formatting is switched off for text typed next: a span is split at the cursor
+     * so the text typed there falls into the gap.
+     */
     fun clear(text: Editable, from: Int, to: Int, kind: CharKind) {
         for (span in spansOfKind(text, from, to, kind)) {
             val a = text.getSpanStart(span)
             val b = text.getSpanEnd(span)
             val flags = text.getSpanFlags(span)
-            if (a == b && from == to) {
-                text.removeSpan(span)
+            if (from == to) {
+                if (a == b) {
+                    if (a == from) text.removeSpan(span)
+                } else if (a <= from && b >= from) {
+                    text.removeSpan(span)
+                    if (a < from) text.setSpan(clone(span), a, from, (flags and MASK.inv()) or Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    if (b > from) text.setSpan(clone(span), from, b, flags)
+                }
                 continue
             }
             if (b <= from || a >= to) continue // only touching the range
@@ -338,7 +354,11 @@ object RichOps {
     /** True when every character in the selection has [kind]; for a cursor, when the text at the cursor has it. */
     fun covers(text: Spanned, from: Int, to: Int, kind: CharKind): Boolean {
         if (from == to) {
-            return spansOfKind(text, from, to, kind).any { text.getSpanStart(it) <= from && text.getSpanEnd(it) >= to }
+            return spansOfKind(text, from, to, kind).any {
+                val a = text.getSpanStart(it)
+                val b = text.getSpanEnd(it)
+                (a < from && b > from) || (a == b && a == from) || (b == from && a < b && endInclusive(text.getSpanFlags(it)))
+            }
         }
         var pos = from
         val spans = spansOfKind(text, from, to, kind).filter { text.getSpanStart(it) < text.getSpanEnd(it) }
@@ -553,6 +573,8 @@ object SpanBridge {
             RichOps.attrsOf(text, r).toParagraph(runsOf(text, r.start, r.end))
         }
 
+    fun runsIn(text: Spanned, start: Int, end: Int): List<Run> = runsOf(text, start, end)
+
     private fun runsOf(text: Spanned, start: Int, end: Int): List<Run> {
         if (start >= end) return emptyList()
         val spans = text.getSpans(start, end, Any::class.java).filter { s ->
@@ -598,4 +620,73 @@ object SpanBridge {
 
     private fun isCharSpan(s: Any) = s is StyleSpan || s is UnderlineSpan || s is StrikethroughSpan ||
         s is ForegroundColorSpan || s is BackgroundColorSpan || s is PtSizeSpan || s is FontNameSpan || s is VertSpan
+}
+
+// ---- blocks the editor cannot edit yet (tables, images, page breaks) ------------------------------------
+
+/** Placeholder character standing in for a table / image / page break so it is kept, in place, on save. */
+const val CHIP_CHAR = '\uFFFC'
+
+class BlockChipSpan(val index: Int, val label: String) : android.text.style.ReplacementSpan() {
+    override fun getSize(paint: Paint, text: CharSequence?, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int =
+        (paint.measureText(label) + 2 * paint.textSize * 0.6f).toInt()
+
+    override fun draw(c: Canvas, text: CharSequence?, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
+        val saved = paint.color
+        val pad = paint.textSize * 0.3f
+        val w = paint.measureText(label) + 4 * pad
+        paint.color = 0xFFE8EAF0.toInt()
+        c.drawRoundRect(x, top.toFloat() + pad, x + w, bottom.toFloat() - pad, pad, pad, paint)
+        paint.color = 0xFF444B5A.toInt()
+        c.drawText(label, x + 2 * pad, y.toFloat(), paint)
+        paint.color = saved
+    }
+}
+
+object EditorModel {
+    fun label(b: com.docscan.app.core.word.Block): String = when (b) {
+        is com.docscan.app.core.word.Block.Table ->
+            "Table ${b.table.rows.size}×${b.table.columnCount}"
+        is com.docscan.app.core.word.Block.Image -> "Image"
+        com.docscan.app.core.word.Block.PageBreak -> "Page break"
+        is com.docscan.app.core.word.Block.Para -> ""
+    }
+
+    /** Builds the editable text for a document. Non-paragraph blocks become one-character chips, kept in order. */
+    fun toEditable(blocks: List<com.docscan.app.core.word.Block>, density: Float): Pair<SpannableStringBuilder, List<com.docscan.app.core.word.Block>> {
+        val originals = ArrayList<com.docscan.app.core.word.Block>()
+        val paras = ArrayList<Paragraph>()
+        val chipIndex = HashMap<Int, Int>()
+        for (b in blocks.ifEmpty { listOf(com.docscan.app.core.word.Block.Para(Paragraph())) }) {
+            if (b is com.docscan.app.core.word.Block.Para) {
+                paras += SpanBridge.splitSoftBreaks(listOf(b.paragraph))
+            } else {
+                chipIndex[paras.size] = originals.size
+                originals += b
+                paras += Paragraph(listOf(Run(CHIP_CHAR.toString())))
+            }
+        }
+        val e = SpanBridge.toEditable(paras, density)
+        val ranges = RichOps.paragraphRanges(e)
+        for ((pi, bi) in chipIndex) {
+            val r = ranges[pi]
+            e.setSpan(BlockChipSpan(bi, label(originals[bi])), r.start, r.start + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        return e to originals
+    }
+
+    fun toBlocks(text: Spanned, originals: List<com.docscan.app.core.word.Block>): List<com.docscan.app.core.word.Block> {
+        val out = ArrayList<com.docscan.app.core.word.Block>()
+        for (r in RichOps.paragraphRanges(text)) {
+            val chip = if (r.end - r.start == 1 && text[r.start] == CHIP_CHAR)
+                text.getSpans(r.start, r.end, BlockChipSpan::class.java).firstOrNull() else null
+            if (chip != null && chip.index in originals.indices) {
+                out += originals[chip.index]
+            } else {
+                val p = RichOps.attrsOf(text, r).toParagraph(SpanBridge.runsIn(text, r.start, r.end))
+                out += com.docscan.app.core.word.Block.Para(p)
+            }
+        }
+        return out
+    }
 }

@@ -63,4 +63,44 @@ class RichTextTest {
         val out = SpanBridge.splitSoftBreaks(listOf(Paragraph(listOf(Run("a\nb")))))
         assertEquals(listOf("a", "b"), out.map { it.text })
     }
+
+    @Test fun cursorToggleOffStopsBoldWhenTyping() {
+        val e = SpanBridge.toEditable(listOf(Paragraph(listOf(Run("ab", RunStyle(bold = true))))), d)
+        assertTrue(RichOps.covers(e, 2, 2, CharKind.BOLD))
+        RichOps.clear(e, 2, 2, CharKind.BOLD)
+        assertFalse(RichOps.covers(e, 2, 2, CharKind.BOLD))
+        e.insert(2, "cd")
+        val runs = SpanBridge.toParagraphs(e)[0].runs
+        assertEquals(listOf("ab", "cd"), runs.map { it.text })
+        assertEquals(listOf(true, false), runs.map { it.style.bold })
+    }
+
+    @Test fun cursorToggleOnMakesTypedTextBold() {
+        val e = SpanBridge.toEditable(listOf(Paragraph(listOf(Run("ab")))), d)
+        RichOps.set(e, 2, 2, CharAttr.Bold)
+        e.insert(2, "X")
+        val runs = SpanBridge.toParagraphs(e)[0].runs
+        assertEquals(listOf("ab", "X"), runs.map { it.text })
+        assertTrue(runs[1].style.bold)
+    }
+
+    @Test fun nonParagraphBlocksSurviveEditing() {
+        val table = com.docscan.app.core.word.Block.Table(
+            com.docscan.app.core.word.TableBlock(listOf(listOf(com.docscan.app.core.word.TableCell())), listOf(2000)),
+        )
+        val blocks = listOf(
+            com.docscan.app.core.word.Block.Para(Paragraph(listOf(Run("before")))),
+            table,
+            com.docscan.app.core.word.Block.PageBreak,
+            com.docscan.app.core.word.Block.Para(Paragraph(listOf(Run("after")))),
+        )
+        val (e, originals) = EditorModel.toEditable(blocks, d)
+        e.insert(0, "X")
+        RichOps.normalize(e, d)
+        val back = EditorModel.toBlocks(e, originals)
+        assertEquals(4, back.size)
+        assertEquals(table, back[1])
+        assertEquals(com.docscan.app.core.word.Block.PageBreak, back[2])
+        assertEquals("Xbefore", (back[0] as com.docscan.app.core.word.Block.Para).paragraph.text)
+    }
 }

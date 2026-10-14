@@ -55,4 +55,5 @@ class AppContainer(context: Context) {
     val arranger = PageArranger(renderer, ocr)
     val exporter = ExportManager(context, renderer, ocr)
     val security = SecurityPrefs(context)
+    val words = com.docscan.app.data.WordStore(context)
 }
