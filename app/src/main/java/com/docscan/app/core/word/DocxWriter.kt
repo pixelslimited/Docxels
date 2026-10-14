@@ -69,7 +69,7 @@ object DocxWriter {
             HEAD + "<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" " +
                 "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dcterms=\"http://purl.org/dc/terms/\" " +
                 "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"><dc:title>${Xml.escape(doc.title)}</dc:title>" +
-                "<dc:creator>DocScan</dc:creator></cp:coreProperties>",
+                "<dc:creator>Kelvin Codes</dc:creator><cp:lastModifiedBy>Kelvin Codes</cp:lastModifiedBy></cp:coreProperties>",
         )
         putText("word/document.xml", HEAD + "<w:document $NS><w:body>$body</w:body></w:document>")
         putText(
