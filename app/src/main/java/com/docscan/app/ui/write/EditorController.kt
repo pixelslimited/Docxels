@@ -35,7 +35,14 @@ class PageDecor(
     val contentHeightPx: Float,
     val bottomMarginPx: Float,
     val smallTextPx: Float,
+    /** Letterhead pictures for page 1 (or the first-page header) and the last page's footer, already decoded. */
+    val headerPics: List<DecorPic> = emptyList(),
+    val footerPics: List<DecorPic> = emptyList(),
+    val sheetHeightTwips: Int = 0,
+    val pxPerTwip: Float = 0f,
 )
+
+class DecorPic(val image: com.docscan.app.core.word.PageImage, val bitmap: android.graphics.Bitmap)
 
 class RichEditText(context: Context) : EditText(context) {
     var onSelection: (() -> Unit)? = null
@@ -99,9 +106,28 @@ class RichEditText(context: Context) : EditText(context) {
         if (need > measuredHeight) setMeasuredDimension(measuredWidth, need)
     }
 
+    private val picPaint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG)
+
+    private fun drawPics(canvas: android.graphics.Canvas, pics: List<DecorPic>, behind: Boolean, d: PageDecor, fromBottom: Boolean) {
+        for (p in pics) {
+            if (p.image.behind != behind) continue
+            val x = p.image.xTwips * d.pxPerTwip
+            val y = if (fromBottom) height - (d.sheetHeightTwips - p.image.yTwips) * d.pxPerTwip else p.image.yTwips * d.pxPerTwip
+            val dst = android.graphics.RectF(x, y, x + p.image.widthTwips * d.pxPerTwip, y + p.image.heightTwips * d.pxPerTwip)
+            canvas.drawBitmap(p.bitmap, null, dst, picPaint)
+        }
+    }
+
     override fun onDraw(canvas: android.graphics.Canvas) {
+        val dd = decor
+        if (dd != null && (dd.headerPics.isNotEmpty() || dd.footerPics.isNotEmpty())) {
+            drawPics(canvas, dd.headerPics, true, dd, false)
+            drawPics(canvas, dd.footerPics, true, dd, true)
+        }
         super.onDraw(canvas)
         val d = decor ?: return
+        drawPics(canvas, d.headerPics, false, d, false)
+        drawPics(canvas, d.footerPics, false, d, true)
         val starts = pageStarts()
         small.textSize = d.smallTextPx
         guide.strokeWidth = maxOf(1f, d.smallTextPx / 8f)
@@ -374,10 +400,21 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
                 contentHeightPx = pageSetup.contentHeightTwips / 20f * ZOOM * eff,
                 bottomMarginPx = pageSetup.marginBottomTwips / 20f * ZOOM * eff,
                 smallTextPx = 9f * ZOOM * eff,
+                headerPics = if (mode == ViewMode.PAGE) pics(if (pageSetup.differentFirstPage) pageSetup.firstHeaderImages else pageSetup.headerImages) else emptyList(),
+                footerPics = if (mode == ViewMode.PAGE) pics(pageSetup.footerImages) else emptyList(),
+                sheetHeightTwips = pageSetup.sheetHeightTwips,
+                pxPerTwip = ZOOM * eff / 20f,
             )
         }
         v.requestLayout()
         v.invalidate()
+    }
+
+    private val picCache = HashMap<com.docscan.app.core.word.PageImage, android.graphics.Bitmap?>()
+
+    private fun pics(list: List<com.docscan.app.core.word.PageImage>): List<DecorPic> = list.mapNotNull { img ->
+        val bmp = picCache.getOrPut(img) { com.docscan.app.export.PageImageBitmaps.decode(img, 1400) } ?: return@mapNotNull null
+        DecorPic(img, bmp)
     }
 
     // -- toolbar state --

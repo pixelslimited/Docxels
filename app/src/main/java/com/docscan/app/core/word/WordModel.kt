@@ -167,6 +167,27 @@ enum class PaperSize(val label: String, val widthTwips: Int, val heightTwips: In
     STATEMENT("Statement", 7920, 12240),
 }
 
+/**
+ * A picture that lives in a header or footer (a letterhead, a logo, a watermark). Position is absolute on the sheet,
+ * in twips from the top-left corner, so it can be drawn the same on every page.
+ */
+class PageImage(
+    val bytes: ByteArray,
+    val extension: String,
+    val xTwips: Int,
+    val yTwips: Int,
+    val widthTwips: Int,
+    val heightTwips: Int,
+    /** True if it sits behind the text (a watermark or full-page letterhead). */
+    val behind: Boolean = false,
+) {
+    override fun equals(other: Any?): Boolean =
+        other is PageImage && extension == other.extension && xTwips == other.xTwips && yTwips == other.yTwips &&
+            widthTwips == other.widthTwips && heightTwips == other.heightTwips && behind == other.behind && bytes.contentEquals(other.bytes)
+
+    override fun hashCode(): Int = bytes.contentHashCode() * 31 + xTwips * 7 + yTwips
+}
+
 data class PageSetup(
     val widthTwips: Int = PaperSize.A4.widthTwips,
     val heightTwips: Int = PaperSize.A4.heightTwips,
@@ -183,6 +204,14 @@ data class PageSetup(
     val firstHeaderText: String = "",
     val firstFooterText: String = "",
     val firstPageNumbers: Boolean = false,
+    /** Distance from the sheet edge to the header / footer text. */
+    val headerDistTwips: Int = 709,
+    val footerDistTwips: Int = 709,
+    /** Letterhead pictures in the header and footer (default pages, and the first page when it differs). */
+    val headerImages: List<PageImage> = emptyList(),
+    val footerImages: List<PageImage> = emptyList(),
+    val firstHeaderImages: List<PageImage> = emptyList(),
+    val firstFooterImages: List<PageImage> = emptyList(),
 ) {
     /** Page size as laid out on the sheet, with orientation applied. */
     val sheetWidthTwips: Int get() = if (landscape) maxOf(widthTwips, heightTwips) else minOf(widthTwips, heightTwips)

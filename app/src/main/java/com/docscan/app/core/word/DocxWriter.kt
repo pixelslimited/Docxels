@@ -27,11 +27,11 @@ object DocxWriter {
         if (doc.blocks.lastOrNull() is Block.Table) body.append("<w:p/>")
 
         val page = doc.page
-        val hasHeader = page.headerText.isNotBlank()
-        val hasFooter = page.footerText.isNotBlank() || page.pageNumbers
+        val hasHeader = page.headerText.isNotBlank() || page.headerImages.isNotEmpty()
+        val hasFooter = page.footerText.isNotBlank() || page.pageNumbers || page.footerImages.isNotEmpty()
         val first = page.differentFirstPage
-        val hasFirstHeader = first && page.firstHeaderText.isNotBlank()
-        val hasFirstFooter = first && (page.firstFooterText.isNotBlank() || page.firstPageNumbers)
+        val hasFirstHeader = first && (page.firstHeaderText.isNotBlank() || page.firstHeaderImages.isNotEmpty())
+        val hasFirstFooter = first && (page.firstFooterText.isNotBlank() || page.firstPageNumbers || page.firstFooterImages.isNotEmpty())
         val rels = StringBuilder()
         rels.append("<Relationship Id=\"rIdStyles\" Type=\"$REL/styles\" Target=\"styles.xml\"/>")
         rels.append("<Relationship Id=\"rIdNumbering\" Type=\"$REL/numbering\" Target=\"numbering.xml\"/>")
@@ -58,7 +58,7 @@ object DocxWriter {
         body.append(
             "<w:pgMar w:top=\"${page.marginTopTwips}\" w:right=\"${page.marginRightTwips}\" " +
                 "w:bottom=\"${page.marginBottomTwips}\" w:left=\"${page.marginLeftTwips}\" " +
-                "w:header=\"709\" w:footer=\"709\" w:gutter=\"0\"/>",
+                "w:header=\"${page.headerDistTwips}\" w:footer=\"${page.footerDistTwips}\" w:gutter=\"0\"/>",
         )
         if (first) body.append("<w:titlePg/>")
         body.append("</w:sectPr>")
@@ -66,7 +66,7 @@ object DocxWriter {
         val zip = ZipOutputStream(out)
         fun putText(name: String, text: String) = put(zip, name, text.toByteArray(Charsets.UTF_8))
 
-        putText("[Content_Types].xml", contentTypes(ctx, hasHeader, hasFooter, hasFirstHeader, hasFirstFooter))
+        putText("[Content_Types].xml", contentTypes(ctx, hasHeader, hasFooter, hasFirstHeader, hasFirstFooter, (page.headerImages + page.footerImages + page.firstHeaderImages + page.firstFooterImages).map { it.extension }))
         putText(
             "_rels/.rels",
             HEAD + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
@@ -88,19 +88,61 @@ object DocxWriter {
         )
         putText("word/styles.xml", stylesXml())
         putText("word/numbering.xml", numberingXml(ctx))
-        if (hasHeader) putText("word/header1.xml", HEAD + headerXml(page.headerText))
-        if (hasFooter) putText("word/footer1.xml", HEAD + footerXml(page.footerText, page.pageNumbers))
-        if (hasFirstHeader) putText("word/header2.xml", HEAD + headerXml(page.firstHeaderText))
-        if (hasFirstFooter) putText("word/footer2.xml", HEAD + footerXml(page.firstFooterText, page.firstPageNumbers))
+        var mediaNo = 0
+        val hfExts = LinkedHashSet<String>()
+        /** Writes a header/footer part, plus its relationships and pictures when it has any. */
+        fun part(name: String, xml: (List<String>) -> String, images: List<PageImage>) {
+            val ids = images.mapIndexed { i, _ -> "rIdP${i + 1}" }
+            putText("word/$name", HEAD + xml(ids))
+            if (images.isNotEmpty()) {
+                val sb = StringBuilder("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">")
+                images.forEachIndexed { i, img ->
+                    mediaNo++
+                    hfExts += img.extension
+                    sb.append("<Relationship Id=\"${ids[i]}\" Type=\"$REL/image\" Target=\"media/letterhead$mediaNo.${img.extension}\"/>")
+                    put(zip, "word/media/letterhead$mediaNo.${img.extension}", img.bytes)
+                }
+                sb.append("</Relationships>")
+                putText("word/_rels/$name.rels", HEAD + sb)
+            }
+        }
+        if (hasHeader) part("header1.xml", { ids -> headerXml(page.headerText, page.headerImages, ids, 1001) }, page.headerImages)
+        if (hasFooter) part("footer1.xml", { ids -> footerXml(page.footerText, page.pageNumbers, page.footerImages, ids, 1101) }, page.footerImages)
+        if (hasFirstHeader) part("header2.xml", { ids -> headerXml(page.firstHeaderText, page.firstHeaderImages, ids, 1201) }, page.firstHeaderImages)
+        if (hasFirstFooter) part("footer2.xml", { ids -> footerXml(page.firstFooterText, page.firstPageNumbers, page.firstFooterImages, ids, 1301) }, page.firstFooterImages)
         ctx.images.forEachIndexed { i, img -> put(zip, "word/media/image${i + 1}.${img.extension}", img.bytes) }
         zip.finish()
         zip.flush()
     }
 
-    private fun headerXml(text: String) =
-        "<w:hdr $NS><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t xml:space=\"preserve\">${Xml.escape(text)}</w:t></w:r></w:p></w:hdr>"
+    /** One header/footer picture, placed by absolute position on the sheet so it repeats exactly on every page. */
+    private fun pageImageXml(img: PageImage, rId: String, id: Int): String {
+        val cx = img.widthTwips.toLong() * Twips.EMU_PER_TWIP
+        val cy = img.heightTwips.toLong() * Twips.EMU_PER_TWIP
+        val x = img.xTwips.toLong() * Twips.EMU_PER_TWIP
+        val y = img.yTwips.toLong() * Twips.EMU_PER_TWIP
+        return "<w:r><w:drawing><wp:anchor distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\" simplePos=\"0\" relativeHeight=\"${251658240 + id}\" " +
+            "behindDoc=\"${if (img.behind) 1 else 0}\" locked=\"0\" layoutInCell=\"1\" allowOverlap=\"1\"><wp:simplePos x=\"0\" y=\"0\"/>" +
+            "<wp:positionH relativeFrom=\"page\"><wp:posOffset>$x</wp:posOffset></wp:positionH>" +
+            "<wp:positionV relativeFrom=\"page\"><wp:posOffset>$y</wp:posOffset></wp:positionV>" +
+            "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/><wp:wrapNone/>" +
+            "<wp:docPr id=\"$id\" name=\"Letterhead $id\"/><wp:cNvGraphicFramePr/>" +
+            "<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\"><pic:pic>" +
+            "<pic:nvPicPr><pic:cNvPr id=\"$id\" name=\"Letterhead $id\"/><pic:cNvPicPr/></pic:nvPicPr>" +
+            "<pic:blipFill><a:blip r:embed=\"$rId\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>" +
+            "<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$cx\" cy=\"$cy\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr>" +
+            "</pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>"
+    }
 
-    private fun footerXml(text: String, numbers: Boolean): String {
+    private fun pictures(images: List<PageImage>, ids: List<String>, firstId: Int): String =
+        images.indices.joinToString("") { pageImageXml(images[it], ids[it], firstId + it) }
+
+    private fun headerXml(text: String, images: List<PageImage>, ids: List<String>, firstId: Int): String {
+        val textRun = if (text.isBlank()) "" else "<w:r><w:t xml:space=\"preserve\">${Xml.escape(text)}</w:t></w:r>"
+        return "<w:hdr $NS><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr>$textRun${pictures(images, ids, firstId)}</w:p></w:hdr>"
+    }
+
+    private fun footerXml(text: String, numbers: Boolean, images: List<PageImage>, ids: List<String>, firstId: Int): String {
         val sb = StringBuilder()
         if (text.isNotBlank()) {
             sb.append("<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t xml:space=\"preserve\">${Xml.escape(text)}</w:t></w:r></w:p>")
@@ -115,6 +157,8 @@ object DocxWriter {
                     "<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
             )
         }
+        if (images.isNotEmpty()) sb.append("<w:p>${pictures(images, ids, firstId)}</w:p>")
+        if (sb.isEmpty()) sb.append("<w:p/>")
         return "<w:ftr $NS>$sb</w:ftr>"
     }
 
@@ -141,12 +185,12 @@ object DocxWriter {
         zip.closeEntry()
     }
 
-    private fun contentTypes(ctx: Ctx, header: Boolean, footer: Boolean, firstHeader: Boolean, firstFooter: Boolean): String {
+    private fun contentTypes(ctx: Ctx, header: Boolean, footer: Boolean, firstHeader: Boolean, firstFooter: Boolean, extra: List<String>): String {
         val sb = StringBuilder(HEAD)
         sb.append("<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">")
         sb.append("<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>")
         sb.append("<Default Extension=\"xml\" ContentType=\"application/xml\"/>")
-        for (ext in ctx.images.map { it.extension }.distinct()) {
+        for (ext in (ctx.images.map { it.extension } + extra).distinct()) {
             sb.append("<Default Extension=\"$ext\" ContentType=\"${imageMime(ext)}\"/>")
         }
         val w = "application/vnd.openxmlformats-officedocument.wordprocessingml"

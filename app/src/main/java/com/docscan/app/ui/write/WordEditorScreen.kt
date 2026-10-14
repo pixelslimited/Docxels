@@ -6,6 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -178,6 +183,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     val container = com.docscan.app.LocalContainer.current
     var viewMode by remember { mutableStateOf(runCatching { ViewMode.valueOf(container.ui.editorView) }.getOrDefault(ViewMode.PAGE)) }
     var reading by remember { mutableStateOf(false) }
+    var previewDoc by remember { mutableStateOf<WordDoc?>(null) }
     var ribbonTab by remember { mutableIntStateOf(0) }
     val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     val snackbar = remember { SnackbarHostState() }
@@ -241,6 +247,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
+                            DropdownMenuItem(text = { Text("Page preview") }, onClick = { menu = false; previewDoc = controller.toDoc(title, page) })
                             DropdownMenuItem(
                                 text = { Text("Share as PDF") },
                                 onClick = {
@@ -334,6 +341,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 viewMode = viewMode,
                 onViewMode = { viewMode = it; container.ui.editorView = it.name },
                 onRead = { reading = true },
+                onPreview = { previewDoc = controller.toDoc(title, page) },
                 onTable = { tableOpen = true },
                 onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onShape = { preset ->
@@ -361,6 +369,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             )
         }
     }
+
+    previewDoc?.let { d -> PagePreview(vm, d) { previewDoc = null } }
 
     if (renaming) {
         TextInputDialog("Rename document", title, "Rename", onConfirm = {
@@ -474,6 +484,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun Ribbon(
     c: EditorController,
@@ -483,6 +494,7 @@ private fun Ribbon(
     viewMode: ViewMode,
     onViewMode: (ViewMode) -> Unit,
     onRead: () -> Unit,
+    onPreview: () -> Unit,
     onTable: () -> Unit,
     onPicture: () -> Unit,
     onShape: (String) -> Unit,
@@ -512,122 +524,154 @@ private fun Ribbon(
     var shapeMenu by remember { mutableStateOf(false) }
     val tabs = listOf("Home", "Insert", "Layout", "Review", "View")
     CustomColorDialogHost(customFor, { customFor = 0 }, c)
+    var open by remember { mutableStateOf(false) }
+    var grid by remember { mutableStateOf(true) }
+    val wide = tab != 0
+    // One item, drawn as a small icon in the compact bar or as a labelled tile in the grid.
+    @Composable
+    fun Btn(
+        label: String,
+        icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+        glyph: String? = null,
+        on: Boolean = false,
+        main: Boolean = true,
+        close: Boolean = false,
+        onClick: () -> Unit,
+    ) {
+        if (!grid && !main) return
+        val click = { onClick(); if (close) open = false }
+        if (grid) {
+            RibbonTile(label, icon, glyph, on, click)
+        } else if (glyph != null) {
+            TextButton(onClick = click) { Text(glyph, maxLines = 1, modifier = Modifier.widthIn(max = 110.dp)) }
+        } else if (wide && icon != null) {
+            RibbonButton(icon, label, click)
+        } else if (icon != null) {
+            Toggle(icon, label, on, click)
+        }
+    }
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Column {
-            TabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
-                tabs.forEachIndexed { i, label ->
-                    Tab(selected = tab == i, onClick = { onTab(i) }, text = { Text(label, maxLines = 1) })
+            if (!open) {
+                Box(Modifier.fillMaxWidth().height(36.dp).clickable { open = true; grid = true }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Show tools", modifier = Modifier.size(28.dp))
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.weight(1f)) {
+                        tabs.forEachIndexed { i, label ->
+                            Tab(selected = tab == i, onClick = { if (tab == i && grid) grid = false else { onTab(i); grid = true } }, text = { Text(label, maxLines = 1) })
+                        }
+                    }
+                    IconButton(onClick = { open = false }) { Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Hide tools") }
                 }
             }
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            val items: @Composable () -> Unit = {
                 when (tab) {
                     0 -> {
-            Box {
-                TextButton(onClick = { styleMenu = true }) { Text(s.style.label) }
-                DropdownMenu(expanded = styleMenu, onDismissRequest = { styleMenu = false }) {
-                    ParaStyle.entries.forEach { st ->
-                        DropdownMenuItem(text = { Text(st.label) }, onClick = { styleMenu = false; c.setStyle(st) })
-                    }
-                }
-            }
-            Toggle(Icons.Default.FormatPaint, if (painting) "Apply copied formatting" else "Format painter: copy formatting", painting, onPainter)
-            TextButton(onClick = onFont) { Text(s.font ?: "Font", maxLines = 1, modifier = Modifier.widthIn(max = 110.dp)) }
-            TextButton(onClick = { c.sizeStep(-1) }) { Text("A−") }
-            TextButton(onClick = onSize) { Text(if (s.sizePt % 1f == 0f) s.sizePt.toInt().toString() else s.sizePt.toString()) }
-            TextButton(onClick = { c.sizeStep(1) }) { Text("A+") }
-            Box {
-                TextButton(onClick = { onCaseMenu(true) }) { Text("Aa") }
-                DropdownMenu(expanded = caseMenu, onDismissRequest = { onCaseMenu(false) }) {
-                    com.docscan.app.core.word.CaseMode.entries.forEach { m ->
-                        DropdownMenuItem(text = { Text(m.label) }, onClick = { onCaseMenu(false); c.changeCase(m) })
-                    }
-                }
-            }
-            Toggle(Icons.Default.FormatBold, "Bold", s.bold) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
-            Toggle(Icons.Default.FormatItalic, "Italic", s.italic) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
-            Toggle(Icons.Default.FormatUnderlined, "Underline", s.underline) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
-            Box {
-                TextButton(onClick = { ulMenu = true }) { Text("U▾") }
-                DropdownMenu(expanded = ulMenu, onDismissRequest = { ulMenu = false }) {
-                    listOf(
-                        "single" to "Single", "double" to "Double", "thick" to "Thick", "dotted" to "Dotted",
-                        "dash" to "Dashed", "wave" to "Wavy", "words" to "Words only",
-                    ).forEach { (w, label) ->
-                        DropdownMenuItem(text = { Text(label) }, onClick = {
-                            ulMenu = false
-                            if (w == "single") c.apply(CharAttr.Underline) else c.apply(CharAttr.UnderlineAs(w))
-                        })
-                    }
-                    DropdownMenuItem(text = { Text("No underline") }, onClick = { ulMenu = false; c.remove(CharKind.UNDERLINE) })
-                }
-            }
-            Toggle(Icons.Default.StrikethroughS, "Strikethrough", s.strike) { c.toggle(CharKind.STRIKE, CharAttr.Strike) }
-            Toggle(Icons.Default.Superscript, "Superscript", s.sup) { c.toggleVert(true) }
-            Toggle(Icons.Default.Subscript, "Subscript", s.sub) { c.toggleVert(false) }
-            Box {
-                Toggle(Icons.Default.FormatColorText, "Text colour", false) { colorMenu = true }
-                DropdownMenu(expanded = colorMenu, onDismissRequest = { colorMenu = false }) {
-                    Swatches(TEXT_COLORS, "Automatic", { colorMenu = false; c.remove(CharKind.COLOR) }) {
-                        colorMenu = false
-                        c.apply(CharAttr.Color(it))
-                    }
-                    TextButton(onClick = { colorMenu = false; customFor = 1 }) { Text("More colours…") }
-                }
-            }
-            Box {
-                Toggle(Icons.Default.FormatColorFill, "Highlight", false) { fillMenu = true }
-                DropdownMenu(expanded = fillMenu, onDismissRequest = { fillMenu = false }) {
-                    Swatches(HIGHLIGHTS, "No highlight", { fillMenu = false; c.remove(CharKind.HIGHLIGHT) }) {
-                        fillMenu = false
-                        c.apply(CharAttr.Highlight(it))
-                    }
-                    TextButton(onClick = { fillMenu = false; customFor = 2 }) { Text("More colours…") }
-                }
-            }
-            Toggle(Icons.Default.FormatAlignLeft, "Align left", s.align == Align.LEFT) { c.setAlign(Align.LEFT) }
-            Toggle(Icons.Default.FormatAlignCenter, "Align centre", s.align == Align.CENTER) { c.setAlign(Align.CENTER) }
-            Toggle(Icons.Default.FormatAlignRight, "Align right", s.align == Align.RIGHT) { c.setAlign(Align.RIGHT) }
-            Toggle(Icons.Default.FormatAlignJustify, "Justify", s.align == Align.JUSTIFY) { c.setAlign(Align.JUSTIFY) }
-            Toggle(Icons.AutoMirrored.Filled.FormatListBulleted, "Bullet list", s.list == ListKind.BULLET) { c.toggleList(ListKind.BULLET) }
-            Toggle(Icons.Default.FormatListNumbered, "Numbered list", s.list == ListKind.NUMBER) { c.toggleList(ListKind.NUMBER) }
-            Toggle(Icons.Default.FormatIndentDecrease, "Decrease indent", false) { c.indent(-1) }
-            Toggle(Icons.Default.FormatIndentIncrease, "Increase indent", false) { c.indent(1) }
-            Toggle(Icons.Default.FormatClear, "Clear formatting", false) { c.clearFormatting() }
+                        Box {
+                            Btn("Style", glyph = s.style.label) { styleMenu = true }
+                            DropdownMenu(expanded = styleMenu, onDismissRequest = { styleMenu = false }) {
+                                ParaStyle.entries.forEach { st ->
+                                    DropdownMenuItem(text = { Text(st.label) }, onClick = { styleMenu = false; c.setStyle(st) })
+                                }
+                            }
+                        }
+                        Btn("Bold", Icons.Default.FormatBold, on = s.bold) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
+                        Btn("Italic", Icons.Default.FormatItalic, on = s.italic) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
+                        Btn("Underline", Icons.Default.FormatUnderlined, on = s.underline) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
+                        Btn("Smaller", glyph = "A−") { c.sizeStep(-1) }
+                        Btn("Size", glyph = if (s.sizePt % 1f == 0f) s.sizePt.toInt().toString() else s.sizePt.toString(), close = true) { onSize() }
+                        Btn("Larger", glyph = "A+") { c.sizeStep(1) }
+                        Btn("Bullets", Icons.AutoMirrored.Filled.FormatListBulleted, on = s.list == ListKind.BULLET) { c.toggleList(ListKind.BULLET) }
+                        Btn("Numbering", Icons.Default.FormatListNumbered, on = s.list == ListKind.NUMBER) { c.toggleList(ListKind.NUMBER) }
+                        Btn("Font", glyph = s.font ?: "Font", main = false, close = true) { onFont() }
+                        Btn("Format painter", Icons.Default.FormatPaint, on = painting, main = false) { onPainter() }
+                        Box {
+                            Btn("Change case", glyph = "Aa", main = false) { onCaseMenu(true) }
+                            DropdownMenu(expanded = caseMenu, onDismissRequest = { onCaseMenu(false) }) {
+                                com.docscan.app.core.word.CaseMode.entries.forEach { m ->
+                                    DropdownMenuItem(text = { Text(m.label) }, onClick = { onCaseMenu(false); c.changeCase(m) })
+                                }
+                            }
+                        }
+                        Box {
+                            Btn("Underline style", glyph = "U▾", main = false) { ulMenu = true }
+                            DropdownMenu(expanded = ulMenu, onDismissRequest = { ulMenu = false }) {
+                                listOf(
+                                    "single" to "Single", "double" to "Double", "thick" to "Thick", "dotted" to "Dotted",
+                                    "dash" to "Dashed", "wave" to "Wavy", "words" to "Words only",
+                                ).forEach { (w, label) ->
+                                    DropdownMenuItem(text = { Text(label) }, onClick = {
+                                        ulMenu = false
+                                        if (w == "single") c.apply(CharAttr.Underline) else c.apply(CharAttr.UnderlineAs(w))
+                                    })
+                                }
+                                DropdownMenuItem(text = { Text("No underline") }, onClick = { ulMenu = false; c.remove(CharKind.UNDERLINE) })
+                            }
+                        }
+                        Btn("Strikethrough", Icons.Default.StrikethroughS, on = s.strike, main = false) { c.toggle(CharKind.STRIKE, CharAttr.Strike) }
+                        Btn("Superscript", Icons.Default.Superscript, on = s.sup, main = false) { c.toggleVert(true) }
+                        Btn("Subscript", Icons.Default.Subscript, on = s.sub, main = false) { c.toggleVert(false) }
+                        Box {
+                            Btn("Text colour", Icons.Default.FormatColorText, main = false) { colorMenu = true }
+                            DropdownMenu(expanded = colorMenu, onDismissRequest = { colorMenu = false }) {
+                                Swatches(TEXT_COLORS, "Automatic", { colorMenu = false; c.remove(CharKind.COLOR) }) {
+                                    colorMenu = false
+                                    c.apply(CharAttr.Color(it))
+                                }
+                                TextButton(onClick = { colorMenu = false; customFor = 1 }) { Text("More colours…") }
+                            }
+                        }
+                        Box {
+                            Btn("Highlight", Icons.Default.FormatColorFill, main = false) { fillMenu = true }
+                            DropdownMenu(expanded = fillMenu, onDismissRequest = { fillMenu = false }) {
+                                Swatches(HIGHLIGHTS, "No highlight", { fillMenu = false; c.remove(CharKind.HIGHLIGHT) }) {
+                                    fillMenu = false
+                                    c.apply(CharAttr.Highlight(it))
+                                }
+                                TextButton(onClick = { fillMenu = false; customFor = 2 }) { Text("More colours…") }
+                            }
+                        }
+                        Btn("Align left", Icons.Default.FormatAlignLeft, on = s.align == Align.LEFT, main = false) { c.setAlign(Align.LEFT) }
+                        Btn("Align centre", Icons.Default.FormatAlignCenter, on = s.align == Align.CENTER, main = false) { c.setAlign(Align.CENTER) }
+                        Btn("Align right", Icons.Default.FormatAlignRight, on = s.align == Align.RIGHT, main = false) { c.setAlign(Align.RIGHT) }
+                        Btn("Justify", Icons.Default.FormatAlignJustify, on = s.align == Align.JUSTIFY, main = false) { c.setAlign(Align.JUSTIFY) }
+                        Btn("Outdent", Icons.Default.FormatIndentDecrease, main = false) { c.indent(-1) }
+                        Btn("Indent", Icons.Default.FormatIndentIncrease, main = false) { c.indent(1) }
+                        Btn("Clear formatting", Icons.Default.FormatClear, main = false) { c.clearFormatting() }
                     }
                     1 -> {
-                        RibbonButton(Icons.Default.TableChart, "Table", onTable)
-                        RibbonButton(Icons.Default.Image, "Picture", onPicture)
+                        Btn("Table", Icons.Default.TableChart, close = true) { onTable() }
+                        Btn("Picture", Icons.Default.Image, close = true) { onPicture() }
                         Box {
-                            RibbonButton(Icons.Default.CropSquare, "Shape") { shapeMenu = true }
+                            Btn("Shape", Icons.Default.CropSquare) { shapeMenu = true }
                             DropdownMenu(expanded = shapeMenu, onDismissRequest = { shapeMenu = false }) {
                                 com.docscan.app.core.word.ShapePresets.INSERTABLE.forEach { (preset, label) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { shapeMenu = false; onShape(preset) })
                                 }
                             }
                         }
-                        RibbonButton(Icons.Default.InsertPageBreak, "Page break", onPageBreak)
-                        RibbonButton(Icons.Default.Link, "Link", onLink)
-                        RibbonButton(Icons.Default.Event, "Date & time", onDate)
-                        RibbonButton(Icons.Default.Functions, "Symbol", onSymbol)
+                        Btn("Page break", Icons.Default.InsertPageBreak, close = true) { onPageBreak() }
+                        Btn("Link", Icons.Default.Link, close = true) { onLink() }
+                        Btn("Date & time", Icons.Default.Event, close = true) { onDate() }
+                        Btn("Symbol", Icons.Default.Functions, close = true) { onSymbol() }
                     }
                     2 -> {
-                        RibbonButton(Icons.Default.Description, "Page setup", onPageSetup)
-                        RibbonButton(Icons.Default.FormatAlignLeft, "Paragraph", onParagraph)
+                        Btn("Page setup", Icons.Default.Description, close = true) { onPageSetup() }
+                        Btn("Paragraph", Icons.Default.FormatAlignLeft, close = true) { onParagraph() }
                         Box {
-                            RibbonButton(Icons.Default.FormatLineSpacing, "Line spacing") { spacingMenu = true }
+                            Btn("Line spacing", Icons.Default.FormatLineSpacing) { spacingMenu = true }
                             DropdownMenu(expanded = spacingMenu, onDismissRequest = { spacingMenu = false }) {
                                 listOf(null to "Default", 1.0f to "Single", 1.15f to "1.15", 1.5f to "1.5", 2.0f to "Double").forEach { (m, label) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { spacingMenu = false; c.setLineSpacing(m) })
                                 }
                             }
                         }
-                        RibbonButton(Icons.Default.FormatIndentDecrease, "Outdent") { c.indent(-1) }
-                        RibbonButton(Icons.Default.FormatIndentIncrease, "Indent") { c.indent(1) }
+                        Btn("Outdent", Icons.Default.FormatIndentDecrease) { c.indent(-1) }
+                        Btn("Indent", Icons.Default.FormatIndentIncrease) { c.indent(1) }
                         Box {
-                            RibbonButton(Icons.Default.FormatColorFill, "Shading") { shadeMenu = true }
+                            Btn("Shading", Icons.Default.FormatColorFill) { shadeMenu = true }
                             DropdownMenu(expanded = shadeMenu, onDismissRequest = { shadeMenu = false }) {
                                 DropdownMenuItem(text = { Text("No shading") }, onClick = { shadeMenu = false; c.setShading(null) })
                                 androidx.compose.foundation.layout.Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
@@ -641,14 +685,15 @@ private fun Ribbon(
                                 }
                             }
                         }
-                        RibbonButton(Icons.Default.CropSquare, "Border") { c.toggleBorder() }
+                        Btn("Border", Icons.Default.CropSquare) { c.toggleBorder() }
                     }
                     3 -> {
-                        RibbonButton(Icons.Default.Search, "Find and replace", onFind)
-                        RibbonButton(Icons.Default.Numbers, "Word count", onCount)
+                        Btn("Find and replace", Icons.Default.Search, close = true) { onFind() }
+                        Btn("Word count", Icons.Default.Numbers, close = true) { onCount() }
                     }
                     else -> {
-                        RibbonButton(Icons.Default.Menu, "Navigation", onNav)
+                        Btn("Page preview", Icons.Default.Description, close = true) { onPreview() }
+                        Btn("Navigation", Icons.Default.Menu, close = true) { onNav() }
                         com.docscan.app.ui.kit.FilterPill("Read mode", false, onRead, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Print layout", viewMode == ViewMode.PAGE, { onViewMode(ViewMode.PAGE) }, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Text width", viewMode == ViewMode.TEXT, { onViewMode(ViewMode.TEXT) }, Modifier.padding(horizontal = 4.dp))
@@ -656,7 +701,34 @@ private fun Ribbon(
                     }
                 }
             }
+            if (open && grid) {
+                androidx.compose.foundation.layout.FlowRow(
+                    Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) { items() }
+            }
         }
+    }
+}
+
+@Composable
+private fun RibbonTile(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, glyph: String?, on: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .width(76.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+            .background(if (on) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(Modifier.height(26.dp), contentAlignment = Alignment.Center) {
+            if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+            else Text(glyph.orEmpty(), style = MaterialTheme.typography.titleMedium, maxLines = 1)
+        }
+        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 
@@ -750,6 +822,8 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
     var mBottom by remember { mutableStateOf(cm(page.marginBottomTwips)) }
     var mLeft by remember { mutableStateOf(cm(page.marginLeftTwips)) }
     var mRight by remember { mutableStateOf(cm(page.marginRightTwips)) }
+    var dropPics by remember { mutableStateOf(false) }
+    val picCount = page.headerImages.size + page.footerImages.size + page.firstHeaderImages.size + page.firstFooterImages.size
     var header by remember { mutableStateOf(page.headerText) }
     var footer by remember { mutableStateOf(page.footerText) }
     var numbers by remember { mutableStateOf(page.pageNumbers) }
@@ -792,6 +866,15 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
                 }
                 OutlinedTextField(header, { header = it }, label = { Text("Header text") }, singleLine = true)
                 OutlinedTextField(footer, { footer = it }, label = { Text("Footer text") }, singleLine = true)
+                if (picCount > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (dropPics) "Letterhead pictures will be removed" else "Letterhead: $picCount picture(s) in the header/footer, kept on every page",
+                            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { dropPics = !dropPics }) { Text(if (dropPics) "Keep" else "Remove") }
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(numbers, { numbers = it })
                     Text("  Page numbers")
@@ -819,7 +902,7 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
                         marginTopTwips = tw(mTop, page.marginTopTwips), marginBottomTwips = tw(mBottom, page.marginBottomTwips),
                         headerText = header.trim(), footerText = footer.trim(), pageNumbers = numbers,
                         differentFirstPage = diffFirst, firstHeaderText = header1.trim(), firstFooterText = footer1.trim(), firstPageNumbers = numbers1,
-                    ),
+                    ).let { if (dropPics) it.copy(headerImages = emptyList(), footerImages = emptyList(), firstHeaderImages = emptyList(), firstFooterImages = emptyList()) else it },
                 )
             }) { Text("Apply") }
         },

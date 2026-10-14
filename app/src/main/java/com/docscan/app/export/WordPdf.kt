@@ -18,6 +18,7 @@ import com.docscan.app.core.word.ImageBlock
 import com.docscan.app.core.word.Paragraph
 import com.docscan.app.core.word.StyleDefaults
 import com.docscan.app.core.word.TableBlock
+import com.docscan.app.core.word.PageImage
 import com.docscan.app.core.word.WordDoc
 import com.docscan.app.ui.write.SpanBridge
 import com.docscan.app.ui.write.ZOOM
@@ -92,6 +93,19 @@ object WordPdf {
             current = p
             canvas = p.canvas
             y = 0f
+            // Pictures behind the text (letterhead backgrounds, watermarks) go down first.
+            val firstNow = page.differentFirstPage && pageNo == 1
+            val c = p.canvas
+            for (img in (if (firstNow) page.firstHeaderImages + page.firstFooterImages else page.headerImages + page.footerImages)) {
+                if (img.behind) drawPageImage(c, img)
+            }
+        }
+
+        val decoded = HashMap<PageImage, android.graphics.Bitmap?>()
+        fun drawPageImage(c: Canvas, img: PageImage) {
+            val bmp = decoded.getOrPut(img) { PageImageBitmaps.decode(img, 1600) } ?: return
+            val dst = android.graphics.RectF(img.xTwips / 20f, img.yTwips / 20f, (img.xTwips + img.widthTwips) / 20f, (img.yTwips + img.heightTwips) / 20f)
+            c.drawBitmap(bmp, null, dst, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
         }
 
         fun finishPage() {
@@ -102,6 +116,9 @@ object WordPdf {
             val headerText = if (firstPage) page.firstHeaderText else page.headerText
             val footerText = if (firstPage) page.firstFooterText else page.footerText
             val numbers = if (firstPage) page.firstPageNumbers else page.pageNumbers
+            for (img in (if (firstPage) page.firstHeaderImages + page.firstFooterImages else page.headerImages + page.footerImages)) {
+                if (!img.behind) drawPageImage(c, img)
+            }
             if (headerText.isNotEmpty()) c.drawText(headerText, mL, mT / 2f + 3f, small)
             val fy = pageH - mB / 2f + 3f
             if (footerText.isNotEmpty()) c.drawText(footerText, mL, fy, small)

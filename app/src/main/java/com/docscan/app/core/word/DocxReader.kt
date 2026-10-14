@@ -326,6 +326,8 @@ object DocxReader {
                     marginBottomTwips = m.attr("bottom")?.toIntOrNull()?.coerceAtLeast(0) ?: setup.marginBottomTwips,
                     marginLeftTwips = m.attr("left")?.toIntOrNull()?.coerceAtLeast(0) ?: setup.marginLeftTwips,
                     marginRightTwips = m.attr("right")?.toIntOrNull()?.coerceAtLeast(0) ?: setup.marginRightTwips,
+                    headerDistTwips = m.attr("header")?.toIntOrNull()?.coerceAtLeast(0) ?: setup.headerDistTwips,
+                    footerDistTwips = m.attr("footer")?.toIntOrNull()?.coerceAtLeast(0) ?: setup.footerDistTwips,
                 )
             }
             val headerRef = sect.childrenNamed("headerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull() }
@@ -335,29 +337,134 @@ object DocxReader {
             if (sect.child("titlePg") != null) {
                 setup = setup.copy(differentFirstPage = true)
                 firstHeaderRef?.attr("id")?.let { id ->
-                    rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(firstHeaderText = partText(it).first) } }
+                    rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(firstHeaderText = partText(it).first, firstHeaderImages = partImages(path, it, false, setup)) } }
                 }
                 firstFooterRef?.attr("id")?.let { id ->
                     rels[id]?.let { path ->
                         xml(path)?.let {
                             val (text, hasPage) = partText(it)
-                            setup = setup.copy(firstFooterText = text, firstPageNumbers = hasPage)
+                            setup = setup.copy(firstFooterText = text, firstPageNumbers = hasPage, firstFooterImages = partImages(path, it, true, setup))
                         }
                     }
                 }
             }
             headerRef?.attr("id")?.let { id ->
-                rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(headerText = partText(it).first) } }
+                rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(headerText = partText(it).first, headerImages = partImages(path, it, false, setup)) } }
             }
             footerRef?.attr("id")?.let { id ->
                 rels[id]?.let { path ->
                     xml(path)?.let {
                         val (text, hasPage) = partText(it)
-                        setup = setup.copy(footerText = text, pageNumbers = hasPage)
+                        setup = setup.copy(footerText = text, pageNumbers = hasPage, footerImages = partImages(path, it, true, setup))
                     }
                 }
             }
-            return setup
+            return pushMargins(setup)
+        }
+
+        /** Letterhead pictures of one header/footer part, placed absolutely on the sheet. */
+        fun partImages(path: String, root: XNode, footer: Boolean, setup: PageSetup): List<PageImage> {
+            val dir = path.substringBeforeLast('/', "")
+            val partRels = readRels((if (dir.isEmpty()) "" else "$dir/") + "_rels/" + path.substringAfterLast('/') + ".rels", dir)
+            val out = ArrayList<PageImage>()
+            val sheetW = setup.sheetWidthTwips
+            val sheetH = setup.sheetHeightTwips
+            fun emu(n: XNode?): Int? = n?.text?.toString()?.trim()?.toLongOrNull()?.let { (it / Twips.EMU_PER_TWIP).toInt() }
+            for (p in root.findAll("p")) {
+                val jc = p.child("pPr")?.child("jc")?.attr("val")
+                for (d in p.findAll("drawing")) {
+                    val blip = d.find("blip") ?: continue
+                    val rid = blip.attr("embed") ?: continue
+                    val target = partRels[rid] ?: continue
+                    val bytes = parts[target] ?: continue
+                    val ext = target.substringAfterLast('.', "png").lowercase().let { if (it == "jpeg") "jpg" else it }
+                    if (ext != "png" && ext != "jpg" && ext != "gif" && ext != "bmp") continue
+                    val extent = d.find("extent")
+                    val w = ((extent?.attr("cx")?.toLongOrNull() ?: 0L) / Twips.EMU_PER_TWIP).toInt()
+                    val h = ((extent?.attr("cy")?.toLongOrNull() ?: 0L) / Twips.EMU_PER_TWIP).toInt()
+                    if (w <= 0 || h <= 0) continue
+                    val anchor = d.find("anchor")
+                    var x: Int
+                    var y: Int
+                    var behind = false
+                    if (anchor == null) {
+                        val area = sheetW - setup.marginLeftTwips - setup.marginRightTwips
+                        x = setup.marginLeftTwips + when (jc) { "center" -> (area - w) / 2; "right" -> area - w; else -> 0 }
+                        y = if (footer) sheetH - setup.footerDistTwips - h else setup.headerDistTwips
+                    } else {
+                        behind = anchor.attr("behindDoc").let { v -> v == "1" || v == "true" }
+                        val ph = anchor.child("positionH")
+                        val pv = anchor.child("positionV")
+                        val hRel = ph?.attr("relativeFrom") ?: "column"
+                        val vRel = pv?.attr("relativeFrom") ?: "paragraph"
+                        val hOrigin = if (hRel == "page") 0 else setup.marginLeftTwips
+                        val hArea = if (hRel == "page") sheetW else sheetW - setup.marginLeftTwips - setup.marginRightTwips
+                        x = hOrigin + (emu(ph?.child("posOffset")) ?: when (ph?.child("align")?.text?.toString()?.trim()) {
+                            "center" -> (hArea - w) / 2
+                            "right" -> hArea - w
+                            else -> 0
+                        })
+                        val vOrigin = when (vRel) {
+                            "page" -> 0
+                            "margin", "topMargin", "insideMargin", "outsideMargin" -> if (footer) sheetH - setup.marginBottomTwips else setup.marginTopTwips
+                            else -> if (footer) sheetH - setup.footerDistTwips - 300 else setup.headerDistTwips
+                        }
+                        val vArea = if (vRel == "page") sheetH else sheetH - setup.marginTopTwips - setup.marginBottomTwips
+                        y = vOrigin + (emu(pv?.child("posOffset")) ?: when (pv?.child("align")?.text?.toString()?.trim()) {
+                            "center" -> (vArea - h) / 2
+                            "bottom" -> vArea - h
+                            else -> 0
+                        })
+                    }
+                    out += PageImage(bytes, ext, x, y, w, h, behind)
+                }
+                // Older Word files draw header pictures with VML.
+                for (pict in p.findAll("pict")) {
+                    val data = pict.find("imagedata") ?: continue
+                    val rid = data.attr("id") ?: continue
+                    val target = partRels[rid] ?: continue
+                    val bytes = parts[target] ?: continue
+                    val ext = target.substringAfterLast('.', "png").lowercase().let { if (it == "jpeg") "jpg" else it }
+                    if (ext != "png" && ext != "jpg" && ext != "gif" && ext != "bmp") continue
+                    val style = (pict.find("shape") ?: pict.find("rect"))?.attr("style").orEmpty()
+                    val css = style.split(';').mapNotNull { kv -> kv.indexOf(':').takeIf { it > 0 }?.let { kv.substring(0, it).trim() to kv.substring(it + 1).trim() } }.toMap()
+                    fun len(v: String?): Int? {
+                        val m = Regex("(-?[0-9.]+)\\s*(pt|in|cm|mm|px)?").matchEntire(v ?: return null) ?: return null
+                        val n = m.groupValues[1].toFloatOrNull() ?: return null
+                        val pt = when (m.groupValues[2]) { "in" -> n * 72f; "cm" -> n * 28.3465f; "mm" -> n * 2.83465f; "px" -> n * 0.75f; else -> n }
+                        return (pt * 20f).toInt()
+                    }
+                    val w = len(css["width"]) ?: continue
+                    val h = len(css["height"]) ?: continue
+                    if (w <= 0 || h <= 0) continue
+                    val absolute = css["position"] == "absolute"
+                    val hRel = css["mso-position-horizontal-relative"] ?: "margin"
+                    val vRel = css["mso-position-vertical-relative"] ?: "margin"
+                    val mx = len(css["margin-left"]) ?: 0
+                    val my = len(css["margin-top"]) ?: 0
+                    val x = (if (hRel == "page") 0 else setup.marginLeftTwips) + if (absolute) mx else 0
+                    val y = if (absolute) {
+                        (if (vRel == "page") 0 else if (footer) sheetH - setup.marginBottomTwips else setup.marginTopTwips) + my
+                    } else if (footer) sheetH - setup.footerDistTwips - h else setup.headerDistTwips
+                    val behind = (css["z-index"]?.toIntOrNull() ?: 0) < 0
+                    out += PageImage(bytes, ext, x, y, w, h, behind)
+                }
+            }
+            return out
+        }
+
+        /** Word moves the body out of the way of header/footer pictures that sit in the flow; do the same. */
+        fun pushMargins(setup: PageSetup): PageSetup {
+            fun pushesTop(list: List<PageImage>) = list.filter { !it.behind && it.yTwips < setup.sheetHeightTwips / 2 }.maxOfOrNull { it.yTwips + it.heightTwips }
+            fun pushesBottom(list: List<PageImage>) = list.filter { !it.behind && it.yTwips >= setup.sheetHeightTwips / 2 }.minOfOrNull { it.yTwips }
+            val top = listOfNotNull(pushesTop(setup.headerImages), pushesTop(setup.firstHeaderImages)).maxOrNull()
+            val bottom = listOfNotNull(pushesBottom(setup.footerImages), pushesBottom(setup.firstFooterImages)).minOrNull()
+            var out = setup
+            if (top != null && top + 60 > out.marginTopTwips) out = out.copy(marginTopTwips = (top + 60).coerceAtMost(out.sheetHeightTwips / 3))
+            if (bottom != null && out.sheetHeightTwips - bottom + 60 > out.marginBottomTwips) {
+                out = out.copy(marginBottomTwips = (out.sheetHeightTwips - bottom + 60).coerceAtMost(out.sheetHeightTwips / 3))
+            }
+            return out
         }
 
         /** Text of a header/footer, and whether it has a page-number field. Paragraphs with a page field contribute no text. */

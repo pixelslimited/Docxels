@@ -175,3 +175,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Delta updates | IMPLEMENTED — NOT VERIFIED | Updater downloads a small patch against the installed build, with full-download fallback. |
 | Screenshots | IMPLEMENTED — NOT VERIFIED | Screen protection is now off by default (setting kept). |
 | Multi-build patches | IMPLEMENTED — NOT VERIFIED | Patches from the last 5 builds are published; Settings shows the real download size and why a full download was used. |
+| Letterhead / header & footer pictures | IMPLEMENTED — NOT VERIFIED | Pictures in a .docx header/footer (DrawingML and old VML) are read with their position, kept when saving, drawn on every page of the PDF export and in Page preview; the editor's print layout shows them on the first page (header) and last page (footer) only. Body is pushed down like Word does. Page setup can remove them. Tested by round-trip unit tests; not tried with real letterhead files. Not supported: text boxes/WordArt in headers, per-section headers, odd/even headers. |
+| Page preview | IMPLEMENTED — NOT VERIFIED | Renders the document through the PDF engine so every page shows margins, header, footer and letterhead. |
+| Ribbon grid | IMPLEMENTED — NOT VERIFIED | Tools are hidden behind an arrow; tapping a tab opens a grid of that tab's functions. |
+
