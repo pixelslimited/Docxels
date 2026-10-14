@@ -359,3 +359,90 @@ fun ImageEditorDialog(
         },
     )
 }
+
+
+private val SHAPE_COLORS = listOf(0x1F4E79, 0x7F6000, 0x375623, 0xC55A11, 0xC00000, 0x7030A0, 0x404040, 0x000000)
+private val SHAPE_FILLS = listOf(0xDDEBF7, 0xFFF2CC, 0xE2EFDA, 0xFCE4D6, 0xF8CBAD, 0xEADCF4, 0xD9D9D9, 0xFFFFFF)
+
+/** Size, colours, outline, alignment and wrap for an inserted shape. */
+@Composable
+fun ShapeEditorDialog(
+    initial: com.docscan.app.core.word.ShapeBlock,
+    contentWidthTwips: Int,
+    onSave: (com.docscan.app.core.word.ShapeBlock) -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val isLine = com.docscan.app.core.word.ShapePresets.isLine(initial.preset)
+    var widthFraction by remember { mutableFloatStateOf((initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.05f, 1f)) }
+    var heightFraction by remember { mutableFloatStateOf((initial.heightTwips.toFloat() / contentWidthTwips).coerceIn(0.03f, 1f)) }
+    var fill by remember { mutableStateOf(initial.fill) }
+    var line by remember { mutableIntStateOf(initial.lineColor) }
+    var lineWidth by remember { mutableFloatStateOf(initial.lineWidthPt) }
+    var align by remember { mutableStateOf(initial.align) }
+    var wrap by remember { mutableStateOf(initial.wrap) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(com.docscan.app.core.word.ShapePresets.label(initial.preset)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Width ${(widthFraction * 100).toInt()}% of the page")
+                Slider(widthFraction, { widthFraction = it }, valueRange = 0.05f..1f)
+                if (!isLine) {
+                    Text("Height ${(heightFraction * 100).toInt()}% of the page width")
+                    Slider(heightFraction, { heightFraction = it }, valueRange = 0.03f..1f)
+                    Text("Fill", style = MaterialTheme.typography.labelLarge)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(fill == null, { fill = null }, label = { Text("None") })
+                        SHAPE_FILLS.forEach { c ->
+                            Box(
+                                Modifier.width(32.dp).padding(2.dp).background(Color(0xFF000000.toInt() or c)).padding(14.dp),
+                            ) { TextButton(onClick = { fill = c }, modifier = Modifier.fillMaxSize()) { Text(if (fill == c) "✓" else "") } }
+                        }
+                    }
+                }
+                Text("Outline", style = MaterialTheme.typography.labelLarge)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SHAPE_COLORS.forEach { c ->
+                        Box(
+                            Modifier.width(32.dp).padding(2.dp).background(Color(0xFF000000.toInt() or c)).padding(14.dp),
+                        ) { TextButton(onClick = { line = c }, modifier = Modifier.fillMaxSize()) { Text(if (line == c) "✓" else "", color = Color.White) } }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    listOf(0f to "No line", 0.5f to "½ pt", 1f to "1 pt", 2f to "2 pt", 4f to "4 pt", 6f to "6 pt").forEach { (w, l) ->
+                        FilterChip(lineWidth == w, { lineWidth = w }, label = { Text(l) })
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(Align.LEFT to "Left", Align.CENTER to "Centre", Align.RIGHT to "Right").forEach { (a, l) ->
+                        FilterChip(align == a, { align = a }, label = { Text(l) })
+                    }
+                }
+                Text("Wrap text", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    com.docscan.app.core.word.ImageWrap.entries.forEach { w -> FilterChip(wrap == w, { wrap = w }, label = { Text(w.label) }) }
+                }
+                if (wrap != com.docscan.app.core.word.ImageWrap.IN_LINE) {
+                    Text(
+                        "Saved in the .docx so Word wraps text around the shape. Here it is shown on its own line.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val w = (contentWidthTwips * widthFraction).toInt().coerceAtLeast(240)
+                val h = if (isLine) 0 else (contentWidthTwips * heightFraction).toInt().coerceAtLeast(120)
+                onSave(initial.copy(widthTwips = w, heightTwips = h, fill = fill, lineColor = line, lineWidthPt = lineWidth, align = align, wrap = wrap))
+            }) { Text("Save") }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onRemove) { Text("Remove") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}

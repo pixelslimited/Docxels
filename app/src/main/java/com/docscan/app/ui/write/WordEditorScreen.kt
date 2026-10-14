@@ -336,6 +336,10 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onRead = { reading = true },
                 onTable = { tableOpen = true },
                 onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onShape = { preset ->
+                    val w = (page.contentWidthTwips * 0.45f).toInt()
+                    controller.insertBlock(Block.Shape(com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = if (preset == "line") 0 else w / 2)))
+                },
                 onPageBreak = { controller.insertPageBreak() },
                 onPageSetup = { pageOpen = true },
                 onFind = { findOpen = true },
@@ -383,6 +387,13 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 initial = b.image,
                 contentWidthTwips = page.contentWidthTwips,
                 onSave = { controller.replaceBlock(idx, Block.Image(it)); editing = null },
+                onRemove = { controller.removeBlock(idx); editing = null },
+                onDismiss = { editing = null },
+            )
+            is Block.Shape -> ShapeEditorDialog(
+                initial = b.shape,
+                contentWidthTwips = page.contentWidthTwips,
+                onSave = { controller.replaceBlock(idx, Block.Shape(it)); editing = null },
                 onRemove = { controller.removeBlock(idx); editing = null },
                 onDismiss = { editing = null },
             )
@@ -461,6 +472,7 @@ private fun Ribbon(
     onRead: () -> Unit,
     onTable: () -> Unit,
     onPicture: () -> Unit,
+    onShape: (String) -> Unit,
     onPageBreak: () -> Unit,
     onPageSetup: () -> Unit,
     onFind: () -> Unit,
@@ -484,6 +496,7 @@ private fun Ribbon(
     var spacingMenu by remember { mutableStateOf(false) }
     var shadeMenu by remember { mutableStateOf(false) }
     var ulMenu by remember { mutableStateOf(false) }
+    var shapeMenu by remember { mutableStateOf(false) }
     val tabs = listOf("Home", "Insert", "Layout", "Review", "View")
     CustomColorDialogHost(customFor, { customFor = 0 }, c)
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -574,6 +587,14 @@ private fun Ribbon(
                     1 -> {
                         RibbonButton(Icons.Default.TableChart, "Table", onTable)
                         RibbonButton(Icons.Default.Image, "Picture", onPicture)
+                        Box {
+                            RibbonButton(Icons.Default.CropSquare, "Shape") { shapeMenu = true }
+                            DropdownMenu(expanded = shapeMenu, onDismissRequest = { shapeMenu = false }) {
+                                com.docscan.app.core.word.ShapePresets.INSERTABLE.forEach { (preset, label) ->
+                                    DropdownMenuItem(text = { Text(label) }, onClick = { shapeMenu = false; onShape(preset) })
+                                }
+                            }
+                        }
                         RibbonButton(Icons.Default.InsertPageBreak, "Page break", onPageBreak)
                         RibbonButton(Icons.Default.Link, "Link", onLink)
                         RibbonButton(Icons.Default.Event, "Date & time", onDate)

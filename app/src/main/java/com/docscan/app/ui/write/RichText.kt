@@ -724,6 +724,7 @@ class BlockChipSpan(
 
     private fun naturalWidthTwips(): Int? = when (val b = block) {
         is com.docscan.app.core.word.Block.Image -> b.image.widthTwips
+        is com.docscan.app.core.word.Block.Shape -> b.shape.widthTwips
         is com.docscan.app.core.word.Block.Table -> b.table.columnWidthsTwips.sum()
         else -> null
     }
@@ -737,6 +738,10 @@ class BlockChipSpan(
 
     private fun heightPx(paint: Paint): Int? = when (val b = block) {
         is com.docscan.app.core.word.Block.Image -> (b.image.heightTwips * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8)
+        is com.docscan.app.core.word.Block.Shape -> {
+            val t = if (com.docscan.app.core.word.ShapePresets.isLine(b.shape.preset)) 120 else b.shape.heightTwips
+            (t * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8)
+        }
         is com.docscan.app.core.word.Block.Table -> (tableRowTwips(b.table).sum() * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8)
         else -> null
     }
@@ -757,6 +762,10 @@ class BlockChipSpan(
     override fun draw(c: Canvas, text: CharSequence?, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
         when (val b = block) {
             is com.docscan.app.core.word.Block.Image -> drawImage(c, b.image, x, top, bottom, paint)
+            is com.docscan.app.core.word.Block.Shape -> {
+                val w = (widthPx(paint) ?: 0).toFloat()
+                com.docscan.app.export.ShapeDraw.draw(c, b.shape, android.graphics.RectF(x, top.toFloat(), x + w, bottom.toFloat()), pxPerTwip(paint) * 20f)
+            }
             is com.docscan.app.core.word.Block.Table -> drawTable(c, b.table, x, top, paint)
             else -> drawLabel(c, x, top, y, bottom, paint)
         }
@@ -857,6 +866,7 @@ object EditorModel {
         is com.docscan.app.core.word.Block.Table ->
             "Table ${b.table.rows.size}×${b.table.columnCount}"
         is com.docscan.app.core.word.Block.Image -> "Image"
+        is com.docscan.app.core.word.Block.Shape -> com.docscan.app.core.word.ShapePresets.label(b.shape.preset)
         com.docscan.app.core.word.Block.PageBreak -> "Page break"
         is com.docscan.app.core.word.Block.Para -> ""
     }

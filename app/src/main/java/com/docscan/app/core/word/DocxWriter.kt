@@ -14,7 +14,9 @@ object DocxWriter {
         "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" " +
         "xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" " +
         "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" " +
-        "xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\""
+        "xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\" " +
+        "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" " +
+        "xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\""
     private const val HEAD = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
 
     fun write(doc: WordDoc, out: OutputStream) {
@@ -182,6 +184,10 @@ object DocxWriter {
                 is Block.Image -> {
                     ctx.currentNumId = 0
                     writeImage(b.image, sb, ctx)
+                }
+                is Block.Shape -> {
+                    ctx.currentNumId = 0
+                    writeShape(b.shape, sb, ctx)
                 }
                 Block.PageBreak -> {
                     ctx.currentNumId = 0
@@ -376,33 +382,50 @@ object DocxWriter {
             "<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$cx\" cy=\"$cy\"/></a:xfrm>" +
             "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>" +
             "</a:graphicData></a:graphic>"
-        if (img.wrap == ImageWrap.IN_LINE) {
-            sb.append(
-                "<w:r><w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">" +
-                    "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:docPr id=\"$id\" name=\"Picture $id\"/>" +
-                    frame + "</wp:inline></w:drawing></w:r></w:p>",
-            )
-        } else {
-            val behind = if (img.wrap == ImageWrap.BEHIND) "1" else "0"
-            val hAlign = when (img.align) { Align.CENTER -> "center"; Align.RIGHT -> "right"; else -> "left" }
-            val wrapEl = when (img.wrap) {
-                ImageWrap.SQUARE -> "<wp:wrapSquare wrapText=\"bothSides\"/>"
-                ImageWrap.TIGHT -> "<wp:wrapTight wrapText=\"bothSides\"><wp:wrapPolygon edited=\"0\"><wp:start x=\"0\" y=\"0\"/>" +
-                    "<wp:lineTo x=\"0\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"0\"/><wp:lineTo x=\"0\" y=\"0\"/></wp:wrapPolygon></wp:wrapTight>"
-                ImageWrap.THROUGH -> "<wp:wrapThrough wrapText=\"bothSides\"><wp:wrapPolygon edited=\"0\"><wp:start x=\"0\" y=\"0\"/>" +
-                    "<wp:lineTo x=\"0\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"0\"/><wp:lineTo x=\"0\" y=\"0\"/></wp:wrapPolygon></wp:wrapThrough>"
-                ImageWrap.TOP_BOTTOM -> "<wp:wrapTopAndBottom/>"
-                else -> "<wp:wrapNone/>"
-            }
-            sb.append(
-                "<w:r><w:drawing><wp:anchor distT=\"0\" distB=\"0\" distL=\"114300\" distR=\"114300\" simplePos=\"0\" relativeHeight=\"${251658240 + id}\" " +
-                    "behindDoc=\"$behind\" locked=\"0\" layoutInCell=\"1\" allowOverlap=\"1\"><wp:simplePos x=\"0\" y=\"0\"/>" +
-                    "<wp:positionH relativeFrom=\"column\"><wp:align>$hAlign</wp:align></wp:positionH>" +
-                    "<wp:positionV relativeFrom=\"paragraph\"><wp:posOffset>0</wp:posOffset></wp:positionV>" +
-                    "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/>" +
-                    wrapEl + "<wp:docPr id=\"$id\" name=\"Picture $id\"/>" + frame + "</wp:anchor></w:drawing></w:r></w:p>",
-            )
+        sb.append("<w:r>").append(drawingXml(id, cx, cy, img.wrap, img.align, frame)).append("</w:r></w:p>")
+    }
+
+    /** `<w:drawing>` holding [frame] either inline or anchored with the chosen text wrap. */
+    private fun drawingXml(id: Int, cx: Long, cy: Long, wrap: ImageWrap, align: Align, frame: String): String {
+        if (wrap == ImageWrap.IN_LINE) {
+            return "<w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">" +
+                "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:docPr id=\"$id\" name=\"Picture $id\"/>" + frame + "</wp:inline></w:drawing>"
         }
+        val behind = if (wrap == ImageWrap.BEHIND) "1" else "0"
+        val hAlign = when (align) { Align.CENTER -> "center"; Align.RIGHT -> "right"; else -> "left" }
+        val wrapEl = when (wrap) {
+            ImageWrap.SQUARE -> "<wp:wrapSquare wrapText=\"bothSides\"/>"
+            ImageWrap.TIGHT -> "<wp:wrapTight wrapText=\"bothSides\"><wp:wrapPolygon edited=\"0\"><wp:start x=\"0\" y=\"0\"/>" +
+                "<wp:lineTo x=\"0\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"0\"/><wp:lineTo x=\"0\" y=\"0\"/></wp:wrapPolygon></wp:wrapTight>"
+            ImageWrap.THROUGH -> "<wp:wrapThrough wrapText=\"bothSides\"><wp:wrapPolygon edited=\"0\"><wp:start x=\"0\" y=\"0\"/>" +
+                "<wp:lineTo x=\"0\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"0\"/><wp:lineTo x=\"0\" y=\"0\"/></wp:wrapPolygon></wp:wrapThrough>"
+            ImageWrap.TOP_BOTTOM -> "<wp:wrapTopAndBottom/>"
+            else -> "<wp:wrapNone/>"
+        }
+        return "<w:drawing><wp:anchor distT=\"0\" distB=\"0\" distL=\"114300\" distR=\"114300\" simplePos=\"0\" relativeHeight=\"${251658240 + id}\" " +
+            "behindDoc=\"$behind\" locked=\"0\" layoutInCell=\"1\" allowOverlap=\"1\"><wp:simplePos x=\"0\" y=\"0\"/>" +
+            "<wp:positionH relativeFrom=\"column\"><wp:align>$hAlign</wp:align></wp:positionH>" +
+            "<wp:positionV relativeFrom=\"paragraph\"><wp:posOffset>0</wp:posOffset></wp:positionV>" +
+            "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/>" +
+            wrapEl + "<wp:docPr id=\"$id\" name=\"Picture $id\"/>" + frame + "</wp:anchor></w:drawing>"
+    }
+
+    private fun writeShape(sh: ShapeBlock, sb: StringBuilder, ctx: Ctx) {
+        val cx = sh.widthTwips.toLong() * Twips.EMU_PER_TWIP
+        val cy = if (ShapePresets.isLine(sh.preset)) 0L else sh.heightTwips.toLong() * Twips.EMU_PER_TWIP
+        val id = ctx.drawingId++
+        val fill = sh.fill?.let { "<a:solidFill><a:srgbClr val=\"${hex(it)}\"/></a:solidFill>" } ?: "<a:noFill/>"
+        val lineW = (sh.lineWidthPt * 12700).toInt().coerceIn(0, 12700 * 40)
+        val frame = "<a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\">" +
+            "<wps:wsp><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$cx\" cy=\"$cy\"/></a:xfrm>" +
+            "<a:prstGeom prst=\"${Xml.escape(sh.preset)}\"><a:avLst/></a:prstGeom>$fill" +
+            (if (sh.lineWidthPt <= 0f) "<a:ln><a:noFill/></a:ln>" else "<a:ln w=\"$lineW\"><a:solidFill><a:srgbClr val=\"${hex(sh.lineColor)}\"/></a:solidFill></a:ln>") + "</wps:spPr><wps:bodyPr/></wps:wsp>" +
+            "</a:graphicData></a:graphic>"
+        sb.append("<w:p>")
+        jc(sh.align)?.let { sb.append("<w:pPr><w:jc w:val=\"$it\"/></w:pPr>") }
+        sb.append("<w:r><mc:AlternateContent><mc:Choice Requires=\"wps\">")
+            .append(drawingXml(id, cx, cy, sh.wrap, sh.align, frame).replace("name=\"Picture $id\"", "name=\"Shape $id\""))
+            .append("</mc:Choice></mc:AlternateContent></w:r></w:p>")
     }
 
     // ---- styles & numbering ---------------------------------------------------------------------------------

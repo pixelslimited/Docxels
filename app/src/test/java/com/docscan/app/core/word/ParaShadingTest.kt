@@ -77,3 +77,30 @@ class ImageWrapTest {
         }
     }
 }
+
+class ShapeBlockTest {
+    private fun roundTrip(s: ShapeBlock): ShapeBlock =
+        (DocxReader.read(DocxWriter.toBytes(WordDoc("T", listOf(Block.Shape(s))))).blocks.first { it is Block.Shape } as Block.Shape).shape
+
+    @Test fun shapeSurvivesRoundTrip() {
+        val s = ShapeBlock("ellipse", 3000, 1500, fill = 0xFFF2CC, lineColor = 0x7F6000, lineWidthPt = 2f, align = Align.CENTER, wrap = ImageWrap.SQUARE)
+        val back = roundTrip(s)
+        assertEquals("ellipse", back.preset)
+        assertEquals(3000, back.widthTwips)
+        assertEquals(1500, back.heightTwips)
+        assertEquals(0xFFF2CC, back.fill)
+        assertEquals(0x7F6000, back.lineColor)
+        assertEquals(2f, back.lineWidthPt, 0.01f)
+        assertEquals(ImageWrap.SQUARE, back.wrap)
+    }
+
+    @Test fun noFillAndNoLineSurvive() {
+        val back = roundTrip(ShapeBlock("rect", 2000, 800, fill = null, lineWidthPt = 0f))
+        assertEquals(null, back.fill)
+        assertEquals(0f, back.lineWidthPt, 0.001f)
+    }
+
+    @Test fun unknownPresetIsKeptNotChanged() {
+        assertEquals("star5", roundTrip(ShapeBlock("star5", 2000, 2000)).preset)
+    }
+}

@@ -35,6 +35,7 @@ object PlainExport {
                     }
                 }
                 is Block.Image -> { counters.fill(0); sb.append("[Picture]\n") }
+                is Block.Shape -> { counters.fill(0); sb.append("[Shape]\n") }
                 Block.PageBreak -> { counters.fill(0); sb.append("\n") }
             }
         }
@@ -144,6 +145,7 @@ object PlainExport {
                     body.append("\\pard\\par\n")
                 }
                 is Block.Image -> { counters.fill(0); body.append("\\pard [Picture]\\par\n") }
+                is Block.Shape -> { counters.fill(0); body.append("\\pard [Shape]\\par\n") }
                 Block.PageBreak -> { counters.fill(0); body.append("\\page\n") }
             }
         }

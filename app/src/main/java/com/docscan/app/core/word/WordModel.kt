@@ -124,7 +124,31 @@ data class ImageBlock(
     override fun hashCode(): Int = bytes.contentHashCode() * 31 + widthTwips
 }
 
+/** A drawn shape. [preset] is the DrawingML preset name ("rect", "roundRect", "ellipse", "line", "rightArrow"…) and is kept as-is, even for presets the editor draws as a plain box. */
+data class ShapeBlock(
+    val preset: String = "rect",
+    val widthTwips: Int,
+    val heightTwips: Int,
+    /** Fill colour (RGB) or null for no fill. */
+    val fill: Int? = 0xDDEBF7,
+    val lineColor: Int = 0x1F4E79,
+    val lineWidthPt: Float = 1.5f,
+    val align: Align = Align.LEFT,
+    val wrap: ImageWrap = ImageWrap.IN_LINE,
+)
+
+object ShapePresets {
+    /** The shapes offered on the Insert tab: preset name to label. */
+    val INSERTABLE = listOf(
+        "rect" to "Rectangle", "roundRect" to "Rounded rectangle", "ellipse" to "Ellipse", "triangle" to "Triangle",
+        "diamond" to "Diamond", "line" to "Line", "rightArrow" to "Arrow",
+    )
+    fun label(preset: String) = INSERTABLE.firstOrNull { it.first == preset }?.second ?: "Shape"
+    fun isLine(preset: String) = preset == "line" || preset == "straightConnector1"
+}
+
 sealed interface Block {
+    data class Shape(val shape: ShapeBlock) : Block
     data class Para(val paragraph: Paragraph) : Block
     data class Table(val table: TableBlock) : Block
     data class Image(val image: ImageBlock) : Block

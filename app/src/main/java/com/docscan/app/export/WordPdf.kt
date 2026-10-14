@@ -73,6 +73,7 @@ object WordPdf {
                         is Block.Para -> pending += b.paragraph
                         is Block.Table -> { flush(); table(b.table) }
                         is Block.Image -> { flush(); image(b.image) }
+                        is Block.Shape -> { flush(); shape(b.shape) }
                         Block.PageBreak -> { flush(); if (y > 0f) newPage() }
                     }
                 }
@@ -237,6 +238,21 @@ object WordPdf {
             } finally {
                 bmp.recycle()
             }
+        }
+
+        fun shape(sh: com.docscan.app.core.word.ShapeBlock) {
+            var w = sh.widthTwips / 20f * ZOOM
+            var h = (if (com.docscan.app.core.word.ShapePresets.isLine(sh.preset)) 4 else sh.heightTwips) / 20f * ZOOM
+            if (w > contentW) { h *= contentW / w; w = contentW }
+            if (h > contentH) { w *= contentH / h; h = contentH }
+            if (y + h > contentH && y > 0f) newPage()
+            val x = when (sh.align) {
+                Align.CENTER -> (contentW - w) / 2f
+                Align.RIGHT -> contentW - w
+                else -> 0f
+            }
+            inContent(y) { ShapeDraw.draw(this, sh, RectF(x, 0f, x + w, h), ZOOM) }
+            y += h + 6f * ZOOM
         }
 
         fun decode(bytes: ByteArray): Bitmap? = runCatching {

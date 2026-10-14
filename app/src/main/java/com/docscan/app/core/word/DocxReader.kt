@@ -493,13 +493,59 @@ object DocxReader {
                         "cr" -> addText("\n", style)
                         "noBreakHyphen" -> addText("‑", style)
                         "drawing", "pict" -> if (allowImages) readImage(c)
+                        "AlternateContent" -> if (allowImages) {
+                            c.childrenNamed("Choice").firstNotNullOfOrNull { it.child("drawing") }?.let { readImage(it) }
+                        }
                     }
                 }
             }
 
             fun charStyleOf(rPr: XNode?): RunStyle = charStyleRun(rPr?.child("rStyle")?.attr("val"))
 
+            fun wrapOf(drawing: XNode): ImageWrap {
+                val anchor = drawing.find("anchor") ?: return ImageWrap.IN_LINE
+                return when {
+                    anchor.child("wrapSquare") != null -> ImageWrap.SQUARE
+                    anchor.child("wrapTight") != null -> ImageWrap.TIGHT
+                    anchor.child("wrapThrough") != null -> ImageWrap.THROUGH
+                    anchor.child("wrapTopAndBottom") != null -> ImageWrap.TOP_BOTTOM
+                    anchor.attr("behindDoc").let { v -> v == "1" || v == "true" } -> ImageWrap.BEHIND
+                    else -> ImageWrap.IN_FRONT
+                }
+            }
+
+            fun readShape(drawing: XNode, wsp: XNode) {
+                val extent = drawing.find("extent")
+                val cx = extent?.attr("cx")?.toLongOrNull() ?: 0L
+                val cy = extent?.attr("cy")?.toLongOrNull() ?: 0L
+                val spPr = wsp.child("spPr")
+                val preset = spPr?.child("prstGeom")?.attr("prst") ?: "rect"
+                val styled = wsp.child("style") != null
+                fun colorOf(holder: XNode?, fallback: Int?): Int? {
+                    val sf = holder?.child("solidFill") ?: return fallback
+                    sf.child("srgbClr")?.attr("val")?.let { v -> parseHex(v)?.let { return it } }
+                    return fallback ?: 0x000000
+                }
+                val fill = if (spPr?.child("noFill") != null) null else colorOf(spPr, if (styled) 0x4472C4 else null)
+                val ln = spPr?.child("ln")
+                val lineColor = colorOf(ln, if (styled) 0x2F528F else 0x000000) ?: 0x000000
+                val lineW = if (ln?.child("noFill") != null) 0f else (ln?.attr("w")?.toFloatOrNull()?.div(12700f) ?: if (styled) 1f else 0.75f)
+                flush(false)
+                out += Block.Shape(
+                    ShapeBlock(
+                        preset = preset,
+                        widthTwips = (cx / Twips.EMU_PER_TWIP).toInt().coerceAtLeast(120),
+                        heightTwips = (cy / Twips.EMU_PER_TWIP).toInt().coerceAtLeast(0),
+                        fill = fill, lineColor = lineColor, lineWidthPt = lineW, align = base.align, wrap = wrapOf(drawing),
+                    ),
+                )
+                emitted = true
+                // Text typed inside the shape is kept as ordinary paragraphs after it, so it is never lost.
+                wsp.find("txbxContent")?.childrenNamed("p")?.forEach { readParagraph(it, out) }
+            }
+
             fun readImage(drawing: XNode) {
+                drawing.find("wsp")?.let { readShape(drawing, it); return }
                 val blip = drawing.find("blip")
                 val embed = blip?.attr("embed") ?: drawing.find("imagedata")?.attr("id")
                 val path = embed?.let { rels[it] } ?: return
@@ -510,15 +556,7 @@ object DocxReader {
                 val cy = extent?.attr("cy")?.toLongOrNull()
                 val w = if (cx != null && cx > 0) (cx / Twips.EMU_PER_TWIP).toInt() else 4320
                 val h = if (cy != null && cy > 0) (cy / Twips.EMU_PER_TWIP).toInt() else 3240
-                val anchor = drawing.find("anchor")
-                val wrap = if (anchor == null) ImageWrap.IN_LINE else when {
-                    anchor.child("wrapSquare") != null -> ImageWrap.SQUARE
-                    anchor.child("wrapTight") != null -> ImageWrap.TIGHT
-                    anchor.child("wrapThrough") != null -> ImageWrap.THROUGH
-                    anchor.child("wrapTopAndBottom") != null -> ImageWrap.TOP_BOTTOM
-                    anchor.attr("behindDoc").let { v -> v == "1" || v == "true" } -> ImageWrap.BEHIND
-                    else -> ImageWrap.IN_FRONT
-                }
+                val wrap = wrapOf(drawing)
                 flush(false)
                 out += Block.Image(ImageBlock(bytes, ext, w.coerceAtLeast(120), h.coerceAtLeast(120), base.align, wrap))
                 emitted = true
