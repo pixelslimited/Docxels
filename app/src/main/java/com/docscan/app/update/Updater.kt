@@ -159,7 +159,8 @@ class Updater(private val context: Context) {
      * confirmation once; the app restarts when the install finishes.
      */
     fun install(apk: File) {
-        runCatching { installWithSession(apk) }.onFailure { installWithIntent(apk) }
+        // The session installer is refused by some phones ("Self update is blocked"); Android's own installer screen always works.
+        installWithIntent(apk)
     }
 
     private fun installWithSession(apk: File) {
