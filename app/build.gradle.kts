@@ -10,7 +10,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.docscan.app"
+        applicationId = "ng.pixelslimited.docxels"
         // minSdk 29 lets us save to Pictures/Downloads through MediaStore with no storage permission.
         minSdk = 29
         targetSdk = 35

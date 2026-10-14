@@ -101,17 +101,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk DocScan.apk
+          cp app/build/outputs/apk/release/app-release.apk Docxels.apk
           gh release delete latest --yes --cleanup-tag || true
           {
-            echo "Built from commit ${GITHUB_SHA::7}. Download DocScan.apk on your phone and install it (allow installs from unknown sources)."
+            echo "Built from commit ${GITHUB_SHA::7}. Download Docxels.apk on your phone and install it (allow installs from unknown sources)."
             echo
             echo '```'
             cat size.txt
             echo '```'
           } > notes.md
-          gh release create latest DocScan.apk \
-            --title "DocScan (latest build)" \
+          gh release create latest Docxels.apk \
+            --title "Docxels (latest build)" \
             --notes-file notes.md \
             --target "$GITHUB_SHA" \
             --latest

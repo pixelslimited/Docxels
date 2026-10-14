@@ -72,7 +72,7 @@ Key decisions:
 
 ## Before publishing to Google Play
 
-- Choose a real application ID (currently `com.docscan.app`) and add a signing config (never commit the keystore).
+- The application ID is `ng.pixelslimited.docxels` (code package stays `com.docscan.app`). Add a signing config (never commit the keystore).
 - Enable minification and add keep rules for OpenCV/ML Kit; build an `.aab`.
 - Write a privacy policy (the app processes images on-device only) and check the current target-API requirement.
 - Test on low-spec phones: rendering is done at up to 2400 px per page.
