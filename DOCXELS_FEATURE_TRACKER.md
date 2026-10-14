@@ -164,4 +164,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Text wrap for pictures (in line, top and bottom, square, tight, behind/in front) | NOT STARTED | Pictures are block items today. Plan: save/load the .docx wrap setting first, then in line / top and bottom in the editor; square and tight need a custom page layout. |
 | Shapes (rectangle, rounded box, ellipse, line, arrow) with wrap | NOT STARTED | No shapes exist yet. |
 | Optional Google sign-in / Pro features / AI-assisted writing | DEFERRED | On hold by the owner while it needs paid services. The app works fully without an account. |
+| Share as plain text (.txt) and RTF | IMPLEMENTED — NOT VERIFIED | Output logic TESTED in `PlainExportTest`. Text drops formatting; RTF keeps character/paragraph formatting and tables but not pictures or headers/footers. |
+| Read mode (view without editing) | IMPLEMENTED — NOT VERIFIED | Blocks typing and table/picture editing; text can still be selected and copied. |
+| Zoom control | NOT STARTED | Page view uses a fixed zoom today. |
 | Comments, track changes, footnotes, TOC, styles pane, sections, headers/footers beyond one line, RTL, spellcheck options | NOT STARTED | Later phases. |
