@@ -405,8 +405,9 @@ object RichOps {
     }
 
     fun attrsOf(text: Spanned, r: Range): ParaAttrs {
-        val spans = text.getSpans(r.start, r.full, ParaSpan::class.java)
-        val chosen = spans.firstOrNull { text.getSpanStart(it) == r.start } ?: spans.firstOrNull()
+        // Query the whole text: getSpans can skip zero-length spans (an empty last paragraph).
+        val spans = text.getSpans(0, text.length, ParaSpan::class.java)
+        val chosen = spans.firstOrNull { text.getSpanStart(it) == r.start }
         return chosen?.attrs ?: ParaAttrs()
     }
 

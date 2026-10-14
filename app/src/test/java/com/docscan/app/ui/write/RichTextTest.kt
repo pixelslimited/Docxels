@@ -27,7 +27,8 @@ class RichTextTest {
             Paragraph(),
         )
         val back = SpanBridge.toParagraphs(SpanBridge.toEditable(paras, d))
-        assertEquals(paras, back)
+        assertEquals(paras.size, back.size)
+        paras.indices.forEach { assertEquals("paragraph $it", paras[it], back[it]) }
     }
 
     @Test fun toggleBoldOnRangeAndCover() {
