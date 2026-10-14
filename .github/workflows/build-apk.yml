@@ -80,6 +80,14 @@ jobs:
             unzip -v "$APK" | awk 'NR>3 && NF>=8 {print $3, $8}' | sort -rn | head -12
           } | tee size.txt
 
+      # Docxels promises "no internet access". Fail the build if a library sneaks the permission back in.
+      - name: Check the APK has no network permission
+        run: |
+          if "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest permissions app/build/outputs/apk/release/app-release.apk | grep -q "INTERNET"; then
+            echo "::error::The APK requests INTERNET, but the app promises to work offline only."
+            exit 1
+          fi
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
