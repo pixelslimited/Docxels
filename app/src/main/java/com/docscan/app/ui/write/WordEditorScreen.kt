@@ -718,12 +718,16 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
     var header by remember { mutableStateOf(page.headerText) }
     var footer by remember { mutableStateOf(page.footerText) }
     var numbers by remember { mutableStateOf(page.pageNumbers) }
+    var diffFirst by remember { mutableStateOf(page.differentFirstPage) }
+    var header1 by remember { mutableStateOf(page.firstHeaderText) }
+    var footer1 by remember { mutableStateOf(page.firstFooterText) }
+    var numbers1 by remember { mutableStateOf(page.firstPageNumbers) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Page setup") },
         text = {
             Column(
-                Modifier.horizontalScrollFreeColumn(),
+                Modifier.horizontalScrollFreeColumn().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text("Paper", style = MaterialTheme.typography.labelLarge)
@@ -757,6 +761,18 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
                     Switch(numbers, { numbers = it })
                     Text("  Page numbers")
                 }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(diffFirst, { diffFirst = it })
+                    Text("  Different first page")
+                }
+                if (diffFirst) {
+                    OutlinedTextField(header1, { header1 = it }, label = { Text("First page header") }, singleLine = true)
+                    OutlinedTextField(footer1, { footer1 = it }, label = { Text("First page footer") }, singleLine = true)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(numbers1, { numbers1 = it })
+                        Text("  Page number on first page")
+                    }
+                }
             }
         },
         confirmButton = {
@@ -767,6 +783,7 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
                         marginLeftTwips = tw(mLeft, page.marginLeftTwips), marginRightTwips = tw(mRight, page.marginRightTwips),
                         marginTopTwips = tw(mTop, page.marginTopTwips), marginBottomTwips = tw(mBottom, page.marginBottomTwips),
                         headerText = header.trim(), footerText = footer.trim(), pageNumbers = numbers,
+                        differentFirstPage = diffFirst, firstHeaderText = header1.trim(), firstFooterText = footer1.trim(), firstPageNumbers = numbers1,
                     ),
                 )
             }) { Text("Apply") }

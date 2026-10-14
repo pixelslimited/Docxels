@@ -27,11 +27,16 @@ object DocxWriter {
         val page = doc.page
         val hasHeader = page.headerText.isNotBlank()
         val hasFooter = page.footerText.isNotBlank() || page.pageNumbers
+        val first = page.differentFirstPage
+        val hasFirstHeader = first && page.firstHeaderText.isNotBlank()
+        val hasFirstFooter = first && (page.firstFooterText.isNotBlank() || page.firstPageNumbers)
         val rels = StringBuilder()
         rels.append("<Relationship Id=\"rIdStyles\" Type=\"$REL/styles\" Target=\"styles.xml\"/>")
         rels.append("<Relationship Id=\"rIdNumbering\" Type=\"$REL/numbering\" Target=\"numbering.xml\"/>")
         if (hasHeader) rels.append("<Relationship Id=\"rIdHeader\" Type=\"$REL/header\" Target=\"header1.xml\"/>")
         if (hasFooter) rels.append("<Relationship Id=\"rIdFooter\" Type=\"$REL/footer\" Target=\"footer1.xml\"/>")
+        if (hasFirstHeader) rels.append("<Relationship Id=\"rIdHeaderFirst\" Type=\"$REL/header\" Target=\"header2.xml\"/>")
+        if (hasFirstFooter) rels.append("<Relationship Id=\"rIdFooterFirst\" Type=\"$REL/footer\" Target=\"footer2.xml\"/>")
         ctx.images.forEachIndexed { i, img ->
             rels.append("<Relationship Id=\"rIdImg${i + 1}\" Type=\"$REL/image\" Target=\"media/image${i + 1}.${img.extension}\"/>")
         }
@@ -43,6 +48,8 @@ object DocxWriter {
         body.append("<w:sectPr>")
         if (hasHeader) body.append("<w:headerReference w:type=\"default\" r:id=\"rIdHeader\"/>")
         if (hasFooter) body.append("<w:footerReference w:type=\"default\" r:id=\"rIdFooter\"/>")
+        if (hasFirstHeader) body.append("<w:headerReference w:type=\"first\" r:id=\"rIdHeaderFirst\"/>")
+        if (hasFirstFooter) body.append("<w:footerReference w:type=\"first\" r:id=\"rIdFooterFirst\"/>")
         body.append("<w:pgSz w:w=\"${page.sheetWidthTwips}\" w:h=\"${page.sheetHeightTwips}\"")
         if (page.landscape) body.append(" w:orient=\"landscape\"")
         body.append("/>")
@@ -51,12 +58,13 @@ object DocxWriter {
                 "w:bottom=\"${page.marginBottomTwips}\" w:left=\"${page.marginLeftTwips}\" " +
                 "w:header=\"709\" w:footer=\"709\" w:gutter=\"0\"/>",
         )
+        if (first) body.append("<w:titlePg/>")
         body.append("</w:sectPr>")
 
         val zip = ZipOutputStream(out)
         fun putText(name: String, text: String) = put(zip, name, text.toByteArray(Charsets.UTF_8))
 
-        putText("[Content_Types].xml", contentTypes(ctx, hasHeader, hasFooter))
+        putText("[Content_Types].xml", contentTypes(ctx, hasHeader, hasFooter, hasFirstHeader, hasFirstFooter))
         putText(
             "_rels/.rels",
             HEAD + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
@@ -78,32 +86,34 @@ object DocxWriter {
         )
         putText("word/styles.xml", stylesXml())
         putText("word/numbering.xml", numberingXml(ctx))
-        if (hasHeader) {
-            putText(
-                "word/header1.xml",
-                HEAD + "<w:hdr $NS><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t xml:space=\"preserve\">${Xml.escape(page.headerText)}</w:t></w:r></w:p></w:hdr>",
-            )
-        }
-        if (hasFooter) {
-            val sb = StringBuilder()
-            if (page.footerText.isNotBlank()) {
-                sb.append("<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t xml:space=\"preserve\">${Xml.escape(page.footerText)}</w:t></w:r></w:p>")
-            }
-            if (page.pageNumbers) {
-                sb.append(
-                    "<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr>" +
-                        "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r>" +
-                        "<w:r><w:instrText xml:space=\"preserve\"> PAGE </w:instrText></w:r>" +
-                        "<w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>" +
-                        "<w:r><w:t>1</w:t></w:r>" +
-                        "<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
-                )
-            }
-            putText("word/footer1.xml", HEAD + "<w:ftr $NS>$sb</w:ftr>")
-        }
+        if (hasHeader) putText("word/header1.xml", HEAD + headerXml(page.headerText))
+        if (hasFooter) putText("word/footer1.xml", HEAD + footerXml(page.footerText, page.pageNumbers))
+        if (hasFirstHeader) putText("word/header2.xml", HEAD + headerXml(page.firstHeaderText))
+        if (hasFirstFooter) putText("word/footer2.xml", HEAD + footerXml(page.firstFooterText, page.firstPageNumbers))
         ctx.images.forEachIndexed { i, img -> put(zip, "word/media/image${i + 1}.${img.extension}", img.bytes) }
         zip.finish()
         zip.flush()
+    }
+
+    private fun headerXml(text: String) =
+        "<w:hdr $NS><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t xml:space=\"preserve\">${Xml.escape(text)}</w:t></w:r></w:p></w:hdr>"
+
+    private fun footerXml(text: String, numbers: Boolean): String {
+        val sb = StringBuilder()
+        if (text.isNotBlank()) {
+            sb.append("<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t xml:space=\"preserve\">${Xml.escape(text)}</w:t></w:r></w:p>")
+        }
+        if (numbers) {
+            sb.append(
+                "<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr>" +
+                    "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r>" +
+                    "<w:r><w:instrText xml:space=\"preserve\"> PAGE </w:instrText></w:r>" +
+                    "<w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>" +
+                    "<w:r><w:t>1</w:t></w:r>" +
+                    "<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
+            )
+        }
+        return "<w:ftr $NS>$sb</w:ftr>"
     }
 
     fun toBytes(doc: WordDoc): ByteArray {
@@ -129,7 +139,7 @@ object DocxWriter {
         zip.closeEntry()
     }
 
-    private fun contentTypes(ctx: Ctx, header: Boolean, footer: Boolean): String {
+    private fun contentTypes(ctx: Ctx, header: Boolean, footer: Boolean, firstHeader: Boolean, firstFooter: Boolean): String {
         val sb = StringBuilder(HEAD)
         sb.append("<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">")
         sb.append("<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>")
@@ -143,6 +153,8 @@ object DocxWriter {
         sb.append("<Override PartName=\"/word/numbering.xml\" ContentType=\"$w.numbering+xml\"/>")
         if (header) sb.append("<Override PartName=\"/word/header1.xml\" ContentType=\"$w.header+xml\"/>")
         if (footer) sb.append("<Override PartName=\"/word/footer1.xml\" ContentType=\"$w.footer+xml\"/>")
+        if (firstHeader) sb.append("<Override PartName=\"/word/header2.xml\" ContentType=\"$w.header+xml\"/>")
+        if (firstFooter) sb.append("<Override PartName=\"/word/footer2.xml\" ContentType=\"$w.footer+xml\"/>")
         sb.append("<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>")
         sb.append("</Types>")
         return sb.toString()

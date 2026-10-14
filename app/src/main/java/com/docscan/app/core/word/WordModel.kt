@@ -142,6 +142,11 @@ data class PageSetup(
     val headerText: String = "",
     val footerText: String = "",
     val pageNumbers: Boolean = false,
+    /** A different header and footer on the first page (Word's "Different first page"). */
+    val differentFirstPage: Boolean = false,
+    val firstHeaderText: String = "",
+    val firstFooterText: String = "",
+    val firstPageNumbers: Boolean = false,
 ) {
     /** Page size as laid out on the sheet, with orientation applied. */
     val sheetWidthTwips: Int get() = if (landscape) maxOf(widthTwips, heightTwips) else minOf(widthTwips, heightTwips)

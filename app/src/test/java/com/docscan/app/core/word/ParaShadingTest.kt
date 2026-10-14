@@ -36,3 +36,25 @@ class UnderlineStyleTest {
         assertEquals(true, back.runs.all { it.style.underline })
     }
 }
+
+class FirstPageHeaderTest {
+    @Test fun differentFirstPageSurvives() {
+        val page = PageSetup(
+            headerText = "Report", footerText = "Confidential", pageNumbers = true,
+            differentFirstPage = true, firstHeaderText = "Cover", firstFooterText = "", firstPageNumbers = false,
+        )
+        val back = DocxReader.read(DocxWriter.toBytes(WordDoc("T", listOf(Block.Para(Paragraph(listOf(Run("x"))))), page))).page
+        assertEquals(true, back.differentFirstPage)
+        assertEquals("Cover", back.firstHeaderText)
+        assertEquals("", back.firstFooterText)
+        assertEquals(false, back.firstPageNumbers)
+        assertEquals("Report", back.headerText)
+        assertEquals("Confidential", back.footerText)
+        assertEquals(true, back.pageNumbers)
+    }
+
+    @Test fun plainDocumentHasNoFirstPageSettings() {
+        val back = DocxReader.read(DocxWriter.toBytes(WordDoc("T", listOf(Block.Para(Paragraph(listOf(Run("x")))))))).page
+        assertEquals(false, back.differentFirstPage)
+    }
+}

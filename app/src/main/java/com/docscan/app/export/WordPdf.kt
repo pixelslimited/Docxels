@@ -97,10 +97,14 @@ object WordPdf {
             val p = current ?: return
             val c = canvas!!
             val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f; color = Color.GRAY; typeface = Typeface.SANS_SERIF }
-            if (page.headerText.isNotEmpty()) c.drawText(page.headerText, mL, mT / 2f + 3f, small)
+            val firstPage = page.differentFirstPage && pageNo == 1
+            val headerText = if (firstPage) page.firstHeaderText else page.headerText
+            val footerText = if (firstPage) page.firstFooterText else page.footerText
+            val numbers = if (firstPage) page.firstPageNumbers else page.pageNumbers
+            if (headerText.isNotEmpty()) c.drawText(headerText, mL, mT / 2f + 3f, small)
             val fy = pageH - mB / 2f + 3f
-            if (page.footerText.isNotEmpty()) c.drawText(page.footerText, mL, fy, small)
-            if (page.pageNumbers) {
+            if (footerText.isNotEmpty()) c.drawText(footerText, mL, fy, small)
+            if (numbers) {
                 val label = pageNo.toString()
                 c.drawText(label, pageW - mL - small.measureText(label), fy, small)
             }

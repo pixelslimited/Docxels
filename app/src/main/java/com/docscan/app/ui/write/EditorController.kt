@@ -28,6 +28,10 @@ class PageDecor(
     val headerText: String,
     val footerText: String,
     val pageNumbers: Boolean,
+    val differentFirstPage: Boolean,
+    val firstHeaderText: String,
+    val firstFooterText: String,
+    val firstPageNumbers: Boolean,
     val contentHeightPx: Float,
     val bottomMarginPx: Float,
     val smallTextPx: Float,
@@ -102,8 +106,9 @@ class RichEditText(context: Context) : EditText(context) {
         small.textSize = d.smallTextPx
         guide.strokeWidth = maxOf(1f, d.smallTextPx / 8f)
         val topPad = totalPaddingTop.toFloat()
-        if (d.headerText.isNotEmpty()) {
-            canvas.drawText(d.headerText, paddingLeft.toFloat(), topPad / 2f + d.smallTextPx / 3f, small)
+        val headerNow = if (d.differentFirstPage) d.firstHeaderText else d.headerText
+        if (headerNow.isNotEmpty()) {
+            canvas.drawText(headerNow, paddingLeft.toFloat(), topPad / 2f + d.smallTextPx / 3f, small)
         }
         for (k in 1 until starts.size) {
             val y = topPad + starts[k] - 2f
@@ -112,8 +117,10 @@ class RichEditText(context: Context) : EditText(context) {
             canvas.drawText(label, width - paddingRight - small.measureText(label), y - d.smallTextPx / 3f, small)
         }
         val footY = height - d.bottomMarginPx / 2f + d.smallTextPx / 3f
-        if (d.footerText.isNotEmpty()) canvas.drawText(d.footerText, paddingLeft.toFloat(), footY, small)
-        if (d.pageNumbers) {
+        val onlyFirst = d.differentFirstPage && starts.size == 1
+        val footerNow = if (onlyFirst) d.firstFooterText else d.footerText
+        if (footerNow.isNotEmpty()) canvas.drawText(footerNow, paddingLeft.toFloat(), footY, small)
+        if (if (onlyFirst) d.firstPageNumbers else d.pageNumbers) {
             val label = starts.size.toString()
             canvas.drawText(label, width - paddingRight - small.measureText(label), footY, small)
         }
@@ -360,6 +367,10 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
                 headerText = pageSetup.headerText,
                 footerText = pageSetup.footerText,
                 pageNumbers = pageSetup.pageNumbers,
+                differentFirstPage = pageSetup.differentFirstPage,
+                firstHeaderText = pageSetup.firstHeaderText,
+                firstFooterText = pageSetup.firstFooterText,
+                firstPageNumbers = pageSetup.firstPageNumbers,
                 contentHeightPx = pageSetup.contentHeightTwips / 20f * ZOOM * eff,
                 bottomMarginPx = pageSetup.marginBottomTwips / 20f * ZOOM * eff,
                 smallTextPx = 9f * ZOOM * eff,

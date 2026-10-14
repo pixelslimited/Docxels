@@ -268,6 +268,22 @@ object DocxReader {
             }
             val headerRef = sect.childrenNamed("headerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull() }
             val footerRef = sect.childrenNamed("footerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull() }
+            val firstHeaderRef = sect.childrenNamed("headerReference").firstOrNull { it.attr("type") == "first" }
+            val firstFooterRef = sect.childrenNamed("footerReference").firstOrNull { it.attr("type") == "first" }
+            if (sect.child("titlePg") != null) {
+                setup = setup.copy(differentFirstPage = true)
+                firstHeaderRef?.attr("id")?.let { id ->
+                    rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(firstHeaderText = partText(it).first) } }
+                }
+                firstFooterRef?.attr("id")?.let { id ->
+                    rels[id]?.let { path ->
+                        xml(path)?.let {
+                            val (text, hasPage) = partText(it)
+                            setup = setup.copy(firstFooterText = text, firstPageNumbers = hasPage)
+                        }
+                    }
+                }
+            }
             headerRef?.attr("id")?.let { id ->
                 rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(headerText = partText(it).first) } }
             }
