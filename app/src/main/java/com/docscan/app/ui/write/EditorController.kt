@@ -20,8 +20,97 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** EditText that reports cursor / selection moves so the toolbar can show what is active. */
+/** How the editor is laid out on screen. */
+enum class ViewMode { PAGE, TEXT, MOBILE }
+
+/** What the page view draws around the text: header and footer text and the height of one page of text. */
+class PageDecor(
+    val headerText: String,
+    val footerText: String,
+    val pageNumbers: Boolean,
+    val contentHeightPx: Float,
+    val bottomMarginPx: Float,
+    val smallTextPx: Float,
+)
+
 class RichEditText(context: Context) : EditText(context) {
     var onSelection: (() -> Unit)? = null
+
+    /** Set in the page views; null in the mobile view. */
+    var decor: PageDecor? = null
+        set(v) {
+            field = v
+            requestLayout()
+            invalidate()
+        }
+
+    /** Tells whether the table / picture / page-break chip with this index is a hard page break. */
+    var isPageBreak: (Int) -> Boolean = { false }
+
+    private val guide = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.STROKE
+        color = 0xFF9AA0AE.toInt()
+        pathEffect = android.graphics.DashPathEffect(floatArrayOf(14f, 10f), 0f)
+    }
+    private val small = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF8A8F9C.toInt() }
+
+    /** Y (in layout coordinates) where each page's text starts, mirroring how the PDF export breaks pages by line. */
+    fun pageStarts(): List<Float> {
+        val d = decor ?: return listOf(0f)
+        val l = layout ?: return listOf(0f)
+        val starts = arrayListOf(0f)
+        var pageStart = 0f
+        val t = text
+        for (i in 0 until l.lineCount) {
+            val top = l.getLineTop(i).toFloat()
+            val bottom = l.getLineBottom(i).toFloat()
+            if (i > 0 && top > pageStart && bottom - pageStart > d.contentHeightPx + 0.5f) {
+                starts += top
+                pageStart = top
+            }
+            val ls = l.getLineStart(i)
+            if (ls < t.length && t[ls] == CHIP_CHAR && i < l.lineCount - 1 &&
+                t.getSpans(ls, minOf(t.length, ls + 1), BlockChipSpan::class.java).any { isPageBreak(it.index) }
+            ) {
+                starts += bottom
+                pageStart = bottom
+            }
+        }
+        return starts
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        val d = decor ?: return
+        if (layout == null) return
+        // Whole sheets only: the page always ends where a printed page would end.
+        val need = (totalPaddingTop + pageStarts().last() + d.contentHeightPx + d.bottomMarginPx).toInt()
+        if (need > measuredHeight) setMeasuredDimension(measuredWidth, need)
+    }
+
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        super.onDraw(canvas)
+        val d = decor ?: return
+        val starts = pageStarts()
+        small.textSize = d.smallTextPx
+        guide.strokeWidth = maxOf(1f, d.smallTextPx / 8f)
+        val topPad = totalPaddingTop.toFloat()
+        if (d.headerText.isNotEmpty()) {
+            canvas.drawText(d.headerText, paddingLeft.toFloat(), topPad / 2f + d.smallTextPx / 3f, small)
+        }
+        for (k in 1 until starts.size) {
+            val y = topPad + starts[k] - 2f
+            canvas.drawLine(0f, y, width.toFloat(), y, guide)
+            val label = "Page ${k + 1}"
+            canvas.drawText(label, width - paddingRight - small.measureText(label), y - d.smallTextPx / 3f, small)
+        }
+        val footY = height - d.bottomMarginPx / 2f + d.smallTextPx / 3f
+        if (d.footerText.isNotEmpty()) canvas.drawText(d.footerText, paddingLeft.toFloat(), footY, small)
+        if (d.pageNumbers) {
+            val label = starts.size.toString()
+            canvas.drawText(label, width - paddingRight - small.measureText(label), footY, small)
+        }
+    }
 
     /** Called with the block index when a table / image placeholder is tapped. */
     var onChipTap: ((Int) -> Unit)? = null
@@ -68,7 +157,12 @@ private class Snap(val blocks: List<Block>, val selStart: Int, val selEnd: Int)
  * Owns the editable text and every formatting action. The screen only draws the toolbar from [state] and calls
  * these methods. Undo/redo is snapshot based: a snapshot of the document is taken once typing pauses.
  */
-class EditorController(private val density: Float, initial: List<Block>) {
+class EditorController(private val baseDensity: Float, initial: List<Block>) {
+    /** The density the text is currently laid out at; the page views rescale it to fit the sheet to the screen. */
+    private var density: Float = baseDensity
+    private var mode = ViewMode.MOBILE
+    private var pageSetup = com.docscan.app.core.word.PageSetup()
+    private var availWidth = 0
     private var originals: List<Block>
     private val initialText: Editable
     private var view: RichEditText? = null
@@ -86,7 +180,7 @@ class EditorController(private val density: Float, initial: List<Block>) {
     var onChanged: () -> Unit = {}
 
     init {
-        val (e, o) = EditorModel.toEditable(initial, density)
+        val (e, o) = EditorModel.toEditable(initial, baseDensity)
         initialText = e
         originals = o
     }
@@ -117,6 +211,7 @@ class EditorController(private val density: Float, initial: List<Block>) {
             }
         })
         v.onSelection = { refresh() }
+        v.isPageBreak = { idx -> originals.getOrNull(idx) == Block.PageBreak }
         current = snapshot()
         refresh()
     }
@@ -181,7 +276,7 @@ class EditorController(private val density: Float, initial: List<Block>) {
         restore(current!!)
     }
 
-    private fun restore(s: Snap) {
+    private fun restore(s: Snap, notify: Boolean = true) {
         val v = view ?: return
         applying = true
         val (e, o) = EditorModel.toEditable(s.blocks, density)
@@ -190,8 +285,72 @@ class EditorController(private val density: Float, initial: List<Block>) {
         val len = v.text.length
         v.setSelection(s.selStart.coerceIn(0, len), s.selEnd.coerceIn(0, len))
         applying = false
-        onChanged()
+        if (notify) onChanged()
         refresh()
+    }
+
+    // -- view layout --
+
+    fun setViewConfig(mode: ViewMode, page: com.docscan.app.core.word.PageSetup) {
+        if (mode == this.mode && page == pageSetup) return
+        this.mode = mode
+        pageSetup = page
+        configure()
+    }
+
+    fun setAvailableWidth(px: Int) {
+        if (px == availWidth) return
+        availWidth = px
+        configure()
+    }
+
+    /**
+     * Lays the editor out for the current mode. In the page views the text is rescaled so the sheet (or just its
+     * text column) fills the screen width, and margins, header and footer are drawn where they would print.
+     */
+    private fun configure() {
+        val v = view ?: return
+        if (availWidth <= 0) return
+        val d0 = baseDensity
+        val gutter = when (mode) { ViewMode.PAGE -> 12f * d0; ViewMode.TEXT -> 8f * d0; ViewMode.MOBILE -> 0f }
+        val usable = (availWidth - 2 * gutter).coerceAtLeast(1f)
+        val sheetPt = pageSetup.sheetWidthTwips / 20f
+        val contentPt = pageSetup.contentWidthTwips / 20f
+        val eff = when (mode) {
+            ViewMode.MOBILE -> d0
+            ViewMode.PAGE -> usable / (sheetPt * ZOOM)
+            ViewMode.TEXT -> usable / (contentPt * ZOOM)
+        }
+        if (kotlin.math.abs(eff - density) > 0.0005f) {
+            val snap = snapshot()
+            density = eff
+            v.paint.density = eff
+            restore(snap, notify = false)
+        }
+        v.paint.density = eff
+        v.setTextSize(TypedValue.COMPLEX_UNIT_PX, StyleDefaults.BODY_SIZE_PT * ZOOM * eff)
+        fun px(twips: Int) = (twips / 20f * ZOOM * eff).toInt()
+        if (mode == ViewMode.MOBILE) {
+            val pad = (20 * d0).toInt()
+            v.setPadding(pad, pad, pad, pad * 6)
+            v.decor = null
+            ChipLimits.maxWidthPx = (availWidth - 2 * pad).toFloat()
+        } else {
+            val side = if (mode == ViewMode.PAGE) px(pageSetup.marginLeftTwips) else 0
+            val sideR = if (mode == ViewMode.PAGE) px(pageSetup.marginRightTwips) else 0
+            v.setPadding(side, px(pageSetup.marginTopTwips), sideR, px(pageSetup.marginBottomTwips))
+            ChipLimits.maxWidthPx = Float.MAX_VALUE
+            v.decor = PageDecor(
+                headerText = pageSetup.headerText,
+                footerText = pageSetup.footerText,
+                pageNumbers = pageSetup.pageNumbers,
+                contentHeightPx = pageSetup.contentHeightTwips / 20f * ZOOM * eff,
+                bottomMarginPx = pageSetup.marginBottomTwips / 20f * ZOOM * eff,
+                smallTextPx = 9f * ZOOM * eff,
+            )
+        }
+        v.requestLayout()
+        v.invalidate()
     }
 
     // -- toolbar state --
@@ -305,7 +464,7 @@ class EditorController(private val density: Float, initial: List<Block>) {
         originals = originals + block
         applying = true
         t.insert(pr.end, insert)
-        t.setSpan(BlockChipSpan(index, EditorModel.label(block)), pr.end + 1, pr.end + 2, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        t.setSpan(BlockChipSpan(index, EditorModel.label(block), block), pr.end + 1, pr.end + 2, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         RichOps.normalize(t, density)
         val chipPara = RichOps.paragraphAt(t, pr.end + 1)
         RichOps.updateParagraphs(t, chipPara.start, chipPara.start, density) { ParaAttrs() }
@@ -326,7 +485,7 @@ class EditorController(private val density: Float, initial: List<Block>) {
             val a = t.getSpanStart(chip)
             val e = t.getSpanEnd(chip)
             t.removeSpan(chip)
-            t.setSpan(BlockChipSpan(index, EditorModel.label(block)), a, e, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            t.setSpan(BlockChipSpan(index, EditorModel.label(block), block), a, e, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         changed()
     }

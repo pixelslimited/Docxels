@@ -3,8 +3,10 @@ package com.docscan.app
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,9 +32,21 @@ class MainActivity : FragmentActivity() {
         setContent {
             val locked by container.security.locked.collectAsState()
             val protect by container.security.protect.collectAsState()
+            val mode by container.ui.theme.collectAsState()
+            val dark = when (mode) {
+                com.docscan.app.security.ThemeMode.LIGHT -> false
+                com.docscan.app.security.ThemeMode.DARK -> true
+                com.docscan.app.security.ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
             LaunchedEffect(protect) { applyScreenProtection(protect) }
+            LaunchedEffect(dark) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT) else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+                    navigationBarStyle = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT) else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+                )
+            }
             CompositionLocalProvider(LocalContainer provides container) {
-                DocScanTheme {
+                DocScanTheme(darkTheme = dark) {
                     Box {
                         AppNav(container)
                         if (locked) LockScreen(onUnlockRequest = ::requestUnlock)

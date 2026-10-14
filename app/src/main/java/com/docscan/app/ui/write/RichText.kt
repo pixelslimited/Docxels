@@ -628,11 +628,79 @@ object SpanBridge {
 /** Placeholder character standing in for a table / image / page break so it is kept, in place, on save. */
 const val CHIP_CHAR = '\uFFFC'
 
-class BlockChipSpan(val index: Int, val label: String) : android.text.style.ReplacementSpan() {
-    override fun getSize(paint: Paint, text: CharSequence?, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int =
-        (paint.measureText(label) + 2 * paint.textSize * 0.6f).toInt()
+/**
+ * Stands in for a table, picture or page break. Pictures and tables are drawn as a preview at their real
+ * size so the page view shows where they sit and how much room they take; the page break is a small label.
+ */
+/** Widest a picture or table may be drawn, in pixels; set by the editor in the mobile view. */
+object ChipLimits {
+    @Volatile var maxWidthPx: Float = Float.MAX_VALUE
+}
+
+class BlockChipSpan(
+    val index: Int,
+    val label: String,
+    val block: com.docscan.app.core.word.Block? = null,
+) : android.text.style.ReplacementSpan() {
+    private var bitmap: android.graphics.Bitmap? = null
+    private var decoded = false
+
+    private fun pxPerTwip(paint: Paint): Float = ZOOM * ((paint as? TextPaint)?.density ?: 1f) / 20f
+
+    private fun tableRowTwips(t: com.docscan.app.core.word.TableBlock): List<Int> = t.rows.map { row ->
+        var col = 0
+        var tallest = 1
+        for (cell in row) {
+            val span = cell.colSpan.coerceAtLeast(1)
+            val width = (0 until span).sumOf { t.columnWidthsTwips.getOrElse(col + it) { 1440 } } - 230
+            col += span
+            val perLine = (width / 110).coerceAtLeast(4)
+            tallest = maxOf(tallest, cell.paragraphs.sumOf { p -> ((p.text.length + perLine - 1) / perLine).coerceAtLeast(1) })
+        }
+        tallest * 264 + 120
+    }
+
+    private fun naturalWidthTwips(): Int? = when (val b = block) {
+        is com.docscan.app.core.word.Block.Image -> b.image.widthTwips
+        is com.docscan.app.core.word.Block.Table -> b.table.columnWidthsTwips.sum()
+        else -> null
+    }
+
+    /** Shrinks to fit when the screen (mobile view) is narrower than the object; the page view never shrinks. */
+    private fun fit(paint: Paint): Float {
+        val w = naturalWidthTwips() ?: return 1f
+        val natural = w * pxPerTwip(paint)
+        return if (natural > ChipLimits.maxWidthPx && natural > 0f) ChipLimits.maxWidthPx / natural else 1f
+    }
+
+    private fun heightPx(paint: Paint): Int? = when (val b = block) {
+        is com.docscan.app.core.word.Block.Image -> (b.image.heightTwips * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8)
+        is com.docscan.app.core.word.Block.Table -> (tableRowTwips(b.table).sum() * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8)
+        else -> null
+    }
+
+    private fun widthPx(paint: Paint): Int? = naturalWidthTwips()?.let { (it * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8) }
+
+    override fun getSize(paint: Paint, text: CharSequence?, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
+        val h = heightPx(paint)
+        if (h != null && fm != null) {
+            fm.ascent = -h
+            fm.top = -h
+            fm.descent = 0
+            fm.bottom = 0
+        }
+        return widthPx(paint) ?: (paint.measureText(label) + 2 * paint.textSize * 0.6f).toInt()
+    }
 
     override fun draw(c: Canvas, text: CharSequence?, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
+        when (val b = block) {
+            is com.docscan.app.core.word.Block.Image -> drawImage(c, b.image, x, top, bottom, paint)
+            is com.docscan.app.core.word.Block.Table -> drawTable(c, b.table, x, top, paint)
+            else -> drawLabel(c, x, top, y, bottom, paint)
+        }
+    }
+
+    private fun drawLabel(c: Canvas, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
         val saved = paint.color
         val pad = paint.textSize * 0.3f
         val w = paint.measureText(label) + 4 * pad
@@ -641,6 +709,84 @@ class BlockChipSpan(val index: Int, val label: String) : android.text.style.Repl
         paint.color = 0xFF444B5A.toInt()
         c.drawText(label, x + 2 * pad, y.toFloat(), paint)
         paint.color = saved
+    }
+
+    private fun drawImage(c: Canvas, img: com.docscan.app.core.word.ImageBlock, x: Float, top: Int, bottom: Int, paint: Paint) {
+        if (!decoded) {
+            decoded = true
+            bitmap = runCatching {
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeByteArray(img.bytes, 0, img.bytes.size, bounds)
+                var sample = 1
+                while (bounds.outWidth / (sample * 2) >= 1200) sample *= 2
+                android.graphics.BitmapFactory.decodeByteArray(img.bytes, 0, img.bytes.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+            }.getOrNull()
+        }
+        val dst = android.graphics.RectF(x, top.toFloat(), x + (widthPx(paint) ?: 0), bottom.toFloat())
+        val bmp = bitmap
+        if (bmp != null) c.drawBitmap(bmp, null, dst, null) else {
+            val saved = paint.color
+            paint.color = 0xFFE8EAF0.toInt()
+            c.drawRect(dst, paint)
+            paint.color = saved
+        }
+    }
+
+    private fun drawTable(c: Canvas, t: com.docscan.app.core.word.TableBlock, x: Float, top: Int, paint: Paint) {
+        val k = pxPerTwip(paint) * fit(paint)
+        val savedColor = paint.color
+        val savedStyle = paint.style
+        val savedStroke = paint.strokeWidth
+        val savedTypeface = paint.typeface
+        val rows = tableRowTwips(t)
+        var yTw = 0
+        val line = 0xFF9AA0AE.toInt()
+        for ((ri, row) in t.rows.withIndex()) {
+            var xTw = 0
+            var col = 0
+            for (cell in row) {
+                val span = cell.colSpan.coerceAtLeast(1)
+                val wTw = (0 until span).sumOf { t.columnWidthsTwips.getOrElse(col + it) { 1440 } }
+                col += span
+                val r = android.graphics.RectF(x + xTw * k, top + yTw * k, x + (xTw + wTw) * k, top + (yTw + rows[ri]) * k)
+                val fill = cell.shading?.let { 0xFF000000.toInt() or it } ?: if (t.headerRow && ri == 0) 0xFFE8EAF0.toInt() else null
+                if (fill != null) {
+                    paint.style = Paint.Style.FILL
+                    paint.color = fill
+                    c.drawRect(r, paint)
+                }
+                if (t.borders) {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = 1f
+                    paint.color = line
+                    c.drawRect(r, paint)
+                }
+                paint.style = Paint.Style.FILL
+                paint.color = 0xFF1B1B1F.toInt()
+                if (t.headerRow && ri == 0) paint.typeface = Typeface.create(savedTypeface ?: Typeface.DEFAULT, Typeface.BOLD)
+                val pad = 57f * k
+                val maxW = r.width() - 2 * pad
+                var ly = r.top + pad + paint.textSize
+                val words = cell.paragraphs.joinToString(" ") { it.text }.split(' ').filter { it.isNotEmpty() }
+                var cur = ""
+                for (w in words) {
+                    val trial = if (cur.isEmpty()) w else "$cur $w"
+                    if (paint.measureText(trial) > maxW && cur.isNotEmpty()) {
+                        if (ly > r.bottom) break
+                        c.drawText(cur, r.left + pad, ly, paint)
+                        ly += paint.textSize * 1.2f
+                        cur = w
+                    } else cur = trial
+                }
+                if (cur.isNotEmpty() && ly <= r.bottom + paint.textSize) c.drawText(cur, r.left + pad, ly, paint)
+                paint.typeface = savedTypeface
+                xTw += wTw
+            }
+            yTw += rows[ri]
+        }
+        paint.color = savedColor
+        paint.style = savedStyle
+        paint.strokeWidth = savedStroke
     }
 }
 
@@ -671,7 +817,7 @@ object EditorModel {
         val ranges = RichOps.paragraphRanges(e)
         for ((pi, bi) in chipIndex) {
             val r = ranges[pi]
-            e.setSpan(BlockChipSpan(bi, label(originals[bi])), r.start, r.start + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            e.setSpan(BlockChipSpan(bi, label(originals[bi]), originals[bi]), r.start, r.start + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         return e to originals
     }

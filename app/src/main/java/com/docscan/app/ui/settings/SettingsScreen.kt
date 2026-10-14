@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsScreen(container: AppContainer, onBack: () -> Unit) {
+fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     val security = container.security
@@ -71,12 +71,24 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.background,
     ) { inner ->
         Column(
-            Modifier.fillMaxSize().padding(inner).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())
+            Modifier.fillMaxSize().padding(inner).statusBarsPadding().verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                Text("Settings", style = MaterialTheme.typography.headlineMedium)
+                if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                Text("Settings", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = if (onBack == null) 12.dp else 0.dp))
+            }
+
+            Section("Appearance")
+            val mode by container.ui.theme.collectAsState()
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.docscan.app.security.ThemeMode.entries.forEach { m ->
+                    com.docscan.app.ui.kit.FilterPill(
+                        m.name.lowercase().replaceFirstChar { it.uppercase() },
+                        mode == m,
+                        { container.ui.setTheme(m) },
+                    )
+                }
             }
 
             Section("Privacy and security")

@@ -40,6 +40,16 @@ import androidx.compose.material.icons.filled.StrikethroughS
 import androidx.compose.material.icons.filled.Subscript
 import androidx.compose.material.icons.filled.Superscript
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.FormatLineSpacing
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.InsertPageBreak
+import androidx.compose.material.icons.filled.Numbers
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -136,6 +146,10 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var findOpen by remember { mutableStateOf(false) }
     var pageOpen by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val container = com.docscan.app.LocalContainer.current
+    var viewMode by remember { mutableStateOf(runCatching { ViewMode.valueOf(container.ui.editorView) }.getOrDefault(ViewMode.PAGE)) }
+    var ribbonTab by remember { mutableIntStateOf(0) }
+    val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     val snackbar = remember { SnackbarHostState() }
     var tableOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Int?>(null) }
@@ -196,15 +210,6 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Find and replace") }, onClick = { menu = false; findOpen = true })
-                            DropdownMenuItem(text = { Text("Insert table") }, onClick = { menu = false; tableOpen = true })
-                            DropdownMenuItem(text = { Text("Insert picture") }, onClick = {
-                                menu = false
-                                photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                            })
-                            DropdownMenuItem(text = { Text("Insert page break") }, onClick = { menu = false; controller.insertPageBreak() })
-                            DropdownMenuItem(text = { Text("Page setup") }, onClick = { menu = false; pageOpen = true })
-                            DropdownMenuItem(text = { Text("Word count") }, onClick = { menu = false; counts = controller.counts() })
                             DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
                             DropdownMenuItem(
                                 text = { Text("Share as PDF") },
@@ -238,10 +243,35 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             AndroidView(
-                factory = { ctx -> RichEditText(ctx).also { controller.attach(it); controller.setChipTapListener { i -> editing = i } } },
+                factory = { ctx ->
+                    PageHost(ctx).also { host ->
+                        controller.attach(host.edit)
+                        controller.setChipTapListener { i -> editing = i }
+                        host.onWidth = { w -> controller.setAvailableWidth(w) }
+                    }
+                },
+                update = { host ->
+                    val d = host.resources.displayMetrics.density
+                    val gutter = when (viewMode) { ViewMode.PAGE -> 12f; ViewMode.TEXT -> 8f; ViewMode.MOBILE -> 0f }
+                    host.setDesk(deskColor, (gutter * d).toInt(), (gutter * d).toInt())
+                    controller.setViewConfig(viewMode, page)
+                },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
-            FormatBar(controller, state)
+            Ribbon(
+                c = controller,
+                s = state,
+                tab = ribbonTab,
+                onTab = { ribbonTab = it },
+                viewMode = viewMode,
+                onViewMode = { viewMode = it; container.ui.editorView = it.name },
+                onTable = { tableOpen = true },
+                onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onPageBreak = { controller.insertPageBreak() },
+                onPageSetup = { pageOpen = true },
+                onFind = { findOpen = true },
+                onCount = { counts = controller.counts() },
+            )
         }
     }
 
@@ -289,15 +319,38 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
 }
 
 @Composable
-private fun FormatBar(c: EditorController, s: ToolbarState) {
+private fun Ribbon(
+    c: EditorController,
+    s: ToolbarState,
+    tab: Int,
+    onTab: (Int) -> Unit,
+    viewMode: ViewMode,
+    onViewMode: (ViewMode) -> Unit,
+    onTable: () -> Unit,
+    onPicture: () -> Unit,
+    onPageBreak: () -> Unit,
+    onPageSetup: () -> Unit,
+    onFind: () -> Unit,
+    onCount: () -> Unit,
+) {
     var styleMenu by remember { mutableStateOf(false) }
     var colorMenu by remember { mutableStateOf(false) }
     var fillMenu by remember { mutableStateOf(false) }
+    var spacingMenu by remember { mutableStateOf(false) }
+    val tabs = listOf("Home", "Insert", "Layout", "Review", "View")
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Column {
+            TabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
+                tabs.forEachIndexed { i, label ->
+                    Tab(selected = tab == i, onClick = { onTab(i) }, text = { Text(label, maxLines = 1) })
+                }
+            }
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when (tab) {
+                    0 -> {
             Box {
                 TextButton(onClick = { styleMenu = true }) { Text(s.style.label) }
                 DropdownMenu(expanded = styleMenu, onDismissRequest = { styleMenu = false }) {
@@ -342,7 +395,45 @@ private fun FormatBar(c: EditorController, s: ToolbarState) {
             Toggle(Icons.Default.FormatIndentDecrease, "Decrease indent", false) { c.indent(-1) }
             Toggle(Icons.Default.FormatIndentIncrease, "Increase indent", false) { c.indent(1) }
             Toggle(Icons.Default.FormatClear, "Clear formatting", false) { c.clearFormatting() }
+                    }
+                    1 -> {
+                        RibbonButton(Icons.Default.TableChart, "Table", onTable)
+                        RibbonButton(Icons.Default.Image, "Picture", onPicture)
+                        RibbonButton(Icons.Default.InsertPageBreak, "Page break", onPageBreak)
+                    }
+                    2 -> {
+                        RibbonButton(Icons.Default.Description, "Page setup", onPageSetup)
+                        Box {
+                            RibbonButton(Icons.Default.FormatLineSpacing, "Line spacing") { spacingMenu = true }
+                            DropdownMenu(expanded = spacingMenu, onDismissRequest = { spacingMenu = false }) {
+                                listOf(null to "Default", 1.0f to "Single", 1.15f to "1.15", 1.5f to "1.5", 2.0f to "Double").forEach { (m, label) ->
+                                    DropdownMenuItem(text = { Text(label) }, onClick = { spacingMenu = false; c.setLineSpacing(m) })
+                                }
+                            }
+                        }
+                        RibbonButton(Icons.Default.FormatIndentDecrease, "Outdent") { c.indent(-1) }
+                        RibbonButton(Icons.Default.FormatIndentIncrease, "Indent") { c.indent(1) }
+                    }
+                    3 -> {
+                        RibbonButton(Icons.Default.Search, "Find and replace", onFind)
+                        RibbonButton(Icons.Default.Numbers, "Word count", onCount)
+                    }
+                    else -> {
+                        com.docscan.app.ui.kit.FilterPill("Print layout", viewMode == ViewMode.PAGE, { onViewMode(ViewMode.PAGE) }, Modifier.padding(horizontal = 4.dp))
+                        com.docscan.app.ui.kit.FilterPill("Text width", viewMode == ViewMode.TEXT, { onViewMode(ViewMode.TEXT) }, Modifier.padding(horizontal = 4.dp))
+                        com.docscan.app.ui.kit.FilterPill("Mobile", viewMode == ViewMode.MOBILE, { onViewMode(ViewMode.MOBILE) }, Modifier.padding(horizontal = 4.dp))
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun RibbonButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Text(label, modifier = Modifier.padding(start = 6.dp), maxLines = 1)
     }
 }
 
