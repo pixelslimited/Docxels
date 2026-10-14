@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
@@ -69,8 +71,6 @@ import com.docscan.app.ui.settings.SettingsScreen
 import com.docscan.app.ui.theme.Brand
 import com.docscan.app.ui.theme.DocxelsTheme
 import com.docscan.app.ui.tools.ToolsScreen
-import androidx.compose.material.icons.filled.Folder as FolderFilled
-import androidx.compose.material.icons.filled.GridView as GridFilled
 
 enum class Tab { HOME, DOCS, TOOLS, SETTINGS }
 
@@ -238,9 +238,9 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 NavItem("Home", Icons.Default.Home, Icons.Outlined.Home, selected == Tab.HOME, Modifier.weight(1f)) { onSelect(Tab.HOME) }
-                NavItem("Documents", FolderFilled, Icons.Outlined.Folder, selected == Tab.DOCS, Modifier.weight(1f)) { onSelect(Tab.DOCS) }
+                NavItem("Documents", Icons.Default.Folder, Icons.Outlined.Folder, selected == Tab.DOCS, Modifier.weight(1f)) { onSelect(Tab.DOCS) }
                 Box(Modifier.weight(1f))
-                NavItem("Tools", GridFilled, Icons.Outlined.GridView, selected == Tab.TOOLS, Modifier.weight(1f)) { onSelect(Tab.TOOLS) }
+                NavItem("Tools", Icons.Default.GridView, Icons.Outlined.GridView, selected == Tab.TOOLS, Modifier.weight(1f)) { onSelect(Tab.TOOLS) }
                 NavItem("Settings", Icons.Default.Settings, Icons.Outlined.Settings, selected == Tab.SETTINGS, Modifier.weight(1f)) { onSelect(Tab.SETTINGS) }
             }
         }
