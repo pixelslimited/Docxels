@@ -89,14 +89,14 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit) {
                     if (!want) {
                         // Turning the lock off needs the same proof as using the app.
                         Authenticator.prompt(activity, "Turn off app lock", "Confirm it's you", onSuccess = {
-                            security.setLockEnabled(false)
+                            security.changeLock(false)
                             lockOn = false
                         })
                     } else if (!Authenticator.available(activity)) {
                         say("Set a screen lock or fingerprint in your phone's settings first.")
                     } else {
                         Authenticator.prompt(activity, "Turn on app lock", "Confirm it's you", onSuccess = {
-                            security.setLockEnabled(true)
+                            security.changeLock(true)
                             lockOn = true
                         })
                     }

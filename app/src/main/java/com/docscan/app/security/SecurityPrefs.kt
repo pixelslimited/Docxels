@@ -53,7 +53,7 @@ class SecurityPrefs(context: Context) {
         if (lockEnabled) _locked.value = true
     }
 
-    fun setLockEnabled(enabled: Boolean) {
+    fun changeLock(enabled: Boolean) {
         lockEnabled = enabled
         if (!enabled) _locked.value = false
     }
