@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Download
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.docscan.app.data.LibraryItem
 import com.docscan.app.ui.kit.DocBadge
+import com.docscan.app.ui.kit.TintIcon
 import com.docscan.app.ui.kit.ToolTile
 import com.docscan.app.ui.kit.docCard
 import com.docscan.app.ui.library.LibraryRow
@@ -90,7 +92,7 @@ fun HomeScreen(
             Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brand.Gradient).padding(18.dp),
         ) {
             Text("What are we working on?", color = Color.White, style = MaterialTheme.typography.titleLarge)
-            Text("Scan, write and sign in one place.", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
+            Text("Scan, write and convert in one place.", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HeroAction(Icons.Default.NoteAdd, "New doc", primary = true, modifier = Modifier.weight(1f), onClick = actions.newDoc)
                 HeroAction(Icons.Default.DocumentScanner, "Scan", modifier = Modifier.weight(1f), onClick = actions.scan)
@@ -99,8 +101,30 @@ fun HomeScreen(
             }
         }
 
+        // Featured: the most-requested conversion gets its own card.
+        Row(
+            Modifier
+                .padding(top = 16.dp)
+                .fillMaxWidth()
+                .docCard()
+                .clickable(role = Role.Button, onClickLabel = "Convert a PDF to Word", onClick = actions.pdfToWord)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TintIcon(Icons.Default.PictureAsPdf, t.pink, box = 52.dp, iconSize = 26.dp)
+            Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                Text("PDF to Word", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Make any PDF editable. Text, headings, lists and tables are kept. Done on this phone; nothing is uploaded.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
         Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Tools", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text("Convert and scan", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             Text(
                 "All tools",
                 style = MaterialTheme.typography.labelLarge,
@@ -109,9 +133,9 @@ fun HomeScreen(
             )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            ToolTile(Icons.Default.DocumentScanner, "Scan", t.violet, actions.scan, Modifier.weight(1f))
+            ToolTile(Icons.Default.PictureAsPdf, "PDF to Word", t.pink, actions.pdfToWord, Modifier.weight(1f))
             ToolTile(Icons.Default.TextSnippet, "Scan to Word", t.teal, actions.scanToWord, Modifier.weight(1f))
-            ToolTile(Icons.Default.PictureAsPdf, "Word to PDF", t.pink, actions.wordToPdf, Modifier.weight(1f))
+            ToolTile(Icons.Default.Description, "Word to PDF", t.blue, actions.wordToPdf, Modifier.weight(1f))
             ToolTile(Icons.Default.PhotoLibrary, "Photos to PDF", t.green, actions.importPhotos, Modifier.weight(1f))
         }
 

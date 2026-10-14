@@ -127,7 +127,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | PDF engine: merge, pick/reorder/delete pages, split, rotate, AES-256 password, unlock | IMPLEMENTED — NOT VERIFIED | `pdf/PdfTools.kt` (PdfBox-Android, lossless). JVM tests in `PdfToolsTest`; become TESTED only once CI is green. |
 | PDF viewer (scroll, page counter, share) | IMPLEMENTED — NOT VERIFIED | `PdfRenderer`; no pinch-zoom, no text search, no annotation yet. |
 | Merge / Split / Rotate / Reorder / Protect screens | IMPLEMENTED — NOT VERIFIED | Results are shared or saved to Downloads/DocScan. Not stored in the library yet. |
-| Compress, PDF to Word, sign, fill form, annotate | NOT STARTED | Still marked Soon. |
+| Compress, sign, fill form, annotate | NOT STARTED | Still marked Soon. |
 
 ## In-app updates (added)
 | Feature | Status | Notes |
@@ -168,3 +168,8 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Read mode (view without editing) | IMPLEMENTED — NOT VERIFIED | Blocks typing and table/picture editing; text can still be selected and copied. |
 | Zoom control | NOT STARTED | Page view uses a fixed zoom today. |
 | Comments, track changes, footnotes, TOC, styles pane, sections, headers/footers beyond one line, RTL, spellcheck options | NOT STARTED | Later phases. |
+| PDF to Word | IMPLEMENTED — NOT VERIFIED | Pages with a text layer are rebuilt from the PDF's own text (PdfBox) via PdfLayout + OcrLayout: headings from font size, lists, alignment, ruled tables. Pages with no text are read with OCR. Pure-Kotlin layout is unit-tested (PdfLayoutTest); the phone path is untried. Limits: pictures/drawings are not carried over (the user is told), multi-column pages come out in top-to-bottom order, bold/italic/colour not read from the PDF, password-protected PDFs must be unlocked first. |
+| Dashboard redesign | IMPLEMENTED — NOT VERIFIED | Home now has a featured PDF to Word card and a Convert row. |
+| Different first page header/footer | IMPLEMENTED — NOT VERIFIED | Page setup option; read/written as titlePg. |
+| Compatibility notice | IMPLEMENTED — NOT VERIFIED | After importing a .docx, lists content that cannot be kept yet. |
+| Delta updates | IMPLEMENTED — NOT VERIFIED | Updater downloads a small patch against the installed build, with full-download fallback. |

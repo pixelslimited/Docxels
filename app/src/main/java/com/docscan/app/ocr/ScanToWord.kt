@@ -29,17 +29,7 @@ class ScanToWord(private val renderer: PageRenderer, private val ocr: OcrEngine)
             onProgress(index + 1, pages.size)
             val bitmap = withContext(Dispatchers.Default) { renderer.render(entity, SIDE) }
             try {
-                val text = ocr.recognize(bitmap)
-                val tables = readTables(bitmap)
-                val input = text.textBlocks.map { b ->
-                    OcrBlockIn(
-                        b.lines.mapNotNull { l ->
-                            val r = l.boundingBox ?: return@mapNotNull null
-                            OcrLine(l.text, r.left, r.top, r.right, r.bottom)
-                        },
-                    )
-                }.filter { it.lines.isNotEmpty() }
-                val pageBlocks = OcrLayout.page(input, tables, bitmap.width, page.contentWidthTwips)
+                val pageBlocks = pageBlocks(bitmap, page)
                 if (index > 0) blocks += Block.PageBreak
                 if (pageBlocks.isEmpty()) {
                     blocks += Block.Para(com.docscan.app.core.word.Paragraph(listOf(com.docscan.app.core.word.Run("[No text recognised on page ${index + 1}]"))))
@@ -51,6 +41,21 @@ class ScanToWord(private val renderer: PageRenderer, private val ocr: OcrEngine)
             }
         }
         return WordDoc(title = title, blocks = blocks.ifEmpty { listOf(Block.Para(com.docscan.app.core.word.Paragraph())) }, page = page)
+    }
+
+    /** Recognises one rendered page: text blocks plus any ruled tables, as document blocks. */
+    suspend fun pageBlocks(bitmap: Bitmap, page: PageSetup): List<Block> {
+        val text = ocr.recognize(bitmap)
+        val tables = readTables(bitmap)
+        val input = text.textBlocks.map { b ->
+            OcrBlockIn(
+                b.lines.mapNotNull { l ->
+                    val r = l.boundingBox ?: return@mapNotNull null
+                    OcrLine(l.text, r.left, r.top, r.right, r.bottom)
+                },
+            )
+        }.filter { it.lines.isNotEmpty() }
+        return OcrLayout.page(input, tables, bitmap.width, page.contentWidthTwips)
     }
 
     private suspend fun readTables(bitmap: Bitmap): List<OcrTable> {

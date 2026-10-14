@@ -74,10 +74,11 @@ fun ToolsScreen(actions: Actions) {
         ToolDef(Icons.Default.Lock, "Password protect", t.blue, false, { actions.pdfTool("protect") }),
     )
     val convert = listOf(
+        ToolDef(Icons.Default.TextSnippet, "PDF to Word", t.green, false, actions.pdfToWord),
         ToolDef(Icons.Default.TextSnippet, "Scan to Word", t.green, false, actions.scanToWord),
         ToolDef(Icons.Default.PictureAsPdf, "Word to PDF", t.green, false, actions.wordToPdf),
         ToolDef(Icons.Default.Image, "Photos to PDF", t.green, false, actions.importPhotos),
-        ToolDef(Icons.Default.TextSnippet, "PDF to Word", t.green, true, planned("PDF to Word")),
+        
         ToolDef(Icons.Default.TableChart, "Scan to Excel", t.green, true, planned("Scan to Excel")),
     )
     val write = listOf(

@@ -86,6 +86,7 @@ class Actions(
     val soon: (String) -> Unit,
     val openWord: (String) -> Unit,
     val pdfTool: (String) -> Unit,
+    val pdfToWord: () -> Unit,
 )
 
 private enum class Pick { SCAN_TO_WORD, WORD_TO_PDF }
@@ -124,6 +125,10 @@ fun MainShell(
         if (uri != null) vm.importWord(context, uri, onOpenWord)
     }
 
+    val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.pdfToWord(context, uri, onOpenWord)
+    }
+
     val actions = remember(vm) {
         Actions(
             newDoc = { vm.newWord(onOpenWord) },
@@ -136,6 +141,7 @@ fun MainShell(
             soon = { name -> vm.say("$name is coming in a later update.") },
             openWord = onOpenWord,
             pdfTool = onPdfTool,
+            pdfToWord = { pdfPicker.launch(arrayOf("application/pdf")) },
         )
     }
 

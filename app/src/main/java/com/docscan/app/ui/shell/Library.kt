@@ -132,6 +132,48 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /** Converts a PDF from the phone's storage into an editable Word document. */
+    fun pdfToWord(context: Context, uri: Uri, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            _busy.value = "Opening PDF…"
+            val result = runCatching {
+                val (file, name) = withContext(Dispatchers.IO) {
+                    var n = "PDF"
+                    var size = -1L
+                    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                        if (c.moveToFirst()) {
+                            c.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }?.let { n = c.getString(it) ?: n }
+                            c.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 }?.let { size = c.getLong(it) }
+                        }
+                    }
+                    require(size < 0 || size <= MAX_IMPORT_BYTES) { "That PDF is too large to convert." }
+                    val dir = File(context.cacheDir, "pdf2word").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
+                    val f = File(dir, "source.pdf")
+                    val ok = context.contentResolver.openInputStream(uri)?.use { com.docscan.app.pdf.copyStreamToFile(it, f, MAX_IMPORT_BYTES) } ?: false
+                    require(ok) { "Could not read that PDF." }
+                    f to n.removeSuffix(".pdf").removeSuffix(".PDF")
+                }
+                try {
+                    container.pdfToWord.convert(file, name) { p, total -> _busy.value = "Converting page $p of $total…" }
+                } finally {
+                    file.delete()
+                }
+            }
+            result.onSuccess { conv ->
+                val id = withContext(Dispatchers.IO) { container.words.add(conv.doc) }
+                _busy.value = null
+                if (conv.notes.isNotEmpty()) _message.value = conv.notes.joinToString(" ")
+                onDone(id)
+            }.onFailure {
+                _busy.value = null
+                _message.value = when (it) {
+                    is com.docscan.app.pdf.PdfPasswordException -> "This PDF is password protected. Remove the password first (Tools → PDF), then convert it."
+                    else -> it.message?.takeIf { m -> m.length < 120 } ?: "Could not convert that PDF."
+                }
+            }
+        }
+    }
+
     /** OCRs a scan into an editable Word document. */
     fun scanToWord(scanId: String, onDone: (String) -> Unit) {
         viewModelScope.launch {
