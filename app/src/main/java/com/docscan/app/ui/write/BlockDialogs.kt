@@ -40,6 +40,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.docscan.app.core.word.Align
 import com.docscan.app.core.word.ImageBlock
 import com.docscan.app.core.word.Paragraph
@@ -270,18 +273,57 @@ fun ImageEditorDialog(
 ) {
     var fraction by remember { mutableFloatStateOf((initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.1f, 1f)) }
     var align by remember { mutableStateOf(initial.align) }
-    val thumb: Bitmap? = remember(initial) {
+    var cur by remember { mutableStateOf(initial) }
+    var busy by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val thumb: Bitmap? = remember(cur) {
         val o = BitmapFactory.Options().apply { inSampleSize = 4 }
-        BitmapFactory.decodeByteArray(initial.bytes, 0, initial.bytes.size, o)
+        BitmapFactory.decodeByteArray(cur.bytes, 0, cur.bytes.size, o)
     }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Picture") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                thumb?.let { Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth().padding(4.dp)) }
+                thumb?.let {
+                    Image(
+                        it.asImageBitmap(), contentDescription = null,
+                        modifier = Modifier.fillMaxWidth().padding(4.dp).background(if (cur !== initial) Color(0xFFCCCCCC) else Color.Transparent),
+                    )
+                }
                 Text("Width ${(fraction * 100).toInt()}% of the page")
                 Slider(fraction, { fraction = it }, valueRange = 0.1f..1f)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(enabled = !busy, onClick = {
+                        busy = true
+                        note = null
+                        scope.launch {
+                            val result = withContext(Dispatchers.Default) {
+                                runCatching {
+                                    val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                    BitmapFactory.decodeByteArray(initial.bytes, 0, initial.bytes.size, o)
+                                    var sample = 1
+                                    while (maxOf(o.outWidth, o.outHeight) / sample > 1600) sample *= 2
+                                    val bmp = BitmapFactory.decodeByteArray(
+                                        initial.bytes, 0, initial.bytes.size,
+                                        BitmapFactory.Options().apply { inSampleSize = sample },
+                                    ) ?: error("decode")
+                                    val cut = com.docscan.app.imaging.BackgroundRemover.remove(bmp)
+                                    val out = java.io.ByteArrayOutputStream()
+                                    cut.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                    out.toByteArray()
+                                }
+                            }
+                            busy = false
+                            result.onSuccess { cur = initial.copy(bytes = it, extension = "png") }
+                                .onFailure { note = "Couldn't remove the background from this picture." }
+                        }
+                    }) { Text(if (busy) "Working…" else "Remove background") }
+                    if (cur !== initial) TextButton(onClick = { cur = initial }) { Text("Restore") }
+                }
+                note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                if (cur !== initial) Text("Background removed on this phone. Works best on a clear subject against a plain background.", style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(Align.LEFT to "Left", Align.CENTER to "Centre", Align.RIGHT to "Right").forEach { (a, l) ->
                         FilterChip(align == a, { align = a }, label = { Text(l) })
@@ -293,7 +335,7 @@ fun ImageEditorDialog(
             TextButton(onClick = {
                 val w = (contentWidthTwips * fraction).toInt().coerceAtLeast(720)
                 val h = (w.toLong() * initial.heightTwips / initial.widthTwips.coerceAtLeast(1)).toInt().coerceAtLeast(360)
-                onSave(initial.copy(widthTwips = w, heightTwips = h, align = align))
+                onSave(cur.copy(widthTwips = w, heightTwips = h, align = align))
             }) { Text("Save") }
         },
         dismissButton = {
