@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Menu
@@ -155,6 +156,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var linkActions by remember { mutableStateOf<Triple<Int, Int, String>?>(null) }
     val recentFonts = remember { mutableStateListOf<String>() }
     var caseMenu by remember { mutableStateOf(false) }
+    var painter by remember { mutableStateOf<List<com.docscan.app.ui.write.CharAttr>?>(null) }
     var status by remember { mutableStateOf("") }
     LaunchedEffect(state) {
         delay(300)
@@ -311,6 +313,11 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onNav = { navOpen = true },
                 caseMenu = caseMenu,
                 onCaseMenu = { caseMenu = it },
+                painting = painter != null,
+                onPainter = {
+                    val held = painter
+                    if (held == null) painter = controller.captureFormat() else { controller.applyFormat(held); painter = null }
+                },
             )
         }
     }
@@ -430,12 +437,16 @@ private fun Ribbon(
     onNav: () -> Unit,
     caseMenu: Boolean,
     onCaseMenu: (Boolean) -> Unit,
+    painting: Boolean,
+    onPainter: () -> Unit,
 ) {
+    var customFor by remember { mutableStateOf(0) }
     var styleMenu by remember { mutableStateOf(false) }
     var colorMenu by remember { mutableStateOf(false) }
     var fillMenu by remember { mutableStateOf(false) }
     var spacingMenu by remember { mutableStateOf(false) }
     val tabs = listOf("Home", "Insert", "Layout", "Review", "View")
+    CustomColorDialogHost(customFor, { customFor = 0 }, c)
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Column {
             TabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
@@ -457,6 +468,7 @@ private fun Ribbon(
                     }
                 }
             }
+            Toggle(Icons.Default.FormatPaint, if (painting) "Apply copied formatting" else "Format painter: copy formatting", painting, onPainter)
             TextButton(onClick = onFont) { Text(s.font ?: "Font", maxLines = 1, modifier = Modifier.widthIn(max = 110.dp)) }
             TextButton(onClick = { c.sizeStep(-1) }) { Text("A−") }
             TextButton(onClick = onSize) { Text(if (s.sizePt % 1f == 0f) s.sizePt.toInt().toString() else s.sizePt.toString()) }
@@ -482,6 +494,7 @@ private fun Ribbon(
                         colorMenu = false
                         c.apply(CharAttr.Color(it))
                     }
+                    TextButton(onClick = { colorMenu = false; customFor = 1 }) { Text("More colours…") }
                 }
             }
             Box {
@@ -491,6 +504,7 @@ private fun Ribbon(
                         fillMenu = false
                         c.apply(CharAttr.Highlight(it))
                     }
+                    TextButton(onClick = { fillMenu = false; customFor = 2 }) { Text("More colours…") }
                 }
             }
             Toggle(Icons.Default.FormatAlignLeft, "Align left", s.align == Align.LEFT) { c.setAlign(Align.LEFT) }
@@ -539,6 +553,19 @@ private fun Ribbon(
             }
         }
     }
+}
+
+@Composable
+private fun CustomColorDialogHost(customFor: Int, onDone: () -> Unit, c: EditorController) {
+    if (customFor == 0) return
+    ColorHexDialog(
+        title = if (customFor == 1) "Text colour" else "Highlight colour",
+        onPick = { rgb ->
+            onDone()
+            if (customFor == 1) c.apply(CharAttr.Color(rgb)) else c.apply(CharAttr.Highlight(rgb))
+        },
+        onDismiss = onDone,
+    )
 }
 
 @Composable
@@ -613,7 +640,11 @@ private fun FindDialog(c: EditorController, onClose: () -> Unit) {
 private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDismiss: () -> Unit) {
     var paper by remember { mutableStateOf(PaperSize.entries.firstOrNull { it.widthTwips == page.widthTwips && it.heightTwips == page.heightTwips } ?: PaperSize.A4) }
     var landscape by remember { mutableStateOf(page.landscape) }
-    var margin by remember { mutableIntStateOf(page.marginLeftTwips) }
+    fun cm(twips: Int) = String.format(java.util.Locale.US, "%.2f", twips / 567f)
+    var mTop by remember { mutableStateOf(cm(page.marginTopTwips)) }
+    var mBottom by remember { mutableStateOf(cm(page.marginBottomTwips)) }
+    var mLeft by remember { mutableStateOf(cm(page.marginLeftTwips)) }
+    var mRight by remember { mutableStateOf(cm(page.marginRightTwips)) }
     var header by remember { mutableStateOf(page.headerText) }
     var footer by remember { mutableStateOf(page.footerText) }
     var numbers by remember { mutableStateOf(page.pageNumbers) }
@@ -633,11 +664,22 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
                     Switch(landscape, { landscape = it })
                     Text("  Landscape")
                 }
-                Text("Margins", style = MaterialTheme.typography.labelLarge)
+                Text("Margins (cm)", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    listOf("Narrow 1.27 cm" to 720, "Normal 2.54 cm" to 1440, "Wide 3.81 cm" to 2160).forEach { (label, v) ->
-                        FilterChip(margin == v, { margin = v }, label = { Text(label) })
+                    listOf(
+                        "Normal" to listOf(1440, 1440, 1440, 1440), "Narrow" to listOf(720, 720, 720, 720),
+                        "Moderate" to listOf(1440, 1440, 1080, 1080), "Wide" to listOf(1440, 1440, 2880, 2880),
+                    ).forEach { (label, v) ->
+                        FilterChip(false, { mTop = cm(v[0]); mBottom = cm(v[1]); mLeft = cm(v[2]); mRight = cm(v[3]) }, label = { Text(label) })
                     }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(mTop, { mTop = it.take(5) }, singleLine = true, label = { Text("Top") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(mBottom, { mBottom = it.take(5) }, singleLine = true, label = { Text("Bottom") }, modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(mLeft, { mLeft = it.take(5) }, singleLine = true, label = { Text("Left") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(mRight, { mRight = it.take(5) }, singleLine = true, label = { Text("Right") }, modifier = Modifier.weight(1f))
                 }
                 OutlinedTextField(header, { header = it }, label = { Text("Header text") }, singleLine = true)
                 OutlinedTextField(footer, { footer = it }, label = { Text("Footer text") }, singleLine = true)
@@ -652,7 +694,8 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
                 onApply(
                     page.copy(
                         widthTwips = paper.widthTwips, heightTwips = paper.heightTwips, landscape = landscape,
-                        marginLeftTwips = margin, marginRightTwips = margin, marginTopTwips = margin, marginBottomTwips = margin,
+                        marginLeftTwips = tw(mLeft, page.marginLeftTwips), marginRightTwips = tw(mRight, page.marginRightTwips),
+                        marginTopTwips = tw(mTop, page.marginTopTwips), marginBottomTwips = tw(mBottom, page.marginBottomTwips),
                         headerText = header.trim(), footerText = footer.trim(), pageNumbers = numbers,
                     ),
                 )
@@ -660,6 +703,12 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+/** Centimetres typed by the user to twips; keeps the old value if the text is not a sensible number. Margins stay between 0 and 10 cm. */
+private fun tw(text: String, fallback: Int): Int {
+    val v = text.replace(',', '.').toFloatOrNull() ?: return fallback
+    return (v.coerceIn(0f, 10f) * 567f).toInt()
 }
 
 @Composable

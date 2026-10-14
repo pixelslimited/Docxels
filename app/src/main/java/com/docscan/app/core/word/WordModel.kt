@@ -114,9 +114,14 @@ sealed interface Block {
 
 enum class PaperSize(val label: String, val widthTwips: Int, val heightTwips: Int) {
     A4("A4", 11906, 16838),
+    A3("A3", 16838, 23811),
     A5("A5", 8392, 11906),
+    B5("B5", 9979, 14173),
     LETTER("Letter", 12240, 15840),
     LEGAL("Legal", 12240, 20160),
+    TABLOID("Tabloid", 15840, 24480),
+    EXECUTIVE("Executive", 10440, 15120),
+    STATEMENT("Statement", 7920, 12240),
 }
 
 data class PageSetup(

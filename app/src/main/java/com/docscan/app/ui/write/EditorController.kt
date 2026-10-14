@@ -586,6 +586,40 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
         return count
     }
 
+    // -- format painter --
+
+    /** Reads the character formatting at the selection (or cursor) so it can be applied elsewhere. */
+    fun captureFormat(): List<CharAttr> {
+        val t = text
+        val (a, b) = selection
+        val out = ArrayList<CharAttr>()
+        if (RichOps.covers(t, a, b, CharKind.BOLD)) out += CharAttr.Bold
+        if (RichOps.covers(t, a, b, CharKind.ITALIC)) out += CharAttr.Italic
+        if (RichOps.covers(t, a, b, CharKind.UNDERLINE)) out += CharAttr.Underline
+        if (RichOps.covers(t, a, b, CharKind.STRIKE)) out += CharAttr.Strike
+        (RichOps.valueAt(t, a, CharKind.COLOR) as? Int)?.let { out += CharAttr.Color(it) }
+        (RichOps.valueAt(t, a, CharKind.HIGHLIGHT) as? Int)?.let { out += CharAttr.Highlight(it) }
+        (RichOps.valueAt(t, a, CharKind.SIZE) as? Float)?.let { out += CharAttr.Size(it) }
+        (RichOps.valueAt(t, a, CharKind.FONT) as? String)?.takeIf { it.isNotEmpty() }?.let { out += CharAttr.Font(it) }
+        (RichOps.valueAt(t, a, CharKind.VERT) as? Boolean)?.let { out += CharAttr.Vert(it) }
+        return out
+    }
+
+    /** Applies captured formatting to the selection, or to the word at the cursor. Replaces the old character formatting. */
+    fun applyFormat(f: List<CharAttr>) {
+        if (view == null) return
+        val t = text
+        var (a, b) = selection
+        if (a == b) {
+            while (a > 0 && t[a - 1].isLetterOrDigit()) a--
+            while (b < t.length && t[b].isLetterOrDigit()) b++
+        }
+        if (a >= b) return
+        RichOps.clearAll(t, a, b)
+        f.forEach { RichOps.set(t, a, b, it) }
+        changed()
+    }
+
     // -- Phase 1 additions: font, size, case, paragraph dialog, insert text, navigation, statistics --
 
     fun setFont(name: String?) {

@@ -411,7 +411,8 @@ object RichOps {
 
     /** Removes every direct character format in the range (the "clear formatting" button). */
     fun clearAll(text: Editable, from: Int, to: Int) {
-        CharKind.entries.forEach { clear(text, from, to, it) }
+        // Clear Formatting keeps hyperlinks, as Word does.
+        CharKind.entries.filter { it != CharKind.LINK }.forEach { clear(text, from, to, it) }
     }
 
     // -- paragraphs --

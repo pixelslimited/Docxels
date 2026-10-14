@@ -301,3 +301,33 @@ fun LinkActionsDialog(url: String, onOpen: () -> Unit, onEdit: () -> Unit, onCop
         },
     )
 }
+
+@Composable
+fun ColorHexDialog(title: String, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    var hex by remember { mutableStateOf("") }
+    val clean = hex.trim().removePrefix("#")
+    val rgb = if (Regex("[0-9A-Fa-f]{6}").matches(clean)) clean.toInt(16) else null
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(
+                        0xC00000, 0xFF0000, 0xFFC000, 0xFFFF00, 0x92D050, 0x00B050, 0x00B0F0, 0x0070C0, 0x002060, 0x7030A0,
+                        0x7F7F7F, 0x404040, 0xF4B183, 0xA9D18E, 0x9DC3E6, 0xB4A7D6, 0xFFE699, 0xD0CECE,
+                    ).forEach { c ->
+                        Box(Modifier.size(34.dp).background(androidx.compose.ui.graphics.Color(0xFF000000.toInt() or c), androidx.compose.foundation.shape.CircleShape).clickable { onPick(c) })
+                    }
+                }
+                OutlinedTextField(
+                    hex, { hex = it.take(7) }, singleLine = true, label = { Text("Hex colour, e.g. 1F3864") },
+                    isError = hex.isNotEmpty() && rgb == null,
+                )
+                if (rgb != null) Box(Modifier.fillMaxWidth().height(28.dp).background(androidx.compose.ui.graphics.Color(0xFF000000.toInt() or rgb)))
+            }
+        },
+        confirmButton = { TextButton(onClick = { rgb?.let(onPick) }, enabled = rgb != null) { Text("Apply") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
