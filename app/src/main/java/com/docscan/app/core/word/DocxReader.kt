@@ -60,6 +60,7 @@ object DocxReader {
 
     private class Reader(val parts: Map<String, ByteArray>, val fallbackTitle: String) {
         var rels: Map<String, String> = emptyMap()
+        var links: Map<String, String> = emptyMap()
         var styles: Map<String, StyleInfo> = emptyMap()
         var defaultStyleId: String? = null
         var numKinds: Map<String, Map<Int, ListKind>> = emptyMap() // numId -> level -> kind
@@ -79,6 +80,7 @@ object DocxReader {
             val dir = mainPath.substringBeforeLast('/', "")
             val relsPath = (if (dir.isEmpty()) "" else "$dir/") + "_rels/" + mainPath.substringAfterLast('/') + ".rels"
             rels = readRels(relsPath, dir)
+            links = readLinks(relsPath)
             readStyles(dir)
             readNumbering(dir)
             val root = xml(mainPath) ?: throw DocxException("The document text could not be read")
@@ -99,6 +101,20 @@ object DocxReader {
                 }
             }
             return if (parts.containsKey("word/document.xml")) "word/document.xml" else null
+        }
+
+        /** External hyperlink targets by relationship id, with the address untouched (readRels turns targets into paths). */
+        fun readLinks(path: String): Map<String, String> {
+            val node = xml(path) ?: return emptyMap()
+            val map = HashMap<String, String>()
+            for (r in node.findAll("Relationship")) {
+                val id = r.attr("Id") ?: continue
+                val target = r.attr("Target") ?: continue
+                if (r.attr("TargetMode") == "External" || r.attr("Type")?.endsWith("/hyperlink") == true) {
+                    LinkSafety.normalize(target)?.let { map[id] = it }
+                }
+            }
+            return map
         }
 
         fun readRels(path: String, baseDir: String): Map<String, String> {
@@ -420,7 +436,11 @@ object DocxReader {
                 for (c in node.children) {
                     when (c.local) {
                         "r" -> readRun(c, inherited)
-                        "hyperlink", "ins", "smartTag", "sdtContent", "customXml", "fldSimple", "bookmarkStart" -> walk(c, inherited)
+                        "hyperlink" -> {
+                            val url = c.attr("id")?.let { links[it] }
+                            walk(c, if (url != null) inherited.copy(link = url) else inherited)
+                        }
+                        "ins", "smartTag", "sdtContent", "customXml", "fldSimple", "bookmarkStart" -> walk(c, inherited)
                         "sdt" -> c.child("sdtContent")?.let { walk(it, inherited) }
                     }
                 }

@@ -114,6 +114,9 @@ class RichEditText(context: Context) : EditText(context) {
 
     /** Called with the block index when a table / image placeholder is tapped. */
     var onChipTap: ((Int) -> Unit)? = null
+
+    /** Called with (start, end, address) when a hyperlink is tapped. */
+    var onLinkTap: ((Int, Int, String) -> Unit)? = null
     private val taps = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
         override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
             val t = text
@@ -121,6 +124,11 @@ class RichEditText(context: Context) : EditText(context) {
             val chip = t.getSpans(maxOf(0, off - 1), minOf(t.length, off + 1), BlockChipSpan::class.java)
                 .firstOrNull { t.getSpanStart(it) <= off && off <= t.getSpanEnd(it) }
             if (chip != null) onChipTap?.invoke(chip.index)
+            else {
+                val link = t.getSpans(maxOf(0, off - 1), minOf(t.length, off + 1), LinkSpan::class.java)
+                    .firstOrNull { t.getSpanStart(it) <= off && off < t.getSpanEnd(it) }
+                if (link != null) onLinkTap?.invoke(t.getSpanStart(link), t.getSpanEnd(link), link.url)
+            }
             return false
         }
     })
@@ -499,6 +507,41 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
         val r = RichOps.paragraphAt(t, t.getSpanStart(chip))
         val from = if (r.hasNewline) r.start else maxOf(0, r.start - 1)
         t.delete(from, r.full)
+        changed()
+    }
+
+    fun setLinkTapListener(l: (Int, Int, String) -> Unit) {
+        view?.onLinkTap = l
+    }
+
+    fun textBetween(a: Int, b: Int): String = text.subSequence(a.coerceIn(0, text.length), b.coerceIn(0, text.length)).toString()
+
+    /** The text currently selected (empty if none). */
+    fun selectedText(): String {
+        val (a, b) = selection
+        return if (a < b) text.subSequence(a, b).toString().replace(CHIP_CHAR.toString(), "") else ""
+    }
+
+    /** Makes [display] a link to [url]. Replaces the selection, or the link at [editStart, editEnd) when editing one. */
+    fun applyLink(display: String, url: String, editStart: Int = -1, editEnd: Int = -1) {
+        val v = view ?: return
+        val t = v.text
+        var (a, b) = if (editStart >= 0) editStart to editEnd else selection
+        a = a.coerceIn(0, t.length); b = b.coerceIn(a, t.length)
+        val shown = display.ifBlank { url }
+        val existing = t.subSequence(a, b).toString()
+        if (existing != shown) {
+            t.replace(a, b, shown)
+            b = a + shown.length
+        }
+        RichOps.clear(t, a, b, CharKind.LINK)
+        RichOps.set(t, a, b, CharAttr.Link(url))
+        v.setSelection(b)
+        changed()
+    }
+
+    fun removeLink(start: Int, end: Int) {
+        RichOps.clear(text, start, end, CharKind.LINK)
         changed()
     }
 

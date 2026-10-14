@@ -17,6 +17,8 @@ data class RunStyle(
     val sizePt: Float? = null,
     val font: String? = null,
     val vertical: VerticalAlign = VerticalAlign.BASELINE,
+    /** Web address, e-mail (mailto:) or phone (tel:) this text links to. */
+    val link: String? = null,
 ) {
     /** Properties set on [this] win; anything unset falls back to [base]. */
     fun over(base: RunStyle): RunStyle = RunStyle(
@@ -29,6 +31,7 @@ data class RunStyle(
         sizePt = sizePt ?: base.sizePt,
         font = font ?: base.font,
         vertical = if (vertical != VerticalAlign.BASELINE) vertical else base.vertical,
+        link = link ?: base.link,
     )
 }
 
@@ -187,4 +190,22 @@ object StyleDefaults {
     }
 
     fun indentLeftTwips(style: ParaStyle): Int = if (style == ParaStyle.QUOTE) 720 else 0
+}
+
+/** Link addresses the app is willing to open or write. Anything else (javascript:, file:, intent:) is refused. */
+object LinkSafety {
+    private val ALLOWED = setOf("http", "https", "mailto", "tel")
+
+    /** Returns a cleaned address, adding https:// to bare web addresses, or null if it is not safe to link to. */
+    fun normalize(raw: String): String? {
+        val t = raw.trim()
+        if (t.isEmpty() || t.length > 2000 || t.any { it.isISOControl() || it == ' ' }) return null
+        val scheme = Regex("^([A-Za-z][A-Za-z0-9+.-]*):").find(t)?.groupValues?.get(1)?.lowercase()
+        return when {
+            scheme != null -> if (scheme in ALLOWED) t else null
+            t.contains('@') && !t.contains('/') -> "mailto:$t"
+            t.contains('.') -> "https://$t"
+            else -> null
+        }
+    }
 }

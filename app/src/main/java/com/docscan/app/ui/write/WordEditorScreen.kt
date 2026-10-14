@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.foundation.layout.widthIn
@@ -150,6 +151,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var dateOpen by remember { mutableStateOf(false) }
     var navOpen by remember { mutableStateOf(false) }
     var statsOpen by remember { mutableStateOf(false) }
+    var linkOpen by remember { mutableStateOf<Triple<String, String, IntArray?>?>(null) }
+    var linkActions by remember { mutableStateOf<Triple<Int, Int, String>?>(null) }
     val recentFonts = remember { mutableStateListOf<String>() }
     var caseMenu by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
@@ -268,6 +271,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     PageHost(ctx).also { host ->
                         controller.attach(host.edit)
                         controller.setChipTapListener { i -> editing = i }
+                        controller.setLinkTapListener { a, b, u -> linkActions = Triple(a, b, u) }
                         host.onWidth = { w -> controller.setAvailableWidth(w) }
                     }
                 },
@@ -303,6 +307,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onParagraph = { paraOpen = true },
                 onSymbol = { symbolOpen = true },
                 onDate = { dateOpen = true },
+                onLink = { linkOpen = Triple(controller.selectedText(), "", null) },
                 onNav = { navOpen = true },
                 caseMenu = caseMenu,
                 onCaseMenu = { caseMenu = it },
@@ -358,6 +363,36 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         onApply = { b, a, l, left, first -> paraOpen = false; controller.setParagraphLayout(b, a, l, left, first) },
         onDismiss = { paraOpen = false },
     )
+    linkOpen?.let { (txt, url, range) ->
+        LinkDialog(
+            initialText = txt, initialUrl = url, editing = range != null,
+            onApply = { t, u ->
+                linkOpen = null
+                if (range != null) controller.applyLink(t, u, range[0], range[1]) else controller.applyLink(t, u)
+            },
+            onDismiss = { linkOpen = null },
+        )
+    }
+    linkActions?.let { (a, b, url) ->
+        LinkActionsDialog(
+            url = url,
+            onOpen = {
+                linkActions = null
+                val safe = com.docscan.app.core.word.LinkSafety.normalize(url)
+                if (safe != null) runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(safe)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            },
+            onEdit = { linkActions = null; linkOpen = Triple(controller.textBetween(a, b), url, intArrayOf(a, b)) },
+            onCopy = {
+                linkActions = null
+                (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                    .setPrimaryClip(android.content.ClipData.newPlainText("link", url))
+            },
+            onRemove = { linkActions = null; controller.removeLink(a, b) },
+            onDismiss = { linkActions = null },
+        )
+    }
     if (symbolOpen) SymbolDialog(onInsert = { symbolOpen = false; controller.insertText(it) }, onDismiss = { symbolOpen = false })
     if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
     if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
@@ -391,6 +426,7 @@ private fun Ribbon(
     onParagraph: () -> Unit,
     onSymbol: () -> Unit,
     onDate: () -> Unit,
+    onLink: () -> Unit,
     onNav: () -> Unit,
     caseMenu: Boolean,
     onCaseMenu: (Boolean) -> Unit,
@@ -471,6 +507,7 @@ private fun Ribbon(
                         RibbonButton(Icons.Default.TableChart, "Table", onTable)
                         RibbonButton(Icons.Default.Image, "Picture", onPicture)
                         RibbonButton(Icons.Default.InsertPageBreak, "Page break", onPageBreak)
+                        RibbonButton(Icons.Default.Link, "Link", onLink)
                         RibbonButton(Icons.Default.Event, "Date & time", onDate)
                         RibbonButton(Icons.Default.Functions, "Symbol", onSymbol)
                     }

@@ -10,6 +10,8 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextPaint
 import android.text.style.AlignmentSpan
+import android.text.style.CharacterStyle
+import android.text.style.UpdateAppearance
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.LeadingMarginSpan
@@ -220,6 +222,14 @@ class FontNameSpan(val name: String) : MetricAffectingSpan() {
     }
 }
 
+/** A hyperlink: blue and underlined. The address travels with the text so it is saved to .docx and PDF. */
+class LinkSpan(val url: String) : CharacterStyle(), UpdateAppearance {
+    override fun updateDrawState(tp: TextPaint) {
+        tp.color = 0xFF0563C1.toInt()
+        tp.isUnderlineText = true
+    }
+}
+
 /** Superscript / subscript. Applied last so it shrinks whatever size the text already has. */
 class VertSpan(val up: Boolean) : MetricAffectingSpan() {
     override fun updateMeasureState(tp: TextPaint) = apply(tp)
@@ -233,7 +243,7 @@ class VertSpan(val up: Boolean) : MetricAffectingSpan() {
 
 // ---- character formatting operations --------------------------------------------------------------------
 
-enum class CharKind { BOLD, ITALIC, UNDERLINE, STRIKE, COLOR, HIGHLIGHT, SIZE, FONT, VERT }
+enum class CharKind { BOLD, ITALIC, UNDERLINE, STRIKE, COLOR, HIGHLIGHT, SIZE, FONT, VERT, LINK }
 
 sealed interface CharAttr {
     val kind: CharKind
@@ -246,6 +256,7 @@ sealed interface CharAttr {
     data class Size(val pt: Float) : CharAttr { override val kind = CharKind.SIZE }
     data class Font(val name: String) : CharAttr { override val kind = CharKind.FONT }
     data class Vert(val up: Boolean) : CharAttr { override val kind = CharKind.VERT }
+    data class Link(val url: String) : CharAttr { override val kind = CharKind.LINK }
 }
 
 object RichOps {
@@ -264,6 +275,7 @@ object RichOps {
         is PtSizeSpan -> CharKind.SIZE
         is FontNameSpan -> CharKind.FONT
         is VertSpan -> CharKind.VERT
+        is LinkSpan -> CharKind.LINK
         else -> null
     }
 
@@ -277,6 +289,7 @@ object RichOps {
         is CharAttr.Size -> PtSizeSpan(a.pt) to (CHAR_FLAGS or prio(2))
         is CharAttr.Font -> FontNameSpan(a.name) to (CHAR_FLAGS or prio(2))
         is CharAttr.Vert -> VertSpan(a.up) to (CHAR_FLAGS or prio(0))
+        is CharAttr.Link -> LinkSpan(a.url) to (Spanned.SPAN_EXCLUSIVE_EXCLUSIVE or prio(1))
     }
 
     private fun clone(span: Any): Any = when (span) {
@@ -288,6 +301,7 @@ object RichOps {
         is PtSizeSpan -> PtSizeSpan(span.pt)
         is FontNameSpan -> FontNameSpan(span.name)
         is VertSpan -> VertSpan(span.up)
+        is LinkSpan -> LinkSpan(span.url)
         else -> span
     }
 
@@ -305,6 +319,7 @@ object RichOps {
             CharKind.SIZE -> CharAttr.Size(11f)
             CharKind.FONT -> CharAttr.Font("")
             CharKind.VERT -> CharAttr.Vert(true)
+            CharKind.LINK -> CharAttr.Link("")
         },
     ).second
 
@@ -389,6 +404,7 @@ object RichOps {
             is ForegroundColorSpan -> span.foregroundColor and 0xFFFFFF
             is BackgroundColorSpan -> span.backgroundColor and 0xFFFFFF
             is VertSpan -> span.up
+            is LinkSpan -> span.url
             else -> true
         }
     }
@@ -555,6 +571,7 @@ object SpanBridge {
         st.highlight?.let { put(CharAttr.Highlight(it)) }
         st.sizePt?.let { put(CharAttr.Size(it)) }
         st.font?.let { put(CharAttr.Font(it)) }
+        st.link?.let { put(CharAttr.Link(it)) }
         when (st.vertical) {
             VerticalAlign.SUPERSCRIPT -> put(CharAttr.Vert(true))
             VerticalAlign.SUBSCRIPT -> put(CharAttr.Vert(false))
@@ -609,6 +626,7 @@ object SpanBridge {
                     is PtSizeSpan -> st.copy(sizePt = s.pt)
                     is FontNameSpan -> st.copy(font = s.name)
                     is VertSpan -> st.copy(vertical = if (s.up) VerticalAlign.SUPERSCRIPT else VerticalAlign.SUBSCRIPT)
+                    is LinkSpan -> st.copy(link = s.url)
                     else -> st
                 }
             }
@@ -620,7 +638,7 @@ object SpanBridge {
     }
 
     private fun isCharSpan(s: Any) = s is StyleSpan || s is UnderlineSpan || s is StrikethroughSpan ||
-        s is ForegroundColorSpan || s is BackgroundColorSpan || s is PtSizeSpan || s is FontNameSpan || s is VertSpan
+        s is ForegroundColorSpan || s is BackgroundColorSpan || s is PtSizeSpan || s is FontNameSpan || s is VertSpan || s is LinkSpan
 }
 
 // ---- blocks the editor cannot edit yet (tables, images, page breaks) ------------------------------------

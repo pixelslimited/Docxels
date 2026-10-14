@@ -259,3 +259,45 @@ private fun CountRow(label: String, n: Int) {
         Text(String.format(Locale.getDefault(), "%,d", n), style = MaterialTheme.typography.titleSmall)
     }
 }
+
+@Composable
+fun LinkDialog(initialText: String, initialUrl: String, editing: Boolean, onApply: (text: String, url: String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(initialText) }
+    var url by remember { mutableStateOf(initialUrl) }
+    val clean = com.docscan.app.core.word.LinkSafety.normalize(url)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (editing) "Edit link" else "Insert link") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(text, { text = it }, singleLine = true, label = { Text("Text to display") })
+                OutlinedTextField(
+                    url, { url = it.trim() }, singleLine = true, label = { Text("Address") },
+                    placeholder = { Text("example.com or name@mail.com") },
+                    isError = url.isNotEmpty() && clean == null,
+                    supportingText = { if (url.isNotEmpty() && clean == null) Text("Use a web address, e-mail or phone link.") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { clean?.let { onApply(text, it) } }, enabled = clean != null) { Text(if (editing) "Save" else "Insert") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+fun LinkActionsDialog(url: String, onOpen: () -> Unit, onEdit: () -> Unit, onCopy: () -> Unit, onRemove: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Link") },
+        text = { Text(url, maxLines = 3) },
+        confirmButton = { TextButton(onClick = onOpen) { Text("Open") } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onEdit) { Text("Edit") }
+                TextButton(onClick = onCopy) { Text("Copy") }
+                TextButton(onClick = onRemove) { Text("Remove") }
+            }
+        },
+    )
+}

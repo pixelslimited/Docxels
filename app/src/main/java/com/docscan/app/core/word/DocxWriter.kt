@@ -36,6 +36,10 @@ object DocxWriter {
             rels.append("<Relationship Id=\"rIdImg${i + 1}\" Type=\"$REL/image\" Target=\"media/image${i + 1}.${img.extension}\"/>")
         }
 
+        ctx.links.forEach { (url, id) ->
+            rels.append("<Relationship Id=\"$id\" Type=\"$REL/hyperlink\" Target=\"${Xml.escape(url)}\" TargetMode=\"External\"/>")
+        }
+
         body.append("<w:sectPr>")
         if (hasHeader) body.append("<w:headerReference w:type=\"default\" r:id=\"rIdHeader\"/>")
         if (hasFooter) body.append("<w:footerReference w:type=\"default\" r:id=\"rIdFooter\"/>")
@@ -116,6 +120,7 @@ object DocxWriter {
         val numberedLists = ArrayList<Int>()
         var currentNumId = 0
         var drawingId = 1
+        val links = LinkedHashMap<String, String>() // address -> relationship id
     }
 
     private fun put(zip: ZipOutputStream, name: String, bytes: ByteArray) {
@@ -218,7 +223,20 @@ object DocxWriter {
         if (p.list != ListKind.NONE) pPr.append("<w:contextualSpacing/>")
         jc(p.align)?.let { pPr.append("<w:jc w:val=\"$it\"/>") }
         if (pPr.isNotEmpty()) sb.append("<w:pPr>").append(pPr).append("</w:pPr>")
-        for (run in p.runs) writeRun(run, sb)
+        var open: String? = null
+        for (run in p.runs) {
+            val url = run.style.link?.let { LinkSafety.normalize(it) }
+            if (url != open) {
+                if (open != null) sb.append("</w:hyperlink>")
+                if (url != null) {
+                    val id = ctx.links.getOrPut(url) { "rIdLink${ctx.links.size + 1}" }
+                    sb.append("<w:hyperlink r:id=\"$id\" w:history=\"1\">")
+                }
+                open = url
+            }
+            writeRun(if (url != null) run.copy(style = run.style.copy(color = run.style.color ?: 0x0563C1, underline = true)) else run, sb)
+        }
+        if (open != null) sb.append("</w:hyperlink>")
         sb.append("</w:p>")
     }
 
