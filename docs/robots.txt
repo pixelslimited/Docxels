@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://icode010101.github.io/Doc-Scanner/sitemap.xml
+Sitemap: https://docxels.pixelslimited.ng/sitemap.xml
