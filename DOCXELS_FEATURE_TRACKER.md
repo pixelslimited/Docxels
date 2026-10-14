@@ -153,4 +153,10 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Insert date & time, symbols, non-breaking space/hyphen | IMPLEMENTED — NOT VERIFIED | Inserted as plain text, not as updating fields. |
 | Navigation pane (headings) | IMPLEMENTED — NOT VERIFIED | Dialog, tap to jump. No drag-to-reorder, no page thumbnails or search results tabs. |
 | Status bar (page X of Y, words) and full Word Count | IMPLEMENTED — NOT VERIFIED | Counts do not include tables, headers, footnotes. Logic TESTED. |
-| Underline styles, font colour custom RGB, shading, borders, format painter, hyperlinks, comments, track changes, footnotes, TOC, styles pane, sections, headers/footers beyond one line, RTL, spellcheck options | NOT STARTED | Later phases. |
+| Hyperlinks (insert, edit, remove, tap to open; written to .docx) | IMPLEMENTED — NOT VERIFIED | Only http(s), mailto and tel are allowed. Logic TESTED in `LinkTest`. |
+| Format painter (character formatting) | IMPLEMENTED — NOT VERIFIED | One-shot; does not copy paragraph formatting. |
+| Custom text/highlight colour (hex) | IMPLEMENTED — NOT VERIFIED | |
+| Paper sizes (9) and per-side margins with presets | IMPLEMENTED — NOT VERIFIED | |
+| Paragraph shading and box border | IMPLEMENTED — NOT VERIFIED | Round trip through .docx TESTED in `ParaShadingTest`; one border style/width only; drawing in the editor and PDF export needs a device check. |
+| Table tools: row above, merge right, split cell, cell bold, cell alignment | IMPLEMENTED — NOT VERIFIED | Merge/split are horizontal only; rows/columns cannot be added to a table that has merged cells. |
+| Underline styles, comments, track changes, footnotes, TOC, styles pane, sections, headers/footers beyond one line, RTL, spellcheck options | NOT STARTED | Later phases. |
