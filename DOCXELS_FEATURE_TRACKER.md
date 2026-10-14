@@ -119,3 +119,12 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Release APK on GitHub | DONE |
 | Android App Bundle, Play signing, store assets | NOT STARTED (listing text in store/) |
 | Public site for search visibility | READY — not published (needs contact email) |
+
+
+## PDF workspace (added)
+| Feature | Status | Notes |
+|---|---|---|
+| PDF engine: merge, pick/reorder/delete pages, split, rotate, AES-256 password, unlock | IMPLEMENTED — NOT VERIFIED | `pdf/PdfTools.kt` (PdfBox-Android, lossless). JVM tests in `PdfToolsTest`; become TESTED only once CI is green. |
+| PDF viewer (scroll, page counter, share) | IMPLEMENTED — NOT VERIFIED | `PdfRenderer`; no pinch-zoom, no text search, no annotation yet. |
+| Merge / Split / Rotate / Reorder / Protect screens | IMPLEMENTED — NOT VERIFIED | Results are shared or saved to Downloads/DocScan. Not stored in the library yet. |
+| Compress, PDF to Word, sign, fill form, annotate | NOT STARTED | Still marked Soon. |

@@ -94,7 +94,7 @@ fun HomeScreen(
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HeroAction(Icons.Default.NoteAdd, "New doc", primary = true, modifier = Modifier.weight(1f), onClick = actions.newDoc)
                 HeroAction(Icons.Default.DocumentScanner, "Scan", modifier = Modifier.weight(1f), onClick = actions.scan)
-                HeroAction(Icons.Default.FolderOpen, "Open PDF", soon = true, modifier = Modifier.weight(1f)) { actions.soon("Opening PDFs") }
+                HeroAction(Icons.Default.FolderOpen, "Open PDF", modifier = Modifier.weight(1f)) { actions.pdfTool("view") }
                 HeroAction(Icons.Default.Download, "Import", modifier = Modifier.weight(1f), onClick = actions.importMenu)
             }
         }

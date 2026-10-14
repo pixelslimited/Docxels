@@ -85,6 +85,7 @@ class Actions(
     val wordToPdf: () -> Unit,
     val soon: (String) -> Unit,
     val openWord: (String) -> Unit,
+    val pdfTool: (String) -> Unit,
 )
 
 private enum class Pick { SCAN_TO_WORD, WORD_TO_PDF }
@@ -96,6 +97,7 @@ fun MainShell(
     onScanDoc: (String) -> Unit,
     onOpenScan: (String) -> Unit,
     onOpenWord: (String) -> Unit,
+    onPdfTool: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(container) } })
@@ -133,6 +135,7 @@ fun MainShell(
             wordToPdf = { pick = Pick.WORD_TO_PDF },
             soon = { name -> vm.say("$name is coming in a later update.") },
             openWord = onOpenWord,
+            pdfTool = onPdfTool,
         )
     }
 

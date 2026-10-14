@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.Draw
@@ -64,12 +65,13 @@ fun ToolsScreen(actions: Actions) {
         ToolDef(Icons.Default.ViewModule, "Batch scan", t.violet, false, actions.scan),
     )
     val pdf = listOf(
-        ToolDef(Icons.Default.CallMerge, "Merge PDFs", t.blue, true, planned("Merge PDFs")),
-        ToolDef(Icons.Default.ContentCut, "Split PDF", t.blue, true, planned("Split PDF")),
+        ToolDef(Icons.Default.FolderOpen, "Open PDF", t.blue, false, { actions.pdfTool("view") }),
+        ToolDef(Icons.Default.CallMerge, "Merge PDFs", t.blue, false, { actions.pdfTool("merge") }),
+        ToolDef(Icons.Default.ContentCut, "Split PDF", t.blue, false, { actions.pdfTool("split") }),
         ToolDef(Icons.Default.Compress, "Compress", t.blue, true, planned("Compress")),
-        ToolDef(Icons.Default.SwapVert, "Reorder pages", t.blue, true, planned("Reorder pages")),
-        ToolDef(Icons.Default.RotateRight, "Rotate pages", t.blue, true, planned("Rotate pages")),
-        ToolDef(Icons.Default.Lock, "Password protect", t.blue, true, planned("Password protect")),
+        ToolDef(Icons.Default.SwapVert, "Reorder pages", t.blue, false, { actions.pdfTool("organize") }),
+        ToolDef(Icons.Default.RotateRight, "Rotate pages", t.blue, false, { actions.pdfTool("rotate") }),
+        ToolDef(Icons.Default.Lock, "Password protect", t.blue, false, { actions.pdfTool("protect") }),
     )
     val convert = listOf(
         ToolDef(Icons.Default.TextSnippet, "Scan to Word", t.green, false, actions.scanToWord),

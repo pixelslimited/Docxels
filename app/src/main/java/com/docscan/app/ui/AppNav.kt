@@ -12,6 +12,9 @@ import com.docscan.app.ui.document.DocumentScreen
 import com.docscan.app.ui.document.DocumentViewModel
 import com.docscan.app.ui.edit.EditScreen
 import com.docscan.app.ui.edit.EditViewModel
+import com.docscan.app.ui.pdf.PdfMode
+import com.docscan.app.ui.pdf.PdfScreen
+import com.docscan.app.ui.pdf.PdfViewModel
 import com.docscan.app.ui.scan.ScanScreen
 import com.docscan.app.ui.scan.ScanViewModel
 import com.docscan.app.ui.shell.MainShell
@@ -23,6 +26,7 @@ private const val SCAN = "scan/{docId}"
 private const val DOC = "doc/{docId}"
 private const val EDIT = "edit/{docId}/{pageId}"
 private const val WRITE = "write/{id}"
+private const val PDF = "pdf/{mode}"
 
 @Composable
 fun AppNav(container: AppContainer) {
@@ -35,7 +39,17 @@ fun AppNav(container: AppContainer) {
                 onScanDoc = { docId -> nav.navigate("scan/$docId") },
                 onOpenScan = { docId -> nav.navigate("doc/$docId") },
                 onOpenWord = { id -> nav.navigate("write/$id") },
+                onPdfTool = { mode -> nav.navigate("pdf/$mode") },
             )
+        }
+        composable(PDF) { entry ->
+            val mode = PdfMode.from(entry.arguments?.getString("mode"))
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val vm: PdfViewModel = viewModel(
+                key = "pdf-${mode.route}",
+                factory = viewModelFactory { initializer { PdfViewModel(container, context.applicationContext) } },
+            )
+            PdfScreen(vm = vm, mode = mode, onBack = { nav.popBackStack() })
         }
         composable(WRITE) { entry ->
             val id = entry.arguments?.getString("id") ?: return@composable
