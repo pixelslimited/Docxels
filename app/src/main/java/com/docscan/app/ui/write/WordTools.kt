@@ -127,7 +127,7 @@ fun ParagraphDialog(initial: ParaAttrs, onApply: (before: Float?, after: Float?,
     var before by remember { mutableStateOf(fmt(initial.spaceBeforePt)) }
     var after by remember { mutableStateOf(fmt(initial.spaceAfterPt)) }
     var line by remember { mutableStateOf(initial.lineSpacing) }
-    var left by XX
+    var left by remember { mutableStateOf(fmt(String.format(Locale.US, "%.2f", initial.indentLeftTwips / 567f).toFloat())) }
     var special by remember { mutableStateOf(if (initial.indentFirstTwips > 0) 1 else if (initial.indentFirstTwips < 0) 2 else 0) }
     var by by remember { mutableStateOf(fmt(String.format(Locale.US, "%.2f", kotlin.math.abs(initial.indentFirstTwips) / 567f).toFloat())) }
     fun num(s: String) = s.replace(',', '.').toFloatOrNull()

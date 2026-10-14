@@ -176,6 +176,7 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
 
             Section("About")
             InfoRow("Docxels", "Version ${versionName(context)} · by Pixels Limited")
+            InfoRow("Open-source notices", "Interface font: Inter © The Inter Project Authors, SIL Open Font License 1.1. PDF tools: PdfBox-Android (Apache 2.0). Text recognition: Google ML Kit. Image processing: OpenCV (Apache 2.0).")
             InfoRow(
                 "Privacy",
                 "Scanning, text recognition and exports all run on this phone. Files you export or share leave the app only where you send them. The only network use is checking for and downloading app updates when you ask.",
