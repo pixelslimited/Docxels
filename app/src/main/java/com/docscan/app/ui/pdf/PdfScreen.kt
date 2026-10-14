@@ -4,6 +4,10 @@ import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.runtime.key
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -98,6 +102,7 @@ fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit) {
     val message by vm.message.collectAsState()
     val locked by vm.locked.collectAsState()
     val snackbar = remember { SnackbarHostState() }
+    var viewing by remember { mutableStateOf<PdfSource?>(null) }
 
     val pickOne = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) { vm.clearResults(); vm.addUris(listOf(uri), replace = true) }
@@ -141,14 +146,14 @@ fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit) {
                     if (sources.isEmpty()) {
                         EmptyPick(mode, pick)
                     } else if (results.isNotEmpty()) {
-                        ResultCard(results, vm)
+                        ResultCard(results, vm, preview = mode != PdfMode.PROTECT)
                     } else {
                         when (mode) {
-                            PdfMode.MERGE -> MergeBody(vm, sources, pick)
-                            PdfMode.SPLIT -> SplitBody(vm, sources[0])
-                            PdfMode.ROTATE -> RotateBody(vm, sources[0])
+                            PdfMode.MERGE -> MergeBody(vm, sources, pick) { viewing = it }
+                            PdfMode.SPLIT -> SplitBody(vm, sources[0]) { viewing = it }
+                            PdfMode.ROTATE -> RotateBody(vm, sources[0]) { viewing = it }
                             PdfMode.ORGANIZE -> OrganizeBody(vm, sources[0])
-                            PdfMode.PROTECT -> ProtectBody(vm, sources[0])
+                            PdfMode.PROTECT -> ProtectBody(vm, sources[0]) { viewing = it }
                             PdfMode.VIEW -> Unit
                         }
                     }
@@ -161,6 +166,26 @@ fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit) {
                         Spacer(Modifier.height(12.dp))
                         Text(busy ?: "")
                     }
+                }
+            }
+        }
+    }
+
+    viewing?.let { v ->
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { viewing = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            androidx.compose.material3.Surface(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { viewing = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close preview") }
+                        Column(Modifier.weight(1f)) {
+                            Text(v.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                            Text("${v.pages} pages", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Box(Modifier.weight(1f)) { PdfPages(v.file) }
                 }
             }
         }
@@ -196,30 +221,53 @@ private fun EmptyPick(mode: PdfMode, pick: () -> Unit) {
 }
 
 @Composable
-private fun ResultCard(files: List<File>, vm: PdfViewModel) {
-    Column(Modifier.fillMaxWidth().padding(20.dp).docCard().padding(20.dp)) {
-        Text("Done", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(4.dp))
-        files.forEach { Text("${it.name} · ${it.length() / 1024} KB", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            GradientButton("Share", onClick = { vm.share(files) }, modifier = Modifier.weight(1f))
-            SoftButton("Save to phone", DocxelsTheme.tints.blue, onClick = { vm.saveToPhone(files) }, modifier = Modifier.weight(1f))
+private fun ResultCard(files: List<File>, vm: PdfViewModel, preview: Boolean) {
+    var selected by remember(files) { mutableStateOf(0) }
+    val current = files.getOrElse(selected) { files.first() }
+    Column(Modifier.fillMaxSize()) {
+        Text(
+            if (files.size == 1) "Preview: check it before you save or share" else "Preview: ${files.size} files made. Tap one to look at it.",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
+        if (files.size > 1) {
+            Row(
+                Modifier.padding(horizontal = 16.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                files.forEachIndexed { i, f ->
+                    androidx.compose.material3.FilterChip(selected == i, { selected = i }, label = { Text("${i + 1}. ${f.nameWithoutExtension}", maxLines = 1) })
+                }
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        TextButton(onClick = vm::clearResults) { Text("Back to editing") }
+        Text(
+            "${current.name} · ${current.length() / 1024} KB",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (preview) key(current.path) { PdfPages(current) }
+            else Text("A password-protected PDF can't be previewed here. Open it in any PDF app with the password.", modifier = Modifier.padding(24.dp))
+        }
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GradientButton(if (files.size > 1) "Share all" else "Share", onClick = { vm.share(files) }, modifier = Modifier.weight(1f))
+                SoftButton(if (files.size > 1) "Save all" else "Save to phone", DocxelsTheme.tints.blue, onClick = { vm.saveToPhone(files) }, modifier = Modifier.weight(1f))
+            }
+            TextButton(onClick = vm::clearResults, modifier = Modifier.fillMaxWidth()) { Text("Back to editing") }
+        }
     }
 }
 
 @Composable
-private fun MergeBody(vm: PdfViewModel, sources: List<com.docscan.app.ui.pdf.PdfSource>, add: () -> Unit) {
+private fun MergeBody(vm: PdfViewModel, sources: List<com.docscan.app.ui.pdf.PdfSource>, add: () -> Unit, onView: (PdfSource) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             itemsIndexed(sources) { i, s ->
                 Row(Modifier.fillMaxWidth().docCard().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(s.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                        Text("${s.pages} pages", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable { onView(s) }) {
+                        Text("${i + 1}. ${s.name}", style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                        Text("${s.pages} pages · tap to view", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { vm.moveSource(i, -1) }, enabled = i > 0) { Icon(Icons.Default.ArrowUpward, "Move up") }
                     IconButton(onClick = { vm.moveSource(i, 1) }, enabled = i < sources.lastIndex) { Icon(Icons.Default.ArrowDownward, "Move down") }
@@ -240,19 +288,25 @@ private fun MergeBody(vm: PdfViewModel, sources: List<com.docscan.app.ui.pdf.Pdf
 }
 
 @Composable
-private fun FileHeader(s: PdfSource) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp).docCard().padding(16.dp)) {
-        Text(s.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-        Text("${s.pages} pages", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun FileHeader(s: PdfSource, onView: (PdfSource) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp).docCard().clickable { onView(s) }.padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(s.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            Text("${s.pages} pages", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        TextButton(onClick = { onView(s) }) { Text("View") }
     }
 }
 
 @Composable
-private fun SplitBody(vm: PdfViewModel, s: PdfSource) {
+private fun SplitBody(vm: PdfViewModel, s: PdfSource, onView: (PdfSource) -> Unit) {
     var range by rememberSaveable(s.file.path) { mutableStateOf("") }
     var every by rememberSaveable(s.file.path) { mutableStateOf("1") }
     Column(Modifier.fillMaxSize().padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FileHeader(s)
+        FileHeader(s, onView)
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Extract pages", style = MaterialTheme.typography.titleSmall)
             OutlinedTextField(range, { range = it }, singleLine = true, label = { Text("Pages, e.g. 1-3, 5") }, modifier = Modifier.fillMaxWidth())
@@ -270,10 +324,10 @@ private fun SplitBody(vm: PdfViewModel, s: PdfSource) {
 }
 
 @Composable
-private fun RotateBody(vm: PdfViewModel, s: PdfSource) {
+private fun RotateBody(vm: PdfViewModel, s: PdfSource, onView: (PdfSource) -> Unit) {
     var range by rememberSaveable(s.file.path) { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FileHeader(s)
+        FileHeader(s, onView)
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(range, { range = it }, singleLine = true, label = { Text("Pages (leave empty for all)") }, modifier = Modifier.fillMaxWidth())
             GradientButton("Rotate right 90°", onClick = { vm.rotate(range, 90) }, modifier = Modifier.fillMaxWidth())
@@ -284,11 +338,11 @@ private fun RotateBody(vm: PdfViewModel, s: PdfSource) {
 }
 
 @Composable
-private fun ProtectBody(vm: PdfViewModel, s: PdfSource) {
+private fun ProtectBody(vm: PdfViewModel, s: PdfSource, onView: (PdfSource) -> Unit) {
     var pw by rememberSaveable { mutableStateOf("") }
     var again by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FileHeader(s)
+        FileHeader(s, onView)
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(pw, { pw = it }, singleLine = true, label = { Text("Password (4+ characters)") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(again, { again = it }, singleLine = true, label = { Text("Repeat password") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
