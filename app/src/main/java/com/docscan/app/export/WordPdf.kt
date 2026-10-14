@@ -1,0 +1,246 @@
+package com.docscan.app.export
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
+import com.docscan.app.core.word.Align
+import com.docscan.app.core.word.Block
+import com.docscan.app.core.word.ImageBlock
+import com.docscan.app.core.word.Paragraph
+import com.docscan.app.core.word.StyleDefaults
+import com.docscan.app.core.word.TableBlock
+import com.docscan.app.core.word.WordDoc
+import com.docscan.app.ui.write.SpanBridge
+import com.docscan.app.ui.write.ZOOM
+import java.io.OutputStream
+
+/**
+ * Draws a [WordDoc] to a PDF with the same text engine the editor uses, so the PDF matches what is on screen.
+ * Layout runs in "zoomed" units (points x [ZOOM]) and the canvas is scaled back, which is what lets the editor's
+ * density-based spans measure correctly here.
+ *
+ * Known limits: justified text is drawn left-aligned, merged table cells are drawn unmerged.
+ */
+object WordPdf {
+    fun write(doc: WordDoc, out: OutputStream) {
+        Writer(doc).run(out)
+    }
+
+    private class Writer(val doc: WordDoc) {
+        val page = doc.page
+        val pageW = page.sheetWidthTwips / 20f
+        val pageH = page.sheetHeightTwips / 20f
+        val mL = page.marginLeftTwips / 20f
+        val mT = page.marginTopTwips / 20f
+        val mB = page.marginBottomTwips / 20f
+        val contentW = page.contentWidthTwips / 20f * ZOOM
+        val contentH = page.contentHeightTwips / 20f * ZOOM
+
+        val pdf = PdfDocument()
+        var pageNo = 0
+        var current: PdfDocument.Page? = null
+        var canvas: Canvas? = null
+        var y = 0f
+
+        val body = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            density = 1f
+            textSize = StyleDefaults.BODY_SIZE_PT * ZOOM
+            typeface = Typeface.SANS_SERIF
+            color = Color.rgb(0x1B, 0x1B, 0x1F)
+        }
+
+        fun run(out: OutputStream) {
+            try {
+                newPage()
+                var pending = ArrayList<Paragraph>()
+                fun flush() {
+                    if (pending.isNotEmpty()) {
+                        paragraphs(pending)
+                        pending = ArrayList()
+                    }
+                }
+                for (b in doc.blocks) {
+                    when (b) {
+                        is Block.Para -> pending += b.paragraph
+                        is Block.Table -> { flush(); table(b.table) }
+                        is Block.Image -> { flush(); image(b.image) }
+                        Block.PageBreak -> { flush(); if (y > 0f) newPage() }
+                    }
+                }
+                flush()
+                finishPage()
+                pdf.writeTo(out)
+            } finally {
+                pdf.close()
+            }
+        }
+
+        fun newPage() {
+            finishPage()
+            pageNo++
+            val p = pdf.startPage(PdfDocument.PageInfo.Builder(pageW.toInt(), pageH.toInt(), pageNo).create())
+            current = p
+            canvas = p.canvas
+            y = 0f
+        }
+
+        fun finishPage() {
+            val p = current ?: return
+            val c = canvas!!
+            val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f; color = Color.GRAY; typeface = Typeface.SANS_SERIF }
+            if (page.headerText.isNotEmpty()) c.drawText(page.headerText, mL, mT / 2f + 3f, small)
+            val fy = pageH - mB / 2f + 3f
+            if (page.footerText.isNotEmpty()) c.drawText(page.footerText, mL, fy, small)
+            if (page.pageNumbers) {
+                val label = pageNo.toString()
+                c.drawText(label, pageW - mL - small.measureText(label), fy, small)
+            }
+            pdf.finishPage(p)
+            current = null
+        }
+
+        /** Runs [draw] in content coordinates (zoomed units) at the current page's top-left of the text area. */
+        inline fun inContent(top: Float, draw: Canvas.() -> Unit) {
+            val c = canvas!!
+            c.save()
+            c.translate(mL, mT)
+            c.scale(1f / ZOOM, 1f / ZOOM)
+            c.translate(0f, top)
+            c.draw()
+            c.restore()
+        }
+
+        fun layoutOf(paragraphs: List<Paragraph>, width: Float): StaticLayout {
+            val text = SpanBridge.toEditable(paragraphs, 1f)
+            return StaticLayout.Builder.obtain(text, 0, text.length, body, width.toInt().coerceAtLeast(1))
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setIncludePad(false)
+                .build()
+        }
+
+        fun paragraphs(list: List<Paragraph>) {
+            val layout = layoutOf(list, contentW)
+            var line = 0
+            while (line < layout.lineCount) {
+                val top = layout.getLineTop(line)
+                val remaining = contentH - y
+                if (layout.getLineBottom(line) - top > remaining && y > 0f) {
+                    newPage()
+                    continue
+                }
+                var last = line
+                while (last + 1 < layout.lineCount && layout.getLineBottom(last + 1) - top <= remaining) last++
+                val height = (layout.getLineBottom(last) - top).toFloat()
+                inContent(y) {
+                    clipRect(0f, 0f, contentW, height)
+                    translate(0f, -top.toFloat())
+                    layout.draw(this)
+                }
+                y += height
+                line = last + 1
+                if (line < layout.lineCount) newPage()
+            }
+        }
+
+        fun table(t: TableBlock) {
+            if (t.rows.isEmpty() || t.columnWidthsTwips.isEmpty()) return
+            val pad = 5f * ZOOM
+            val total = t.columnWidthsTwips.sum().coerceAtLeast(1) / 20f * ZOOM
+            val scale = if (total > contentW) contentW / total else 1f
+            val widths = t.columnWidthsTwips.map { it / 20f * ZOOM * scale }
+            val border = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 0.75f * ZOOM; color = Color.rgb(0x80, 0x80, 0x80) }
+            val fill = Paint()
+            y += 2f * ZOOM
+
+            class Placed(val x: Float, val w: Float, val cell: com.docscan.app.core.word.TableCell, val layout: StaticLayout)
+
+            fun place(row: List<com.docscan.app.core.word.TableCell>): Pair<List<Placed>, Float> {
+                var col = 0
+                var x = 0f
+                val placed = ArrayList<Placed>()
+                var h = 0f
+                for (cell in row) {
+                    val span = cell.colSpan.coerceAtLeast(1)
+                    val w = (col until minOf(col + span, widths.size)).sumOf { widths[it].toDouble() }.toFloat()
+                    val paras = if (cell.vMergeContinue) listOf(Paragraph()) else cell.paragraphs
+                    val l = layoutOf(paras, (w - 2 * pad).coerceAtLeast(1f))
+                    h = maxOf(h, l.height + 2 * pad)
+                    placed += Placed(x, w, cell, l)
+                    x += w
+                    col += span
+                }
+                return placed to h
+            }
+
+            fun draw(row: List<Placed>, h: Float) {
+                inContent(y) {
+                    for (p in row) {
+                        p.cell.shading?.let {
+                            fill.color = Color.rgb((it shr 16) and 0xFF, (it shr 8) and 0xFF, it and 0xFF)
+                            drawRect(p.x, 0f, p.x + p.w, h, fill)
+                        }
+                        if (t.borders) drawRect(RectF(p.x, 0f, p.x + p.w, h), border)
+                        save()
+                        clipRect(p.x, 0f, p.x + p.w, h)
+                        translate(p.x + pad, pad)
+                        p.layout.draw(this)
+                        restore()
+                    }
+                }
+            }
+
+            var headerPlaced: Pair<List<Placed>, Float>? = null
+            t.rows.forEachIndexed { ri, row ->
+                val (placed, rawH) = place(row)
+                val h = minOf(rawH, contentH)
+                if (y + h > contentH && y > 0f) {
+                    newPage()
+                    headerPlaced?.let { (hp, hh) -> draw(hp, hh); y += hh }
+                }
+                draw(placed, h)
+                y += h
+                if (ri == 0 && t.headerRow) headerPlaced = placed to h
+            }
+            y += 6f * ZOOM
+        }
+
+        fun image(img: ImageBlock) {
+            val bmp = decode(img.bytes) ?: return
+            try {
+                var w = img.widthTwips / 20f * ZOOM
+                var h = img.heightTwips / 20f * ZOOM
+                if (w > contentW) { h *= contentW / w; w = contentW }
+                if (h > contentH) { w *= contentH / h; h = contentH }
+                if (y + h > contentH && y > 0f) newPage()
+                val x = when (img.align) {
+                    Align.CENTER -> (contentW - w) / 2f
+                    Align.RIGHT -> contentW - w
+                    else -> 0f
+                }
+                inContent(y) {
+                    drawBitmap(bmp, null, RectF(x, 0f, x + w, h), Paint(Paint.FILTER_BITMAP_FLAG))
+                }
+                y += h + 6f * ZOOM
+            } finally {
+                bmp.recycle()
+            }
+        }
+
+        fun decode(bytes: ByteArray): Bitmap? = runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 2600) sample *= 2
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+        }.getOrNull()
+    }
+}

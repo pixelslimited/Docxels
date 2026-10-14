@@ -136,6 +136,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var findOpen by remember { mutableStateOf(false) }
     var pageOpen by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val snackbar = remember { SnackbarHostState() }
     var tableOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Int?>(null) }
     val photo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -155,7 +156,6 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             if (block == null) snackbar.showSnackbar("Could not read that picture.") else controller.insertBlock(Block.Image(block))
         }
     }
-    val snackbar = remember { SnackbarHostState() }
 
     fun saveNow() = vm.save(controller.toDoc(title, page))
 
@@ -206,6 +206,17 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                             DropdownMenuItem(text = { Text("Page setup") }, onClick = { menu = false; pageOpen = true })
                             DropdownMenuItem(text = { Text("Word count") }, onClick = { menu = false; counts = controller.counts() })
                             DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
+                            DropdownMenuItem(
+                                text = { Text("Share as PDF") },
+                                onClick = {
+                                    menu = false
+                                    val d = controller.toDoc(title, page)
+                                    scope.launch {
+                                        runCatching { ShareHelper.share(context, listOf(vm.pdfFile(d, context)), Mime.PDF) }
+                                            .onFailure { snackbar.showSnackbar("Could not create the PDF.") }
+                                    }
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Share as .docx") },
                                 onClick = {

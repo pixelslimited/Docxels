@@ -39,4 +39,10 @@ class WordViewModel(private val container: AppContainer, val id: String) : ViewM
             f.writeBytes(com.docscan.app.core.word.DocxWriter.toBytes(doc)) // the shared copy must be readable by other apps
         }
     }
+
+    suspend fun pdfFile(doc: WordDoc, context: android.content.Context): java.io.File = withContext(Dispatchers.Default) {
+        val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
+        val name = doc.title.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Document" }
+        java.io.File(dir, "$name.pdf").also { f -> f.outputStream().use { com.docscan.app.export.WordPdf.write(doc, it) } }
+    }
 }
