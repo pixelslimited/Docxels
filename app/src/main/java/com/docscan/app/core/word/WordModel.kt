@@ -97,6 +97,17 @@ data class TableBlock(
     val columnCount: Int get() = columnWidthsTwips.size
 }
 
+/** How text flows around a picture (Word's "Wrap text"). The editor shows everything except IN_LINE as above/below the text. */
+enum class ImageWrap(val label: String) {
+    IN_LINE("In line with text"),
+    SQUARE("Square"),
+    TIGHT("Tight"),
+    THROUGH("Through"),
+    TOP_BOTTOM("Top and bottom"),
+    BEHIND("Behind text"),
+    IN_FRONT("In front of text"),
+}
+
 data class ImageBlock(
     val bytes: ByteArray,
     /** "png" or "jpg". */
@@ -104,10 +115,11 @@ data class ImageBlock(
     val widthTwips: Int,
     val heightTwips: Int,
     val align: Align = Align.LEFT,
+    val wrap: ImageWrap = ImageWrap.IN_LINE,
 ) {
     override fun equals(other: Any?): Boolean =
         other is ImageBlock && extension == other.extension && widthTwips == other.widthTwips &&
-            heightTwips == other.heightTwips && align == other.align && bytes.contentEquals(other.bytes)
+            heightTwips == other.heightTwips && align == other.align && wrap == other.wrap && bytes.contentEquals(other.bytes)
 
     override fun hashCode(): Int = bytes.contentHashCode() * 31 + widthTwips
 }

@@ -369,17 +369,40 @@ object DocxWriter {
         val id = ctx.drawingId++
         sb.append("<w:p>")
         jc(img.align)?.let { sb.append("<w:pPr><w:jc w:val=\"$it\"/></w:pPr>") }
-        sb.append(
-            "<w:r><w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">" +
-                "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:docPr id=\"$id\" name=\"Picture $id\"/>" +
-                "<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect=\"1\"/></wp:cNvGraphicFramePr>" +
-                "<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">" +
-                "<pic:pic><pic:nvPicPr><pic:cNvPr id=\"$id\" name=\"image$index.${img.extension}\"/><pic:cNvPicPr/></pic:nvPicPr>" +
-                "<pic:blipFill><a:blip r:embed=\"rIdImg$index\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>" +
-                "<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$cx\" cy=\"$cy\"/></a:xfrm>" +
-                "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>" +
-                "</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>",
-        )
+        val frame = "<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect=\"1\"/></wp:cNvGraphicFramePr>" +
+            "<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">" +
+            "<pic:pic><pic:nvPicPr><pic:cNvPr id=\"$id\" name=\"image$index.${img.extension}\"/><pic:cNvPicPr/></pic:nvPicPr>" +
+            "<pic:blipFill><a:blip r:embed=\"rIdImg$index\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>" +
+            "<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$cx\" cy=\"$cy\"/></a:xfrm>" +
+            "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>" +
+            "</a:graphicData></a:graphic>"
+        if (img.wrap == ImageWrap.IN_LINE) {
+            sb.append(
+                "<w:r><w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">" +
+                    "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:docPr id=\"$id\" name=\"Picture $id\"/>" +
+                    frame + "</wp:inline></w:drawing></w:r></w:p>",
+            )
+        } else {
+            val behind = if (img.wrap == ImageWrap.BEHIND) "1" else "0"
+            val hAlign = when (img.align) { Align.CENTER -> "center"; Align.RIGHT -> "right"; else -> "left" }
+            val wrapEl = when (img.wrap) {
+                ImageWrap.SQUARE -> "<wp:wrapSquare wrapText=\"bothSides\"/>"
+                ImageWrap.TIGHT -> "<wp:wrapTight wrapText=\"bothSides\"><wp:wrapPolygon edited=\"0\"><wp:start x=\"0\" y=\"0\"/>" +
+                    "<wp:lineTo x=\"0\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"0\"/><wp:lineTo x=\"0\" y=\"0\"/></wp:wrapPolygon></wp:wrapTight>"
+                ImageWrap.THROUGH -> "<wp:wrapThrough wrapText=\"bothSides\"><wp:wrapPolygon edited=\"0\"><wp:start x=\"0\" y=\"0\"/>" +
+                    "<wp:lineTo x=\"0\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"21600\"/><wp:lineTo x=\"21600\" y=\"0\"/><wp:lineTo x=\"0\" y=\"0\"/></wp:wrapPolygon></wp:wrapThrough>"
+                ImageWrap.TOP_BOTTOM -> "<wp:wrapTopAndBottom/>"
+                else -> "<wp:wrapNone/>"
+            }
+            sb.append(
+                "<w:r><w:drawing><wp:anchor distT=\"0\" distB=\"0\" distL=\"114300\" distR=\"114300\" simplePos=\"0\" relativeHeight=\"${251658240 + id}\" " +
+                    "behindDoc=\"$behind\" locked=\"0\" layoutInCell=\"1\" allowOverlap=\"1\"><wp:simplePos x=\"0\" y=\"0\"/>" +
+                    "<wp:positionH relativeFrom=\"column\"><wp:align>$hAlign</wp:align></wp:positionH>" +
+                    "<wp:positionV relativeFrom=\"paragraph\"><wp:posOffset>0</wp:posOffset></wp:positionV>" +
+                    "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/>" +
+                    wrapEl + "<wp:docPr id=\"$id\" name=\"Picture $id\"/>" + frame + "</wp:anchor></w:drawing></w:r></w:p>",
+            )
+        }
     }
 
     // ---- styles & numbering ---------------------------------------------------------------------------------

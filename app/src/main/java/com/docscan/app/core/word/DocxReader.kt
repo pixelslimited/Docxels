@@ -510,8 +510,17 @@ object DocxReader {
                 val cy = extent?.attr("cy")?.toLongOrNull()
                 val w = if (cx != null && cx > 0) (cx / Twips.EMU_PER_TWIP).toInt() else 4320
                 val h = if (cy != null && cy > 0) (cy / Twips.EMU_PER_TWIP).toInt() else 3240
+                val anchor = drawing.find("anchor")
+                val wrap = if (anchor == null) ImageWrap.IN_LINE else when {
+                    anchor.child("wrapSquare") != null -> ImageWrap.SQUARE
+                    anchor.child("wrapTight") != null -> ImageWrap.TIGHT
+                    anchor.child("wrapThrough") != null -> ImageWrap.THROUGH
+                    anchor.child("wrapTopAndBottom") != null -> ImageWrap.TOP_BOTTOM
+                    anchor.attr("behindDoc").let { v -> v == "1" || v == "true" } -> ImageWrap.BEHIND
+                    else -> ImageWrap.IN_FRONT
+                }
                 flush(false)
-                out += Block.Image(ImageBlock(bytes, ext, w.coerceAtLeast(120), h.coerceAtLeast(120), base.align))
+                out += Block.Image(ImageBlock(bytes, ext, w.coerceAtLeast(120), h.coerceAtLeast(120), base.align, wrap))
                 emitted = true
             }
 

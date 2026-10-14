@@ -273,6 +273,7 @@ fun ImageEditorDialog(
 ) {
     var fraction by remember { mutableFloatStateOf((initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.1f, 1f)) }
     var align by remember { mutableStateOf(initial.align) }
+    var wrap by remember { mutableStateOf(initial.wrap) }
     var cur by remember { mutableStateOf(initial) }
     var busy by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
@@ -324,6 +325,18 @@ fun ImageEditorDialog(
                 }
                 note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 if (cur !== initial) Text("Background removed on this phone. Works best on a clear subject against a plain background.", style = MaterialTheme.typography.bodySmall)
+                Text("Wrap text", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    com.docscan.app.core.word.ImageWrap.entries.forEach { w ->
+                        FilterChip(wrap == w, { wrap = w }, label = { Text(w.label) })
+                    }
+                }
+                if (wrap != com.docscan.app.core.word.ImageWrap.IN_LINE) {
+                    Text(
+                        "Saved in the .docx so Word wraps text around the picture. Here the picture is shown on its own line.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(Align.LEFT to "Left", Align.CENTER to "Centre", Align.RIGHT to "Right").forEach { (a, l) ->
                         FilterChip(align == a, { align = a }, label = { Text(l) })
@@ -335,7 +348,7 @@ fun ImageEditorDialog(
             TextButton(onClick = {
                 val w = (contentWidthTwips * fraction).toInt().coerceAtLeast(720)
                 val h = (w.toLong() * initial.heightTwips / initial.widthTwips.coerceAtLeast(1)).toInt().coerceAtLeast(360)
-                onSave(cur.copy(widthTwips = w, heightTwips = h, align = align))
+                onSave(cur.copy(widthTwips = w, heightTwips = h, align = align, wrap = wrap))
             }) { Text("Save") }
         },
         dismissButton = {

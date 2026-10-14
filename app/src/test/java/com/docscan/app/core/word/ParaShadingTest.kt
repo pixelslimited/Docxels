@@ -58,3 +58,22 @@ class FirstPageHeaderTest {
         assertEquals(false, back.differentFirstPage)
     }
 }
+
+class ImageWrapTest {
+    private val png = java.util.Base64.getDecoder().decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+    )
+
+    private fun roundTrip(wrap: ImageWrap): ImageBlock {
+        val doc = WordDoc("T", listOf(Block.Image(ImageBlock(png, "png", 2000, 1500, Align.CENTER, wrap))))
+        return (DocxReader.read(DocxWriter.toBytes(doc)).blocks.first { it is Block.Image } as Block.Image).image
+    }
+
+    @Test fun everyWrapModeSurvives() {
+        for (w in ImageWrap.entries) {
+            val back = roundTrip(w)
+            assertEquals(w, back.wrap)
+            assertEquals(2000, back.widthTwips)
+        }
+    }
+}
