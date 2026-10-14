@@ -261,6 +261,28 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                                     }
                                 },
                             )
+                            DropdownMenuItem(
+                                text = { Text("Share as text (.txt)") },
+                                onClick = {
+                                    menu = false
+                                    val d = controller.toDoc(title, page)
+                                    scope.launch {
+                                        runCatching { ShareHelper.share(context, listOf(vm.txtFile(d, context)), Mime.TXT) }
+                                            .onFailure { snackbar.showSnackbar("Could not share the document.") }
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share as RTF (no pictures)") },
+                                onClick = {
+                                    menu = false
+                                    val d = controller.toDoc(title, page)
+                                    scope.launch {
+                                        runCatching { ShareHelper.share(context, listOf(vm.rtfFile(d, context)), Mime.RTF) }
+                                            .onFailure { snackbar.showSnackbar("Could not share the document.") }
+                                    }
+                                },
+                            )
                         }
                     }
                 },

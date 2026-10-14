@@ -30,6 +30,7 @@ object Mime {
     const val JPEG = "image/jpeg"
     const val PNG = "image/png"
     const val TXT = "text/plain"
+    const val RTF = "application/rtf"
 }
 
 enum class DocFormat(val label: String) {

@@ -40,6 +40,18 @@ class WordViewModel(private val container: AppContainer, val id: String) : ViewM
         }
     }
 
+    private fun safeName(doc: WordDoc) = doc.title.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Document" }
+
+    suspend fun txtFile(doc: WordDoc, context: android.content.Context): java.io.File = withContext(Dispatchers.IO) {
+        val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
+        java.io.File(dir, "${safeName(doc)}.txt").also { it.writeText(com.docscan.app.core.word.PlainExport.toText(doc), Charsets.UTF_8) }
+    }
+
+    suspend fun rtfFile(doc: WordDoc, context: android.content.Context): java.io.File = withContext(Dispatchers.IO) {
+        val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
+        java.io.File(dir, "${safeName(doc)}.rtf").also { it.writeText(com.docscan.app.core.word.PlainExport.toRtf(doc), Charsets.US_ASCII) }
+    }
+
     suspend fun pdfFile(doc: WordDoc, context: android.content.Context): java.io.File = withContext(Dispatchers.Default) {
         val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
         val name = doc.title.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Document" }
