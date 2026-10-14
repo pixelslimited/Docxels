@@ -40,6 +40,11 @@ class WordStore(context: Context) {
         _items.value = list.sortedByDescending { it.modified }
     }
 
+    /** What the file had that Docxels cannot keep yet, per document, until the editor has shown it once. */
+    private val compatNotes = HashMap<String, List<String>>()
+
+    fun takeCompatNotes(id: String): List<String> = synchronized(lock) { compatNotes.remove(id).orEmpty() }
+
     fun create(title: String = "Untitled"): String = synchronized(lock) {
         val id = UUID.randomUUID().toString()
         SecureFiles.write(file(id), DocxWriter.toBytes(WordDoc(title = title)))
@@ -73,6 +78,8 @@ class WordStore(context: Context) {
     fun importDocx(bytes: ByteArray, fallbackTitle: String): String = synchronized(lock) {
         val doc = DocxReader.read(bytes, fallbackTitle)
         val id = UUID.randomUUID().toString()
+        val notes = DocxReader.compatNotes(bytes)
+        if (notes.isNotEmpty()) compatNotes[id] = notes
         SecureFiles.write(file(id), DocxWriter.toBytes(doc))
         writeIndex(_items.value + WordItem(id, doc.title, System.currentTimeMillis()))
         id

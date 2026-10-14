@@ -18,10 +18,16 @@ class WordViewModel(private val container: AppContainer, val id: String) : ViewM
     var failed by mutableStateOf(false)
         private set
 
+    /** Things the imported file had that cannot be kept yet; shown once when the document opens. */
+    var compatNotes by mutableStateOf<List<String>>(emptyList())
+
     init {
         viewModelScope.launch {
             val loaded = withContext(Dispatchers.IO) { runCatching { container.words.load(id) }.getOrNull() }
-            if (loaded == null) failed = true else doc = loaded
+            if (loaded == null) failed = true else {
+                doc = loaded
+                compatNotes = container.words.takeCompatNotes(id)
+            }
         }
     }
 

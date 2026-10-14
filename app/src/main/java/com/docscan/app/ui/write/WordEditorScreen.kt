@@ -400,6 +400,19 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             else -> editing = null
         }
     }
+    if (vm.compatNotes.isNotEmpty()) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { vm.compatNotes = emptyList() },
+            title = { Text("Some content can't be kept yet") },
+            text = {
+                Text(
+                    "This file contains " + vm.compatNotes.joinToString(", ") + ". Docxels can't edit or keep these yet, " +
+                        "so they will be missing if you save this copy. Your original file is not changed.",
+                )
+            },
+            confirmButton = { TextButton(onClick = { vm.compatNotes = emptyList() }) { Text("OK") } },
+        )
+    }
     if (findOpen) FindDialog(controller, onClose = { findOpen = false })
     if (pageOpen) PageSetupDialog(page, onApply = { page = it; pageOpen = false }, onDismiss = { pageOpen = false })
     if (fontOpen) FontPickerDialog(

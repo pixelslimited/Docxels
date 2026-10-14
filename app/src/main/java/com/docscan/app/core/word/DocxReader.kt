@@ -43,6 +43,68 @@ object DocxReader {
         return Reader(parts, fallbackTitle).run()
     }
 
+    /**
+     * What a file contains that Docxels cannot keep yet. Shown to the user after opening, so nothing is lost without
+     * them knowing. Returns an empty list for a plain document.
+     */
+    fun compatNotes(bytes: ByteArray): List<String> {
+        val names = HashSet<String>()
+        var doc = ""
+        var footnotes = ""
+        var comments = ""
+        runCatching {
+            ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zip ->
+                var entries = 0
+                while (true) {
+                    val e = zip.nextEntry ?: break
+                    if (++entries > MAX_ENTRIES) break
+                    if (e.isDirectory) continue
+                    val n = e.name.trimStart('/')
+                    names += n
+                    when (n) {
+                        "word/document.xml" -> doc = String(readBounded(zip, MAX_ENTRY_BYTES), Charsets.UTF_8)
+                        "word/footnotes.xml" -> footnotes = String(readBounded(zip, MAX_ENTRY_BYTES), Charsets.UTF_8)
+                        "word/comments.xml" -> comments = String(readBounded(zip, MAX_ENTRY_BYTES), Charsets.UTF_8)
+                    }
+                }
+            }
+        }
+        fun count(text: String, token: String): Int {
+            var i = 0
+            var c = 0
+            while (true) {
+                i = text.indexOf(token, i)
+                if (i < 0) return c
+                c++
+                i += token.length
+            }
+        }
+        val notes = ArrayList<String>()
+        val fn = count(footnotes, "<w:footnote ") - count(footnotes, "w:type=\"separator\"") - count(footnotes, "w:type=\"continuationSeparator\"")
+        if (fn > 0) notes += "footnotes ($fn)"
+        if ("word/endnotes.xml" in names) {
+            val en = count(doc, "<w:endnoteReference")
+            if (en > 0) notes += "endnotes ($en)"
+        }
+        val cm = count(comments, "<w:comment ")
+        if (cm > 0) notes += "comments ($cm)"
+        val tracked = count(doc, "<w:ins ") + count(doc, "<w:del ")
+        if (tracked > 0) notes += "tracked changes ($tracked; the final text is kept)"
+        if (names.any { it.startsWith("word/charts/") }) notes += "charts"
+        if (names.any { it.startsWith("word/diagrams/") }) notes += "SmartArt diagrams"
+        if (names.any { it.startsWith("word/embeddings/") }) notes += "embedded objects"
+        if ("word/vbaProject.bin" in names) notes += "macros (never run, not kept)"
+        val eq = count(doc, "<m:oMath")
+        if (eq > 0) notes += "equations ($eq)"
+        val boxes = count(doc, "<w:txbxContent") - count(doc, "wordprocessingShape")
+        if (boxes > 0) notes += "text boxes"
+        val sections = count(doc, "<w:sectPr")
+        if (sections > 1) notes += "several sections (only the last page setup is kept)"
+        if (Regex("<w:cols [^>]*w:num=\"([2-9]|\\d\\d)\"").containsMatchIn(doc)) notes += "multiple columns"
+        if (count(doc, "<w:sdt>") + count(doc, "<w:sdt ") > 0) notes += "content controls (their text is kept)"
+        return notes
+    }
+
     private fun readBounded(input: InputStream, limit: Long): ByteArray {
         val out = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(16 * 1024)

@@ -104,3 +104,32 @@ class ShapeBlockTest {
         assertEquals("star5", roundTrip(ShapeBlock("star5", 2000, 2000)).preset)
     }
 }
+
+class CompatNotesTest {
+    private fun zip(vararg parts: Pair<String, String>): ByteArray {
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(bos).use { z ->
+            for ((n, t) in parts) { z.putNextEntry(java.util.zip.ZipEntry(n)); z.write(t.toByteArray()); z.closeEntry() }
+        }
+        return bos.toByteArray()
+    }
+
+    @Test fun plainDocumentHasNoNotes() {
+        val bytes = DocxWriter.toBytes(WordDoc("T", listOf(Block.Para(Paragraph(listOf(Run("hello")))))))
+        assertEquals(emptyList<String>(), DocxReader.compatNotes(bytes))
+    }
+
+    @Test fun reportsFootnotesCommentsAndTrackedChanges() {
+        val bytes = zip(
+            "word/document.xml" to "<w:document><w:body><w:p><w:ins w:id=\"1\"><w:r><w:t>x</w:t></w:r></w:ins><w:del w:id=\"2\"/></w:p></w:body></w:document>",
+            "word/footnotes.xml" to "<w:footnotes><w:footnote w:type=\"separator\" w:id=\"-1\"/><w:footnote w:id=\"1\"/><w:footnote w:id=\"2\"/></w:footnotes>",
+            "word/comments.xml" to "<w:comments><w:comment w:id=\"0\"/></w:comments>",
+            "word/charts/chart1.xml" to "<c/>",
+        )
+        val notes = DocxReader.compatNotes(bytes)
+        assertEquals(true, notes.any { it.startsWith("footnotes (2)") })
+        assertEquals(true, notes.any { it.startsWith("comments (1)") })
+        assertEquals(true, notes.any { it.startsWith("tracked changes (2") })
+        assertEquals(true, notes.contains("charts"))
+    }
+}
