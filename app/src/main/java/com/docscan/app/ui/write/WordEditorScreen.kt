@@ -117,6 +117,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val TEXT_COLORS = listOf(0x000000, 0x595959, 0xC00000, 0xED7D31, 0x00B050, 0x0070C0, 0x7030A0, 0xFFFFFF)
+private val SHADES = listOf(0xF2F2F2, 0xFFF2CC, 0xDDEBF7, 0xE2EFDA, 0xFCE4D6, 0xEADCF4)
 private val HIGHLIGHTS = listOf(0xFFFF00, 0x92D050, 0x00FFFF, 0xFF99CC, 0xFFC000, 0xD9D9D9)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -445,6 +446,7 @@ private fun Ribbon(
     var colorMenu by remember { mutableStateOf(false) }
     var fillMenu by remember { mutableStateOf(false) }
     var spacingMenu by remember { mutableStateOf(false) }
+    var shadeMenu by remember { mutableStateOf(false) }
     val tabs = listOf("Home", "Insert", "Layout", "Review", "View")
     CustomColorDialogHost(customFor, { customFor = 0 }, c)
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -538,6 +540,22 @@ private fun Ribbon(
                         }
                         RibbonButton(Icons.Default.FormatIndentDecrease, "Outdent") { c.indent(-1) }
                         RibbonButton(Icons.Default.FormatIndentIncrease, "Indent") { c.indent(1) }
+                        Box {
+                            RibbonButton(Icons.Default.FormatColorFill, "Shading") { shadeMenu = true }
+                            DropdownMenu(expanded = shadeMenu, onDismissRequest = { shadeMenu = false }) {
+                                DropdownMenuItem(text = { Text("No shading") }, onClick = { shadeMenu = false; c.setShading(null) })
+                                androidx.compose.foundation.layout.Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                    SHADES.forEach { rgb ->
+                                        Box(
+                                            Modifier.padding(3.dp).size(28.dp)
+                                                .background(androidx.compose.ui.graphics.Color(0xFF000000.toInt() or rgb), androidx.compose.foundation.shape.CircleShape)
+                                                .clickable { shadeMenu = false; c.setShading(rgb) },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        RibbonButton(Icons.Default.CropSquare, "Border") { c.toggleBorder() }
                     }
                     3 -> {
                         RibbonButton(Icons.Default.Search, "Find and replace", onFind)

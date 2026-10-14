@@ -66,6 +66,10 @@ data class Paragraph(
     /** Line spacing as a multiple of single spacing (1.0, 1.15, 1.5, 2.0). */
     val lineSpacing: Float? = null,
     val keepWithNext: Boolean = false,
+    /** Paragraph background colour (RGB), or null for none. */
+    val shading: Int? = null,
+    /** Box border colour (RGB), or null for no border. */
+    val borderColor: Int? = null,
 ) {
     val text: String get() = runs.joinToString("") { it.text }
     val isEmpty: Boolean get() = runs.all { it.text.isEmpty() }

@@ -59,16 +59,18 @@ data class ParaAttrs(
     val spaceAfterPt: Float? = null,
     val lineSpacing: Float? = null,
     val keepWithNext: Boolean = false,
+    val shading: Int? = null,
+    val borderColor: Int? = null,
 ) {
     fun toParagraph(runs: List<Run>) = Paragraph(
         runs, style, align, list, level, indentLeftTwips, indentFirstTwips,
-        spaceBeforePt, spaceAfterPt, lineSpacing, keepWithNext,
+        spaceBeforePt, spaceAfterPt, lineSpacing, keepWithNext, shading, borderColor,
     )
 
     companion object {
         fun of(p: Paragraph) = ParaAttrs(
             p.style, p.align, p.list, p.level, p.indentLeftTwips, p.indentFirstTwips,
-            p.spaceBeforePt, p.spaceAfterPt, p.lineSpacing, p.keepWithNext,
+            p.spaceBeforePt, p.spaceAfterPt, p.lineSpacing, p.keepWithNext, p.shading, p.borderColor,
         )
     }
 }
@@ -76,7 +78,7 @@ data class ParaAttrs(
 // ---- spans ----------------------------------------------------------------------------------------------
 
 /** Paragraph attributes: indent and list marker, alignment, and spacing. */
-class ParaSpan(val attrs: ParaAttrs, private val density: Float) : LeadingMarginSpan, AlignmentSpan, LineHeightSpan {
+class ParaSpan(val attrs: ParaAttrs, private val density: Float) : LeadingMarginSpan, AlignmentSpan, LineHeightSpan, android.text.style.LineBackgroundSpan {
     private fun px(twips: Int) = twips / 20f * ZOOM * density
     private fun pxPt(pt: Float) = pt * ZOOM * density
 
@@ -98,6 +100,39 @@ class ParaSpan(val attrs: ParaAttrs, private val density: Float) : LeadingMargin
         val at = x + dir * px((leftTwips - 360).coerceAtLeast(0))
         val w = p.measureText(marker)
         c.drawText(marker, if (dir > 0) at else at - w, baseline.toFloat(), p)
+    }
+
+    override fun drawBackground(
+        c: Canvas, p: Paint, left: Int, right: Int, top: Int, baseline: Int, bottom: Int,
+        text: CharSequence, start: Int, end: Int, lineNumber: Int,
+    ) {
+        if (attrs.shading == null && attrs.borderColor == null) return
+        val sp = text as? Spanned
+        val s = sp?.getSpanStart(this) ?: start
+        val e = sp?.getSpanEnd(this) ?: end
+        val l = left + px(leftTwips.coerceAtLeast(0)).toInt().toFloat()
+        val r = right.toFloat()
+        val oldColor = p.color
+        val oldStyle = p.style
+        val oldWidth = p.strokeWidth
+        attrs.shading?.let {
+            p.style = Paint.Style.FILL
+            p.color = 0xFF000000.toInt() or it
+            c.drawRect(l, top.toFloat(), r, bottom.toFloat(), p)
+        }
+        attrs.borderColor?.let {
+            p.style = Paint.Style.STROKE
+            p.strokeWidth = ZOOM * density
+            p.color = 0xFF000000.toInt() or it
+            val half = p.strokeWidth / 2
+            c.drawLine(l + half, top.toFloat(), l + half, bottom.toFloat(), p)
+            c.drawLine(r - half, top.toFloat(), r - half, bottom.toFloat(), p)
+            if (start <= s) c.drawLine(l, top + half, r, top + half, p)
+            if (end >= e) c.drawLine(l, bottom - half, r, bottom - half, p)
+        }
+        p.color = oldColor
+        p.style = oldStyle
+        p.strokeWidth = oldWidth
     }
 
     override fun getAlignment(): Layout.Alignment = when (attrs.align) {

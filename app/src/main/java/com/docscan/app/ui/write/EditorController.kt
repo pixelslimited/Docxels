@@ -443,6 +443,11 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
 
     fun setStyle(style: ParaStyle) = paragraphs { it.copy(style = style) }
     fun setAlign(align: Align) = paragraphs { it.copy(align = align) }
+    fun setShading(rgb: Int?) = paragraphs { it.copy(shading = rgb) }
+    fun toggleBorder() {
+        val on = currentParagraph().borderColor == null
+        paragraphs { it.copy(borderColor = if (on) 0x404040 else null) }
+    }
 
     fun toggleList(kind: ListKind) {
         val t = text

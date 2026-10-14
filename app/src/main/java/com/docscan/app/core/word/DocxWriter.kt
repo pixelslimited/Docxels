@@ -207,6 +207,15 @@ object DocxWriter {
                 pPr.append("<w:numPr><w:ilvl w:val=\"${p.level.coerceIn(0, 8)}\"/><w:numId w:val=\"${ctx.currentNumId}\"/></w:numPr>")
             }
         }
+        p.borderColor?.let { c ->
+            val col = String.format("%06X", c and 0xFFFFFF)
+            pPr.append("<w:pBdr>")
+            for (side in listOf("top", "left", "bottom", "right")) {
+                pPr.append("<w:$side w:val=\"single\" w:sz=\"6\" w:space=\"4\" w:color=\"$col\"/>")
+            }
+            pPr.append("</w:pBdr>")
+        }
+        p.shading?.let { pPr.append("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"${String.format("%06X", it and 0xFFFFFF)}\"/>") }
         if (p.spaceBeforePt != null || p.spaceAfterPt != null || p.lineSpacing != null) {
             pPr.append("<w:spacing")
             p.spaceBeforePt?.let { pPr.append(" w:before=\"${(it * 20).toInt()}\"") }
