@@ -173,3 +173,5 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Different first page header/footer | IMPLEMENTED — NOT VERIFIED | Page setup option; read/written as titlePg. |
 | Compatibility notice | IMPLEMENTED — NOT VERIFIED | After importing a .docx, lists content that cannot be kept yet. |
 | Delta updates | IMPLEMENTED — NOT VERIFIED | Updater downloads a small patch against the installed build, with full-download fallback. |
+| Screenshots | IMPLEMENTED — NOT VERIFIED | Screen protection is now off by default (setting kept). |
+| Multi-build patches | IMPLEMENTED — NOT VERIFIED | Patches from the last 5 builds are published; Settings shows the real download size and why a full download was used. |

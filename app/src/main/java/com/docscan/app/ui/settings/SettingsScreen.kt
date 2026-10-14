@@ -140,7 +140,7 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             HorizontalDivider()
             ToggleRow(
                 title = "Hide screen contents",
-                body = "Blocks screenshots and hides the app in the recent-apps list.",
+                body = "Off by default, so you can take screenshots. Turn on to block screenshots and hide the app in the recent-apps list.",
                 checked = protect,
                 onChange = { security.protectScreen = it },
             )

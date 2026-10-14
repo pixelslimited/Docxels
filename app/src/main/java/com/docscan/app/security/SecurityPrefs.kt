@@ -19,9 +19,9 @@ class SecurityPrefs(context: Context) {
 
     /** Blocks screenshots and hides the app preview in the recent-apps list. */
     var protectScreen: Boolean
-        get() = prefs.getBoolean("protect_screen", true)
+        get() = prefs.getBoolean("protect_screen_v2", false)
         set(v) {
-            prefs.edit().putBoolean("protect_screen", v).apply()
+            prefs.edit().putBoolean("protect_screen_v2", v).apply()
             _protect.value = v
         }
 

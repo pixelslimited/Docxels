@@ -9,25 +9,37 @@ BASE="https://github.com/$SITE/releases/latest/download"
 SHA=$(sha256sum "$APK" | cut -d' ' -f1)
 SIZE=$(stat -c %s "$APK")
 
-# Try to build a patch from the build that is currently published.
-PATCH_JSON=""
-PATCH_FILE=""
+# Patches: one from each of the last few builds, so a phone that skipped a build still gets a small download.
+KEEP=5
+PATCH_FILES=()
+PATCH_ITEMS=()
 WORK=$(mktemp -d)
-if curl -fsSL "$BASE/update.json" -o "$WORK/prev.json" && curl -fsSL "$BASE/Docxels.apk" -o "$WORK/prev.apk"; then
+mkdir -p "$WORK/hist"
+gh release download history --repo "$SITE" --dir "$WORK/hist" --pattern 'Docxels-*.apk' 2>/dev/null || true
+# The currently published build also counts, in case the history release does not have it yet.
+if curl -fsSL "$BASE/update.json" -o "$WORK/prev.json" 2>/dev/null; then
   PREV=$(python3 -c "import json;print(json.load(open('$WORK/prev.json'))['versionCode'])" || echo 0)
-  PREV_SHA=$(python3 -c "import json;print(json.load(open('$WORK/prev.json'))['sha256'])" || echo x)
-  if [ "$PREV" != "0" ] && [ "$PREV" != "$CODE" ] && [ "$(sha256sum "$WORK/prev.apk" | cut -d' ' -f1)" = "$PREV_SHA" ]; then
-    python3 -m pip install --quiet --user bsdiff4 || true
-    PATCH_FILE="Docxels-$PREV-to-$CODE.patch"
-    if python3 scripts/make-patch.py "$WORK/prev.apk" "$APK" "$PATCH_FILE"; then
-      PSHA=$(sha256sum "$PATCH_FILE" | cut -d' ' -f1)
-      PSIZE=$(stat -c %s "$PATCH_FILE")
-      PATCH_JSON=",\"patch\":{\"fromVersionCode\":$PREV,\"url\":\"$BASE/$PATCH_FILE\",\"sha256\":\"$PSHA\",\"size\":$PSIZE}"
-    else
-      echo "Patch could not be built; publishing the full update only."
-      PATCH_FILE=""
-    fi
+  if [ "$PREV" != "0" ] && [ ! -f "$WORK/hist/Docxels-$PREV.apk" ]; then
+    curl -fsSL "$BASE/Docxels.apk" -o "$WORK/hist/Docxels-$PREV.apk" || rm -f "$WORK/hist/Docxels-$PREV.apk"
   fi
+fi
+python3 -m pip install --quiet --user bsdiff4 || true
+for OLD in $(ls "$WORK/hist"/Docxels-*.apk 2>/dev/null | sort -t- -k2 -n | tail -n "$KEEP"); do
+  FROM=$(basename "$OLD" .apk | sed 's/Docxels-//')
+  [ "$FROM" = "$CODE" ] && continue
+  PF="Docxels-$FROM-to-$CODE.patch"
+  if python3 scripts/make-patch.py "$OLD" "$APK" "$PF"; then
+    PSHA=$(sha256sum "$PF" | cut -d' ' -f1)
+    PSIZE=$(stat -c %s "$PF")
+    PATCH_FILES+=("$PF")
+    PATCH_ITEMS+=("{\"fromVersionCode\":$FROM,\"url\":\"$BASE/$PF\",\"sha256\":\"$PSHA\",\"size\":$PSIZE}")
+  else
+    echo "Patch from $FROM could not be built."
+  fi
+done
+PATCH_JSON=""
+if [ "${#PATCH_ITEMS[@]}" -gt 0 ]; then
+  PATCH_JSON=",\"patches\":[$(IFS=,; echo "${PATCH_ITEMS[*]}")]"
 fi
 
 cat > update.json <<JSON
@@ -35,6 +47,13 @@ cat > update.json <<JSON
 JSON
 cp "$APK" Docxels.apk 2>/dev/null || true
 gh release delete latest --repo "$SITE" --yes --cleanup-tag || true
-ASSETS=(Docxels.apk update.json)
-[ -n "$PATCH_FILE" ] && ASSETS+=("$PATCH_FILE")
+ASSETS=(Docxels.apk update.json "${PATCH_FILES[@]}")
 gh release create latest "${ASSETS[@]}" --repo "$SITE" --title "Docxels $CODE" --notes "Build $CODE. Install from the app: Settings > App updates." --latest
+
+# Keep this build (and the last few) so the next release can make patches from them.
+cp "$APK" "Docxels-$CODE.apk"
+gh release view history --repo "$SITE" >/dev/null 2>&1 || gh release create history --repo "$SITE" --title "Build history" --notes "Older builds, used only to make small update patches." --latest=false
+gh release upload history "Docxels-$CODE.apk" --repo "$SITE" --clobber
+for OLDNAME in $(gh release view history --repo "$SITE" --json assets --jq '.assets[].name' | sort -t- -k2 -n | head -n -"$KEEP"); do
+  gh release delete-asset history "$OLDNAME" --repo "$SITE" --yes || true
+done

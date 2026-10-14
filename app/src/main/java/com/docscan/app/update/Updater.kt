@@ -40,10 +40,12 @@ class Updater(private val context: Context) {
      */
     suspend fun download(info: UpdateInfo, progress: (Float) -> Unit): File = withContext(Dispatchers.IO) {
         dir.listFiles()?.forEach { it.delete() }
-        val p = info.patch
-        if (p != null && p.fromVersionCode == installedCode() && p.size * 10 < info.size * 8) {
-            val rebuilt = runCatching { downloadViaPatch(info, p, progress) }.getOrNull()
-            if (rebuilt != null) return@withContext rebuilt
+        val p = info.patchFor(installedCode())
+        lastPatchNote = if (info.patch == null && info.patches.isEmpty()) "No small update was published for this build."
+        else if (p == null) "No small update fits the version you have (build ${installedCode()})." else ""
+        if (p != null) {
+            val failure = runCatching { return@withContext downloadViaPatch(info, p, progress) }.exceptionOrNull()
+            lastPatchNote = "The small update could not be used (${failure?.message ?: "unknown"}), so the full file was downloaded."
             dir.listFiles()?.forEach { it.delete() }
             progress(0f)
         }
@@ -52,6 +54,10 @@ class Updater(private val context: Context) {
 
     /** True if the last [download] rebuilt the APK from a patch (for the status text). */
     @Volatile var lastUsedPatch = false
+        private set
+
+    /** Why the full file was downloaded instead of a patch; empty when a patch was used. */
+    @Volatile var lastPatchNote = ""
         private set
 
     private fun downloadViaPatch(info: UpdateInfo, p: UpdateInfo.Patch, progress: (Float) -> Unit): File {

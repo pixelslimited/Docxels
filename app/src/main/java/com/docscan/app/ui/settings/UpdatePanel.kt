@@ -73,7 +73,9 @@ fun UpdatePanel() {
                 OutlinedButton(onClick = ::check) { Text("Check again") }
             }
             is UpdateState.Available -> {
-                Text("Version ${s.info.versionName} is available (${s.info.size / 1_048_576} MB).", style = MaterialTheme.typography.titleSmall)
+                val small = s.info.patchFor(updater.installedCode())
+                val sizeText = if (small != null) "download about ${fmtSize(small.size)}, only the changes" else "download ${fmtSize(s.info.size)}"
+                Text("Version ${s.info.versionName} is available ($sizeText).", style = MaterialTheme.typography.titleSmall)
                 if (s.info.notes.isNotBlank()) Text(s.info.notes, style = MaterialTheme.typography.bodyMedium)
                 Button(onClick = { download(s.info) }) { Text("Download and install") }
             }
@@ -82,7 +84,10 @@ fun UpdatePanel() {
                 Text("Downloading… ${(s.progress * 100).toInt()}%")
             }
             is UpdateState.Ready -> {
-                Text("Downloaded and verified.")
+                Text(if (updater.lastUsedPatch) "Downloaded only the changes and verified." else "Downloaded and verified.")
+                if (!updater.lastUsedPatch && updater.lastPatchNote.isNotBlank()) {
+                    Text(updater.lastPatchNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Button(onClick = { if (updater.ensureInstallPermission()) updater.install(s.apk) }) { Text("Install now") }
                 Text(
                     "If Android asks, allow Docxels to install apps, then come back and tap Install now. Your documents are kept.",
@@ -97,3 +102,6 @@ fun UpdatePanel() {
         }
     }
 }
+
+private fun fmtSize(bytes: Long): String =
+    if (bytes >= 1_048_576) "%.1f MB".format(bytes / 1_048_576.0) else "${(bytes / 1024).coerceAtLeast(1)} KB"

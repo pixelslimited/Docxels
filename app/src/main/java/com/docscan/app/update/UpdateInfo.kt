@@ -12,7 +12,13 @@ data class UpdateInfo(
     val notes: String,
     /** Optional small patch that turns the build [Patch.fromVersionCode] into this one. */
     val patch: Patch? = null,
+    /** Patches from several earlier builds, so a phone that skipped a build still gets a small download. */
+    val patches: List<Patch> = emptyList(),
 ) {
+    /** The patch that fits the installed build, if any. */
+    fun patchFor(installed: Long): Patch? =
+        (patches + listOfNotNull(patch)).firstOrNull { it.fromVersionCode == installed && it.size * 10 < size * 8 }
+
     data class Patch(val fromVersionCode: Long, val url: String, val sha256: String, val size: Long)
 
     companion object {
@@ -42,18 +48,18 @@ data class UpdateInfo(
             val ok = parsed.scheme == "https" && hostAllowed(parsed.host) &&
                 Regex("[0-9a-f]{64}").matches(sha) && info.size in 1..MAX_APK_BYTES && info.versionCode > 0
             // A malformed or unsafe patch entry is simply ignored; the full download still works.
-            val patch = o.optJSONObject("patch")?.let { p ->
-                runCatching {
-                    val pu = p.getString("url")
-                    val ps = p.getString("sha256").lowercase()
-                    val pj = java.net.URI(pu)
-                    val candidate = Patch(p.getLong("fromVersionCode"), pu, ps, p.getLong("size"))
-                    if (pj.scheme == "https" && hostAllowed(pj.host) && Regex("[0-9a-f]{64}").matches(ps) &&
-                        candidate.size in 1..MAX_APK_BYTES && candidate.fromVersionCode > 0
-                    ) candidate else null
-                }.getOrNull()
-            }
-            if (ok) info.copy(patch = patch) else null
+            fun readPatch(p: JSONObject): Patch? = runCatching {
+                val pu = p.getString("url")
+                val ps = p.getString("sha256").lowercase()
+                val pj = java.net.URI(pu)
+                val candidate = Patch(p.getLong("fromVersionCode"), pu, ps, p.getLong("size"))
+                if (pj.scheme == "https" && hostAllowed(pj.host) && Regex("[0-9a-f]{64}").matches(ps) &&
+                    candidate.size in 1..MAX_APK_BYTES && candidate.fromVersionCode > 0
+                ) candidate else null
+            }.getOrNull()
+            val patch = o.optJSONObject("patch")?.let(::readPatch)
+            val patches = o.optJSONArray("patches")?.let { a -> (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(::readPatch) } } ?: emptyList()
+            if (ok) info.copy(patch = patch, patches = patches) else null
         } catch (e: Exception) {
             null
         }
