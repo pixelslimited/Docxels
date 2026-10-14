@@ -40,7 +40,7 @@ class RichEditText(context: Context) : EditText(context) {
     var readOnly = false
 
     init {
-        filters = arrayOf(android.text.InputFilter { _, _, _, _, dest, dstart, dend -> if (readOnly) dest.subSequence(dstart, dend) else null })
+        filters = arrayOf(android.text.InputFilter { _, _, _, dest, dstart, dend -> if (readOnly) dest.subSequence(dstart, dend) else null })
     }
 
     /** Set in the page views; null in the mobile view. */
