@@ -84,7 +84,15 @@ import com.docscan.app.core.word.ListKind
 import com.docscan.app.core.word.PageSetup
 import com.docscan.app.core.word.PaperSize
 import com.docscan.app.core.word.ParaStyle
+import com.docscan.app.core.word.Block
+import com.docscan.app.core.word.ImageBlock
 import com.docscan.app.core.word.WordDoc
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import com.docscan.app.data.ImageIO
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.docscan.app.export.Mime
 import com.docscan.app.export.ShareHelper
 import com.docscan.app.ui.TextInputDialog
@@ -128,6 +136,25 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var findOpen by remember { mutableStateOf(false) }
     var pageOpen by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var tableOpen by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Int?>(null) }
+    val photo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val block = withContext(Dispatchers.IO) {
+                runCatching {
+                    val bmp = ImageIO.decodeUri(context, uri, 1600) ?: error("unreadable")
+                    val out = java.io.ByteArrayOutputStream()
+                    bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+                    val w = page.contentWidthTwips
+                    val h = (w.toLong() * bmp.height / bmp.width.coerceAtLeast(1)).toInt()
+                    bmp.recycle()
+                    ImageBlock(out.toByteArray(), "jpg", w, h)
+                }.getOrNull()
+            }
+            if (block == null) snackbar.showSnackbar("Could not read that picture.") else controller.insertBlock(Block.Image(block))
+        }
+    }
     val snackbar = remember { SnackbarHostState() }
 
     fun saveNow() = vm.save(controller.toDoc(title, page))
@@ -170,6 +197,11 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(text = { Text("Find and replace") }, onClick = { menu = false; findOpen = true })
+                            DropdownMenuItem(text = { Text("Insert table") }, onClick = { menu = false; tableOpen = true })
+                            DropdownMenuItem(text = { Text("Insert picture") }, onClick = {
+                                menu = false
+                                photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            })
                             DropdownMenuItem(text = { Text("Insert page break") }, onClick = { menu = false; controller.insertPageBreak() })
                             DropdownMenuItem(text = { Text("Page setup") }, onClick = { menu = false; pageOpen = true })
                             DropdownMenuItem(text = { Text("Word count") }, onClick = { menu = false; counts = controller.counts() })
@@ -195,7 +227,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             AndroidView(
-                factory = { ctx -> RichEditText(ctx).also { controller.attach(it) } },
+                factory = { ctx -> RichEditText(ctx).also { controller.attach(it); controller.setChipTapListener { i -> editing = i } } },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
             FormatBar(controller, state)
@@ -207,6 +239,31 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             title = it.ifBlank { "Untitled" }
             renaming = false
         }, onDismiss = { renaming = false })
+    }
+    if (tableOpen) InsertTableDialog(
+        onInsert = { r, c, h ->
+            tableOpen = false
+            controller.insertBlock(Block.Table(newTable(r, c, h, page.contentWidthTwips)))
+        },
+        onDismiss = { tableOpen = false },
+    )
+    editing?.let { idx ->
+        when (val b = controller.blockAt(idx)) {
+            is Block.Table -> TableEditorDialog(
+                initial = b.table,
+                onSave = { controller.replaceBlock(idx, Block.Table(it)); editing = null },
+                onRemove = { controller.removeBlock(idx); editing = null },
+                onDismiss = { editing = null },
+            )
+            is Block.Image -> ImageEditorDialog(
+                initial = b.image,
+                contentWidthTwips = page.contentWidthTwips,
+                onSave = { controller.replaceBlock(idx, Block.Image(it)); editing = null },
+                onRemove = { controller.removeBlock(idx); editing = null },
+                onDismiss = { editing = null },
+            )
+            else -> editing = null
+        }
     }
     if (findOpen) FindDialog(controller, onClose = { findOpen = false })
     if (pageOpen) PageSetupDialog(page, onApply = { page = it; pageOpen = false }, onDismiss = { pageOpen = false })

@@ -22,6 +22,25 @@ import kotlinx.coroutines.flow.StateFlow
 /** EditText that reports cursor / selection moves so the toolbar can show what is active. */
 class RichEditText(context: Context) : EditText(context) {
     var onSelection: (() -> Unit)? = null
+
+    /** Called with the block index when a table / image placeholder is tapped. */
+    var onChipTap: ((Int) -> Unit)? = null
+    private val taps = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+        override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
+            val t = text
+            val off = getOffsetForPosition(e.x, e.y)
+            val chip = t.getSpans(maxOf(0, off - 1), minOf(t.length, off + 1), BlockChipSpan::class.java)
+                .firstOrNull { t.getSpanStart(it) <= off && off <= t.getSpanEnd(it) }
+            if (chip != null) onChipTap?.invoke(chip.index)
+            return false
+        }
+    })
+
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        taps.onTouchEvent(event)
+        return super.onTouchEvent(event)
+    }
+
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
         super.onSelectionChanged(selStart, selEnd)
         onSelection?.invoke()
@@ -274,22 +293,56 @@ class EditorController(private val density: Float, initial: List<Block>) {
 
     // -- inserting --
 
-    fun insertPageBreak() {
+    fun insertPageBreak() = insertBlock(Block.PageBreak)
+
+    /** Inserts a table / image / page break after the paragraph the cursor is in. */
+    fun insertBlock(block: Block) {
         val v = view ?: return
         val t = v.text
         val pr = RichOps.paragraphAt(t, selection.first)
         val insert = if (pr.hasNewline) "\n$CHIP_CHAR" else "\n$CHIP_CHAR\n"
         val index = originals.size
-        originals = originals + Block.PageBreak
+        originals = originals + block
         applying = true
         t.insert(pr.end, insert)
-        t.setSpan(BlockChipSpan(index, EditorModel.label(Block.PageBreak)), pr.end + 1, pr.end + 2, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        t.setSpan(BlockChipSpan(index, EditorModel.label(block)), pr.end + 1, pr.end + 2, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         RichOps.normalize(t, density)
         val chipPara = RichOps.paragraphAt(t, pr.end + 1)
         RichOps.updateParagraphs(t, chipPara.start, chipPara.start, density) { ParaAttrs() }
         applying = false
         v.setSelection(minOf(t.length, pr.end + 3))
         changed()
+    }
+
+    fun blockAt(index: Int): Block? = originals.getOrNull(index)
+
+    /** Replaces an existing table / image (edited in its own dialog). */
+    fun replaceBlock(index: Int, block: Block) {
+        if (index !in originals.indices) return
+        originals = originals.toMutableList().also { it[index] = block }
+        val t = text
+        for (chip in t.getSpans(0, t.length, BlockChipSpan::class.java)) {
+            if (chip.index != index) continue
+            val a = t.getSpanStart(chip)
+            val e = t.getSpanEnd(chip)
+            t.removeSpan(chip)
+            t.setSpan(BlockChipSpan(index, EditorModel.label(block)), a, e, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        changed()
+    }
+
+    /** Removes the block's placeholder paragraph. */
+    fun removeBlock(index: Int) {
+        val t = text
+        val chip = t.getSpans(0, t.length, BlockChipSpan::class.java).firstOrNull { it.index == index } ?: return
+        val r = RichOps.paragraphAt(t, t.getSpanStart(chip))
+        val from = if (r.hasNewline) r.start else maxOf(0, r.start - 1)
+        t.delete(from, r.full)
+        changed()
+    }
+
+    fun setChipTapListener(l: (Int) -> Unit) {
+        view?.onChipTap = l
     }
 
     // -- find / replace --
