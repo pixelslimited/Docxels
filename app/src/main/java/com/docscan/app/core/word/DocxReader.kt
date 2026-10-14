@@ -330,8 +330,8 @@ object DocxReader {
                     footerDistTwips = m.attr("footer")?.toIntOrNull()?.coerceAtLeast(0) ?: setup.footerDistTwips,
                 )
             }
-            val headerRef = sect.childrenNamed("headerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull() }
-            val footerRef = sect.childrenNamed("footerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull() }
+            val headerRef = sect.childrenNamed("headerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull { it.attr("type") == null } }
+            val footerRef = sect.childrenNamed("footerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull { it.attr("type") == null } }
             val firstHeaderRef = sect.childrenNamed("headerReference").firstOrNull { it.attr("type") == "first" }
             val firstFooterRef = sect.childrenNamed("footerReference").firstOrNull { it.attr("type") == "first" }
             if (sect.child("titlePg") != null) {
