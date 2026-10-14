@@ -6,30 +6,33 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import com.docscan.app.security.SecureFiles
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import kotlin.math.max
 
-/** Private, app-internal storage for page images. Nothing here is visible to other apps. */
+/** Private, app-internal storage for page images (encrypted at rest). Nothing here is visible to other apps. */
 class FileStore(context: Context) {
     private val root = File(context.filesDir, "docs").apply { mkdirs() }
 
     fun file(documentId: String, name: String): File = File(File(root, documentId).apply { mkdirs() }, name)
 
     fun deleteDocument(documentId: String) {
-        File(root, documentId).deleteRecursively()
+        SecureFiles.wipeDirectory(File(root, documentId))
     }
 }
 
 /** Bitmap decoding that honours EXIF orientation and never loads more pixels than needed. */
 object ImageIO {
     fun decodeFile(file: File, maxSide: Int): Bitmap? {
-        if (!file.exists()) return null
+        val bytes = SecureFiles.read(file) ?: return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
-        val bitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOptions(bounds, maxSide)) ?: return null
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOptions(bounds, maxSide)) ?: return null
         val orientation = runCatching {
-            ExifInterface(file.absolutePath).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
         return finish(bitmap, orientation, maxSide)
     }
@@ -50,7 +53,9 @@ object ImageIO {
     }
 
     fun saveJpeg(bitmap: Bitmap, file: File, quality: Int = 92) {
-        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, quality, it) }
+        val out = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+        SecureFiles.write(file, out.toByteArray())
     }
 
     private fun decodeOptions(bounds: BitmapFactory.Options, maxSide: Int): BitmapFactory.Options {

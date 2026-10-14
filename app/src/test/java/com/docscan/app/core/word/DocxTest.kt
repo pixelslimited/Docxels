@@ -246,3 +246,43 @@ class DocxTest {
         DocxReader.read("this is not a docx".toByteArray())
     }
 }
+
+class DocxHardeningTest {
+    @Test(expected = MiniXml.XmlException::class)
+    fun deeplyNestedXmlIsRejected() {
+        val n = MiniXml.MAX_DEPTH + 50
+        MiniXml.parse("<a>".repeat(n) + "</a>".repeat(n))
+    }
+
+    @Test(expected = DocxReader.DocxException::class)
+    fun tooManyZipEntriesAreRejected() {
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(bos).use { z ->
+            for (i in 0..DocxReader.MAX_ENTRIES + 5) {
+                z.putNextEntry(java.util.zip.ZipEntry("f$i.txt"))
+                z.write(1)
+                z.closeEntry()
+            }
+        }
+        DocxReader.read(bos.toByteArray())
+    }
+
+    @Test(expected = DocxReader.DocxException::class)
+    fun fileWithoutDocumentPartIsRejected() {
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(bos).use { z ->
+            z.putNextEntry(java.util.zip.ZipEntry("hello.txt"))
+            z.write("hi".toByteArray())
+            z.closeEntry()
+        }
+        DocxReader.read(bos.toByteArray())
+    }
+
+    @Test
+    fun entitiesAreNotExpandedFromDoctype() {
+        // A "billion laughs" style document must not grow: custom entities are simply left as text.
+        val xml = "<?xml version=\"1.0\"?><!DOCTYPE x [<!ENTITY a \"aaaaaaaaaa\"><!ENTITY b \"&a;&a;&a;&a;\">]><x>&b;</x>"
+        val root = MiniXml.parse(xml)
+        org.junit.Assert.assertEquals("&b;", root.text.toString())
+    }
+}

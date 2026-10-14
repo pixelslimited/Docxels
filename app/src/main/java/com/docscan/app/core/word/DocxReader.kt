@@ -13,16 +13,21 @@ import java.util.zip.ZipInputStream
 object DocxReader {
     class DocxException(message: String) : Exception(message)
 
-    private const val MAX_TOTAL_BYTES = 200L * 1024 * 1024
+    // Limits that keep a malicious or corrupt file (zip bomb, millions of entries) from exhausting memory.
+    const val MAX_TOTAL_BYTES = 200L * 1024 * 1024
+    const val MAX_ENTRY_BYTES = 64L * 1024 * 1024
+    const val MAX_ENTRIES = 3000
 
     fun read(input: InputStream, fallbackTitle: String = "Untitled"): WordDoc {
         val parts = HashMap<String, ByteArray>()
         var total = 0L
         ZipInputStream(input).use { zip ->
+            var entries = 0
             while (true) {
                 val entry = zip.nextEntry ?: break
+                if (++entries > MAX_ENTRIES) throw DocxException("This file has too many parts to be a normal document")
                 if (entry.isDirectory) continue
-                val bytes = zip.readBytes()
+                val bytes = readBounded(zip, MAX_ENTRY_BYTES)
                 total += bytes.size
                 if (total > MAX_TOTAL_BYTES) throw DocxException("File is too large to open")
                 parts[entry.name.trimStart('/')] = bytes
@@ -30,6 +35,20 @@ object DocxReader {
         }
         if (parts.isEmpty()) throw DocxException("Not a Word document")
         return Reader(parts, fallbackTitle).run()
+    }
+
+    private fun readBounded(input: InputStream, limit: Long): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(16 * 1024)
+        var total = 0L
+        while (true) {
+            val n = input.read(buffer)
+            if (n < 0) break
+            total += n
+            if (total > limit) throw DocxException("A part of this file is unreasonably large")
+            out.write(buffer, 0, n)
+        }
+        return out.toByteArray()
     }
 
     fun read(bytes: ByteArray, fallbackTitle: String = "Untitled"): WordDoc =

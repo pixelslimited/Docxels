@@ -4,3 +4,10 @@
 
 # ML Kit, CameraX, Room and Compose ship their own consumer rules.
 -dontwarn com.google.errorprone.annotations.**
+
+# Remove verbose / debug / info logging from release builds so nothing about documents can end up in logs.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}

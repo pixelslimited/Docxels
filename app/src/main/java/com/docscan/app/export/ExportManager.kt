@@ -215,7 +215,7 @@ class ExportManager(
     }
 
     fun clearCache() {
-        dir.listFiles()?.forEach { it.delete() }
+        dir.listFiles()?.forEach { com.docscan.app.security.SecureFiles.wipe(it) }
     }
 
     private fun safeName(name: String): String =

@@ -73,6 +73,9 @@ jobs:
           {
             echo "APK size: $(du -h "$APK" | cut -f1)"
             echo
+            echo "Permissions requested by the APK:"
+            "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest permissions "$APK" || echo "(could not read)"
+            echo
             echo "Largest parts (compressed bytes, file):"
             unzip -v "$APK" | awk 'NR>3 && NF>=8 {print $3, $8}' | sort -rn | head -12
           } | tee size.txt

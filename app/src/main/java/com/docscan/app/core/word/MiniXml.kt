@@ -45,6 +45,9 @@ class XNode(val name: String, val attrs: Map<String, String>) {
 object MiniXml {
     class XmlException(message: String) : Exception(message)
 
+    /** Real documents nest a few dozen levels at most; deeper input is hostile or broken. */
+    const val MAX_DEPTH = 200
+
     fun parse(source: String): XNode {
         val root = XNode("#document", emptyMap())
         val stack = ArrayList<XNode>()
@@ -151,7 +154,10 @@ object MiniXml {
         }
         val node = XNode(name, attrs)
         stack.last().children += node
-        if (!selfClosing) stack += node
+        if (!selfClosing) {
+            if (stack.size > MAX_DEPTH) throw XmlException("Document is nested too deeply")
+            stack += node
+        }
         return i
     }
 

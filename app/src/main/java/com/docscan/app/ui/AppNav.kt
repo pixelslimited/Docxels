@@ -16,8 +16,10 @@ import com.docscan.app.ui.home.HomeScreen
 import com.docscan.app.ui.home.HomeViewModel
 import com.docscan.app.ui.scan.ScanScreen
 import com.docscan.app.ui.scan.ScanViewModel
+import com.docscan.app.ui.settings.SettingsScreen
 
 private const val HOME = "home"
+private const val SETTINGS = "settings"
 private const val SCAN = "scan/{docId}"
 private const val DOC = "doc/{docId}"
 private const val EDIT = "edit/{docId}/{pageId}"
@@ -33,8 +35,10 @@ fun AppNav(container: AppContainer) {
                 vm = vm,
                 onScan = { docId -> nav.navigate("scan/$docId") },
                 onOpen = { docId -> nav.navigate("doc/$docId") },
+                onSettings = { nav.navigate(SETTINGS) },
             )
         }
+        composable(SETTINGS) { SettingsScreen(container = container, onBack = { nav.popBackStack() }) }
         composable(SCAN) { entry ->
             val docId = entry.arguments?.getString("docId") ?: return@composable
             val vm: ScanViewModel = viewModel(

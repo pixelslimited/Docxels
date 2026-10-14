@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -74,7 +76,7 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-fun HomeScreen(vm: HomeViewModel, onScan: (String) -> Unit, onOpen: (String) -> Unit) {
+fun HomeScreen(vm: HomeViewModel, onScan: (String) -> Unit, onOpen: (String) -> Unit, onSettings: () -> Unit = {}) {
     val context = LocalContext.current
     val items by vm.items.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -134,6 +136,10 @@ fun HomeScreen(vm: HomeViewModel, onScan: (String) -> Unit, onOpen: (String) -> 
             }
         }
 
+        IconButton(
+            onClick = onSettings,
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 20.dp, end = 8.dp),
+        ) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
         Dock(
             modifier = Modifier.align(Alignment.BottomCenter),
             onImport = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
