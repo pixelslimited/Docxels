@@ -36,6 +36,18 @@ jobs:
           set -o pipefail
           gradle :app:testDebugUnitTest --stacktrace 2>&1 | tee build.log
 
+      # Posts a generated sample .docx (base64) on the commit so the writer can be checked in real Word-compatible software.
+      - name: Post sample document
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          F=app/build/word-sample/sample.docx
+          if [ -f "$F" ]; then
+            { echo "docx-sample base64:"; echo '```'; base64 -w0 "$F"; echo; echo '```'; } > sample.md
+            gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@sample.md || true
+          fi
+
       # Release build: shrunk (R8), not debuggable (faster image processing), arm64 only.
       - name: Build release APK
         run: |
