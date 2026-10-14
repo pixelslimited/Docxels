@@ -159,4 +159,9 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Paper sizes (9) and per-side margins with presets | IMPLEMENTED — NOT VERIFIED | |
 | Paragraph shading and box border | IMPLEMENTED — NOT VERIFIED | Round trip through .docx TESTED in `ParaShadingTest`; one border style/width only; drawing in the editor and PDF export needs a device check. |
 | Table tools: row above, merge right, split cell, cell bold, cell alignment | IMPLEMENTED — NOT VERIFIED | Merge/split are horizontal only; rows/columns cannot be added to a table that has merged cells. |
-| Underline styles, comments, track changes, footnotes, TOC, styles pane, sections, headers/footers beyond one line, RTL, spellcheck options | NOT STARTED | Later phases. |
+| Underline styles (double, thick, dotted, dashed, wavy, words) | IMPLEMENTED — NOT VERIFIED | Kept through .docx (TESTED); shown as a plain underline on screen. |
+| Remove background from inserted pictures | IMPLEMENTED — NOT VERIFIED | On-device GrabCut (OpenCV), result is a transparent PNG; quality depends on the picture. Needs a device check. |
+| Text wrap for pictures (in line, top and bottom, square, tight, behind/in front) | NOT STARTED | Pictures are block items today. Plan: save/load the .docx wrap setting first, then in line / top and bottom in the editor; square and tight need a custom page layout. |
+| Shapes (rectangle, rounded box, ellipse, line, arrow) with wrap | NOT STARTED | No shapes exist yet. |
+| Optional Google sign-in / Pro features / AI-assisted writing | DEFERRED | On hold by the owner while it needs paid services. The app works fully without an account. |
+| Comments, track changes, footnotes, TOC, styles pane, sections, headers/footers beyond one line, RTL, spellcheck options | NOT STARTED | Later phases. |
