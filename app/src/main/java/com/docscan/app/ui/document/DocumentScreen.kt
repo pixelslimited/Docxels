@@ -248,6 +248,10 @@ private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean
                     "Text is read from each page (OCR) so you can edit it in Word.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                DocFormat.TXT -> Text(
+                    "All text from the pages (OCR) in one plain .txt file.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 else -> Text("One image file per page.", style = MaterialTheme.typography.bodySmall)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {

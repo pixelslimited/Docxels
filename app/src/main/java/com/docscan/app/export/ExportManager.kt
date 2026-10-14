@@ -29,11 +29,13 @@ object Mime {
     const val XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     const val JPEG = "image/jpeg"
     const val PNG = "image/png"
+    const val TXT = "text/plain"
 }
 
 enum class DocFormat(val label: String) {
     PDF("PDF"),
     WORD("Word"),
+    TXT("Text"),
     JPEG("Image (JPEG)"),
     PNG("Image (PNG)"),
 }
@@ -61,6 +63,7 @@ class ExportManager(
             DocFormat.PDF -> ExportResult(listOf(pdf(pages, base, options.a4)), Mime.PDF)
             // Word is always recognised, editable text (OCR); page pictures are what PDF and image export are for.
             DocFormat.WORD -> ExportResult(listOf(wordText(pages, base)), Mime.DOCX)
+            DocFormat.TXT -> ExportResult(listOf(textFile(pages, base)), Mime.TXT)
             DocFormat.JPEG -> ExportResult(images(pages, base, png = false), Mime.JPEG)
             DocFormat.PNG -> ExportResult(images(pages, base, png = true), Mime.PNG)
         }
@@ -116,6 +119,20 @@ class ExportManager(
                 }
             }
             File(dir, "$base.docx").also { file -> FileOutputStream(file).use { docx.writeTo(it) } }
+        }
+
+    /** Plain text of every page (OCR), pages separated by a blank line and a rule. */
+    private suspend fun textFile(pages: List<PageEntity>, base: String): File =
+        withContext(Dispatchers.IO) {
+            val text = StringBuilder()
+            pages.forEachIndexed { index, page ->
+                val bitmap = renderer.render(page, OCR_SIDE)
+                val paragraphs = ocr.paragraphs(bitmap)
+                bitmap.recycle()
+                if (index > 0) text.append("\n\n----- Page ${index + 1} -----\n\n")
+                text.append(if (paragraphs.isEmpty()) "[No text recognised on page ${index + 1}]" else paragraphs.joinToString("\n\n"))
+            }
+            File(dir, "$base.txt").also { it.writeText(text.toString(), Charsets.UTF_8) }
         }
 
     private suspend fun images(pages: List<PageEntity>, base: String, png: Boolean): List<File> =

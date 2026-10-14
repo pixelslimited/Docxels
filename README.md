@@ -11,14 +11,16 @@ Offline document scanner for Android (Kotlin, Jetpack Compose, Material 3). Phot
 
 | Area | What it does |
 | --- | --- |
-| Capture | CameraX live preview with a **live page outline**, flash, batch capture, import from gallery (system photo picker, no permission) |
+| Capture | CameraX live preview with a **live page outline**, flash, batch capture, import from gallery. Three modes: **Document**, **Book** (curved page flattened) and **2 pages** (both open pages in one shot, split at the spine). **Auto-capture** shoots when the page holds still and again after the page is turned; **Fingers** removes hands/objects at capture. Photos are processed in a queue so scanning never waits |
 | Edges | **Auto** detection (OpenCV: Canny + contour quad, with an Otsu fallback) and **manual** editing: 4 corner handles + 4 side handles that move a whole edge |
 | Straighten | Perspective warp to a flat rectangle, text-tilt levelling, **curled/wavy paper flattening** (needs several text lines), rotate in 90° steps |
 | Look | Original / **Color** (enhances without shifting colours: lightness-only CLAHE + sharpen) / Gray / **B&W** (adaptive threshold); shadow and uneven-light removal; auto levels; brightness and contrast sliders; apply one look to all pages |
 | Clean-up | **Auto-clean** removes hands/fingers, pens and other objects, staple pins and folded corners/edges (filled with the surrounding paper colour) and **brush** (paint over anything it missed) |
 | Arrange | **Manual**: move earlier/later, rotate, delete. **Auto**: fixes upright orientation by OCR and sorts by printed page numbers when most pages have one |
-| Export | Whole document to **PDF** (A4 or fit-width), **Word** (editable text read by OCR), **JPEG/PNG** per page. Share sheet or save to Downloads/Pictures |
+| Export | Whole document to **PDF** (A4 or fit-width), **Word** (editable text read by OCR), **Text (.txt)**, **JPEG/PNG** per page. Share sheet or save to Downloads/Pictures |
 | Tables | Finds ruled tables, reads cell text (OCR), lets you correct cells, exports to **Excel (.xlsx)**, **Word table**, **PDF** or **image** |
+
+The interface is a minimal "paper and ink" design (warm paper, near-black ink, one vermilion accent, light and dark). Documents can be searched by name.
 
 Everything runs on the phone. No account, no internet, only the camera permission.
 
