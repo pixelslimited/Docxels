@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Functions
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.Redo
@@ -75,6 +79,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -138,6 +143,22 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val controller = remember { EditorController(density, initial.blocks) }
     val state by controller.state.collectAsState()
+    var fontOpen by remember { mutableStateOf(false) }
+    var sizeOpen by remember { mutableStateOf(false) }
+    var paraOpen by remember { mutableStateOf(false) }
+    var symbolOpen by remember { mutableStateOf(false) }
+    var dateOpen by remember { mutableStateOf(false) }
+    var navOpen by remember { mutableStateOf(false) }
+    var statsOpen by remember { mutableStateOf(false) }
+    val recentFonts = remember { mutableStateListOf<String>() }
+    var caseMenu by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    LaunchedEffect(state) {
+        delay(300)
+        val st = controller.stats()
+        val pg = controller.pageInfo()
+        status = (if (pg != null) "Page ${pg.first} of ${pg.second}  ·  " else "") + "%,d words".format(st.words)
+    }
     var title by remember { mutableStateOf(initial.title) }
     var page by remember { mutableStateOf(initial.page) }
     var tick by remember { mutableIntStateOf(0) }
@@ -258,6 +279,12 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
+            Text(
+                status,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().clickable { statsOpen = true }.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
             Ribbon(
                 c = controller,
                 s = state,
@@ -270,7 +297,15 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onPageBreak = { controller.insertPageBreak() },
                 onPageSetup = { pageOpen = true },
                 onFind = { findOpen = true },
-                onCount = { counts = controller.counts() },
+                onCount = { statsOpen = true },
+                onFont = { fontOpen = true },
+                onSize = { sizeOpen = true },
+                onParagraph = { paraOpen = true },
+                onSymbol = { symbolOpen = true },
+                onDate = { dateOpen = true },
+                onNav = { navOpen = true },
+                caseMenu = caseMenu,
+                onCaseMenu = { caseMenu = it },
             )
         }
     }
@@ -308,6 +343,25 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
     if (findOpen) FindDialog(controller, onClose = { findOpen = false })
     if (pageOpen) PageSetupDialog(page, onApply = { page = it; pageOpen = false }, onDismiss = { pageOpen = false })
+    if (fontOpen) FontPickerDialog(
+        current = state.font, recent = recentFonts.toList(),
+        onPick = { f ->
+            fontOpen = false
+            controller.setFont(f)
+            if (f != null) { recentFonts.remove(f); recentFonts.add(0, f); while (recentFonts.size > 5) recentFonts.removeAt(5) }
+        },
+        onDismiss = { fontOpen = false },
+    )
+    if (sizeOpen) SizeDialog(state.sizePt, onPick = { sizeOpen = false; controller.setSize(it) }, onDismiss = { sizeOpen = false })
+    if (paraOpen) ParagraphDialog(
+        initial = remember { controller.currentParagraph() },
+        onApply = { b, a, l, left, first -> paraOpen = false; controller.setParagraphLayout(b, a, l, left, first) },
+        onDismiss = { paraOpen = false },
+    )
+    if (symbolOpen) SymbolDialog(onInsert = { symbolOpen = false; controller.insertText(it) }, onDismiss = { symbolOpen = false })
+    if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
+    if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
+    if (statsOpen) WordCountDialog(remember { controller.stats() }, controller.pageInfo()?.second, onDismiss = { statsOpen = false })
     counts?.let { (words, chars) ->
         AlertDialog(
             onDismissRequest = { counts = null },
@@ -332,6 +386,14 @@ private fun Ribbon(
     onPageSetup: () -> Unit,
     onFind: () -> Unit,
     onCount: () -> Unit,
+    onFont: () -> Unit,
+    onSize: () -> Unit,
+    onParagraph: () -> Unit,
+    onSymbol: () -> Unit,
+    onDate: () -> Unit,
+    onNav: () -> Unit,
+    caseMenu: Boolean,
+    onCaseMenu: (Boolean) -> Unit,
 ) {
     var styleMenu by remember { mutableStateOf(false) }
     var colorMenu by remember { mutableStateOf(false) }
@@ -359,9 +421,18 @@ private fun Ribbon(
                     }
                 }
             }
+            TextButton(onClick = onFont) { Text(s.font ?: "Font", maxLines = 1, modifier = Modifier.widthIn(max = 110.dp)) }
             TextButton(onClick = { c.sizeStep(-1) }) { Text("A−") }
-            Text(if (s.sizePt % 1f == 0f) s.sizePt.toInt().toString() else s.sizePt.toString(), style = MaterialTheme.typography.labelLarge)
+            TextButton(onClick = onSize) { Text(if (s.sizePt % 1f == 0f) s.sizePt.toInt().toString() else s.sizePt.toString()) }
             TextButton(onClick = { c.sizeStep(1) }) { Text("A+") }
+            Box {
+                TextButton(onClick = { onCaseMenu(true) }) { Text("Aa") }
+                DropdownMenu(expanded = caseMenu, onDismissRequest = { onCaseMenu(false) }) {
+                    com.docscan.app.core.word.CaseMode.entries.forEach { m ->
+                        DropdownMenuItem(text = { Text(m.label) }, onClick = { onCaseMenu(false); c.changeCase(m) })
+                    }
+                }
+            }
             Toggle(Icons.Default.FormatBold, "Bold", s.bold) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
             Toggle(Icons.Default.FormatItalic, "Italic", s.italic) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
             Toggle(Icons.Default.FormatUnderlined, "Underline", s.underline) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
@@ -400,9 +471,12 @@ private fun Ribbon(
                         RibbonButton(Icons.Default.TableChart, "Table", onTable)
                         RibbonButton(Icons.Default.Image, "Picture", onPicture)
                         RibbonButton(Icons.Default.InsertPageBreak, "Page break", onPageBreak)
+                        RibbonButton(Icons.Default.Event, "Date & time", onDate)
+                        RibbonButton(Icons.Default.Functions, "Symbol", onSymbol)
                     }
                     2 -> {
                         RibbonButton(Icons.Default.Description, "Page setup", onPageSetup)
+                        RibbonButton(Icons.Default.FormatAlignLeft, "Paragraph", onParagraph)
                         Box {
                             RibbonButton(Icons.Default.FormatLineSpacing, "Line spacing") { spacingMenu = true }
                             DropdownMenu(expanded = spacingMenu, onDismissRequest = { spacingMenu = false }) {
@@ -419,6 +493,7 @@ private fun Ribbon(
                         RibbonButton(Icons.Default.Numbers, "Word count", onCount)
                     }
                     else -> {
+                        RibbonButton(Icons.Default.Menu, "Navigation", onNav)
                         com.docscan.app.ui.kit.FilterPill("Print layout", viewMode == ViewMode.PAGE, { onViewMode(ViewMode.PAGE) }, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Text width", viewMode == ViewMode.TEXT, { onViewMode(ViewMode.TEXT) }, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Mobile", viewMode == ViewMode.MOBILE, { onViewMode(ViewMode.MOBILE) }, Modifier.padding(horizontal = 4.dp))

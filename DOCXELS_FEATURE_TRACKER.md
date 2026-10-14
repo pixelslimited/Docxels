@@ -142,3 +142,15 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Wipe PDF working copies and old updates (on leaving a tool and at start-up) | IMPLEMENTED — NOT VERIFIED | |
 | Device check (root tools, test-keys, debugger) shown in Settings | IMPLEMENTED — NOT VERIFIED | Heuristic only; logic tested in `DeviceIntegrityTest`. Bypassable. |
 | Replace committed signing key with a private CI secret | NOT STARTED | Required before Google Play; anyone with repo access can sign an app as Docxels today. |
+
+## Word processor, Phase 1 (spec: Docxels_Word_Feature_Specification.docx)
+| Spec item | Status | Notes |
+|---|---|---|
+| Font name picker (Home) | IMPLEMENTED — NOT VERIFIED | 18 common Word fonts + any name. Android shows the nearest of its own fonts; the real name is saved in .docx. No font files bundled. |
+| Font size picker + custom size (1-400 pt) | IMPLEMENTED — NOT VERIFIED | |
+| Change Case (5 modes) | IMPLEMENTED — NOT VERIFIED | Logic TESTED in `WordToolsTest`; keeps formatting by re-attaching spans (needs device check). |
+| Paragraph dialog (spacing before/after, line spacing, indent, first line/hanging) | IMPLEMENTED — NOT VERIFIED | No right indent, mirror indents or "at least/exactly" line spacing yet. |
+| Insert date & time, symbols, non-breaking space/hyphen | IMPLEMENTED — NOT VERIFIED | Inserted as plain text, not as updating fields. |
+| Navigation pane (headings) | IMPLEMENTED — NOT VERIFIED | Dialog, tap to jump. No drag-to-reorder, no page thumbnails or search results tabs. |
+| Status bar (page X of Y, words) and full Word Count | IMPLEMENTED — NOT VERIFIED | Counts do not include tables, headers, footnotes. Logic TESTED. |
+| Underline styles, font colour custom RGB, shading, borders, format painter, hyperlinks, comments, track changes, footnotes, TOC, styles pane, sections, headers/footers beyond one line, RTL, spellcheck options | NOT STARTED | Later phases. |

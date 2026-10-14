@@ -147,6 +147,7 @@ data class ToolbarState(
     val align: Align = Align.LEFT,
     val list: ListKind = ListKind.NONE,
     val sizePt: Float = StyleDefaults.BODY_SIZE_PT,
+    val font: String? = null,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
 )
@@ -373,6 +374,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
             align = attrs.align,
             list = attrs.list,
             sizePt = size,
+            font = (RichOps.valueAt(t, a, CharKind.FONT) as? String)?.takeIf { it.isNotEmpty() },
             canUndo = undoStack.isNotEmpty() || (current?.let { it.blocks != EditorModel.toBlocks(t, originals) } ?: false),
             canRedo = redoStack.isNotEmpty(),
         )
@@ -539,6 +541,104 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
             count++
         }
         return count
+    }
+
+    // -- Phase 1 additions: font, size, case, paragraph dialog, insert text, navigation, statistics --
+
+    fun setFont(name: String?) {
+        if (name == null) remove(CharKind.FONT) else apply(CharAttr.Font(name))
+    }
+
+    fun setSize(pt: Float) = apply(CharAttr.Size(pt.coerceIn(1f, 400f)))
+
+    /** Changes case of the selection, or of the word at the cursor when nothing is selected. Formatting is kept. */
+    fun changeCase(mode: com.docscan.app.core.word.CaseMode) {
+        if (view == null) return
+        var (a, b) = selection
+        val t = text
+        if (a == b) {
+            while (a > 0 && t[a - 1].isLetterOrDigit()) a--
+            while (b < t.length && t[b].isLetterOrDigit()) b++
+        }
+        if (a >= b) return
+        val old = t.subSequence(a, b).toString()
+        val new = com.docscan.app.core.word.TextCase.apply(old, mode)
+        if (new == old) return
+        // Replacing text can drop spans that cover exactly the replaced range, so put every span back afterwards.
+        val spans = t.getSpans(a, b, Any::class.java).map { Triple(it, t.getSpanStart(it) to t.getSpanEnd(it), t.getSpanFlags(it)) }
+        val sel = selection
+        t.replace(a, b, new)
+        for ((sp, range, flags) in spans) {
+            if (sp is android.text.style.ParagraphStyle || sp is android.text.style.CharacterStyle) {
+                if (t.getSpanStart(sp) != range.first || t.getSpanEnd(sp) != range.second) t.setSpan(sp, range.first, range.second, flags)
+            }
+        }
+        view?.setSelection(sel.first.coerceIn(0, t.length), sel.second.coerceIn(0, t.length))
+        changed()
+    }
+
+    fun currentParagraph(): ParaAttrs {
+        val t = text
+        return RichOps.attrsOf(t, RichOps.paragraphAt(t, selection.first))
+    }
+
+    /** Paragraph dialog: any argument left null keeps the current value; [clearSpacing] resets before/after to the style default. */
+    fun setParagraphLayout(
+        before: Float?, after: Float?, lineSpacing: Float?, indentLeftTwips: Int, indentFirstTwips: Int,
+    ) = paragraphs {
+        it.copy(
+            spaceBeforePt = before, spaceAfterPt = after, lineSpacing = lineSpacing,
+            indentLeftTwips = indentLeftTwips, indentFirstTwips = indentFirstTwips,
+        )
+    }
+
+    /** Types [s] at the cursor, replacing any selection. */
+    fun insertText(s: String) {
+        val v = view ?: return
+        val (a, b) = selection
+        v.text.replace(a, b, s)
+        v.setSelection(a + s.length)
+        changed()
+    }
+
+    fun outline(): List<com.docscan.app.core.word.OutlineItem> {
+        val t = text
+        val lines = t.toString().split('\n')
+        var off = 0
+        val styles = lines.map { line ->
+            val st = RichOps.attrsOf(t, RichOps.paragraphAt(t, off)).style
+            off += line.length + 1
+            st
+        }
+        return com.docscan.app.core.word.Outline.build(lines.map { it.replace(CHIP_CHAR.toString(), "") }, styles)
+    }
+
+    fun goTo(offset: Int) {
+        val v = view ?: return
+        val o = offset.coerceIn(0, v.text.length)
+        v.requestFocus()
+        v.setSelection(o)
+        val l = v.layout ?: return
+        val line = l.getLineForOffset(o)
+        val r = android.graphics.Rect(0, l.getLineTop(line) + v.paddingTop, v.width, l.getLineBottom(line) + v.paddingTop)
+        v.requestRectangleOnScreen(r, true)
+    }
+
+    /** (current page, total pages) in the page view; null where pages are not laid out. */
+    fun pageInfo(): Pair<Int, Int>? {
+        val v = view ?: return null
+        if (v.decor == null) return null
+        val l = v.layout ?: return null
+        val starts = v.pageStarts()
+        val y = l.getLineTop(l.getLineForOffset(selection.first.coerceIn(0, v.text.length))).toFloat()
+        val page = starts.indexOfLast { it <= y + 0.5f }.coerceAtLeast(0) + 1
+        return page to starts.size
+    }
+
+    fun stats(): com.docscan.app.core.word.WordStats {
+        val v = view
+        val s = text.toString().replace(CHIP_CHAR.toString(), "")
+        return com.docscan.app.core.word.WordStats.of(s, v?.layout?.lineCount ?: 0)
     }
 
     fun counts(): Pair<Int, Int> {
