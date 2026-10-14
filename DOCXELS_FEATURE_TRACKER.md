@@ -16,9 +16,11 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 ## Part 4 – Home and navigation
 | Feature | Priority | Status | Where | Limits / outstanding |
 |---|---|---|---|---|
-| Home grid, search by name, empty state | 1 | IMPLEMENTED — NOT VERIFIED | ui/home | No folders, favourites, recent section yet |
+| Home (start actions, tools row, recent list), search by name, empty state | 1 | IMPLEMENTED — NOT VERIFIED | ui/home, ui/shell | Redesigned to the owner's mock-ups. No export-progress card, folders or favourites yet; "Open PDF" is marked Soon; search is by name only (no scanned-text search yet) |
 | Settings entry | 1 | IMPLEMENTED — NOT VERIFIED | ui/settings, AppNav | Few settings so far |
-| Bottom navigation (Home / Documents / Tools / Settings) | 1 | NOT STARTED | | Current layout is a single home + floating dock |
+| Bottom navigation (Home / Documents / Tools / Settings) with raised scan button | 1 | IMPLEMENTED — NOT VERIFIED | ui/shell/MainShell | Never run on a phone |
+| Theme (indigo/violet, pastel tints), Light / Dark / System setting | 1 | IMPLEMENTED — NOT VERIFIED | ui/theme, security/UiPrefs | |
+| Tools hub | 2 | IMPLEMENTED — NOT VERIFIED | ui/tools | Live: scan, batch scan, import images, scan to Word, Word to PDF, photos to PDF, new document. Marked "Soon" (not built): ID card, merge, split, compress, reorder, rotate, password protect, PDF to Word, scan to Excel, sign, fill form, templates |
 
 ## Part 5 – Scanner
 | Feature | Priority | Status | Where | Limits / outstanding |
@@ -43,9 +45,10 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Editor screen, formatting toolbar | 2 | IMPLEMENTED — NOT VERIFIED | ui/write | Span engine tested (Robolectric); screen never run on a phone |
 | Font, size, colour, highlight, super/sub, clear formatting | 2 | IMPLEMENTED — NOT VERIFIED | ui/write/RichText | Span logic tested; no font-name picker yet |
 | Paragraph alignment, spacing, indents, lists | 2 | IMPLEMENTED — NOT VERIFIED | ui/write | Styles, alignment, bullets, numbering, indent; no spacing UI yet |
-| Tables (edit) / images (insert, resize) | 3 | IMPLEMENTED — NOT VERIFIED | ui/write/BlockDialogs | Shown as blocks in the text and edited in a dialog; not shown inline yet; no merge editing |
-| Page size, orientation, margins, header / footer, page numbers | 3 | IMPLEMENTED — NOT VERIFIED | ui/write | Dialog; no print-layout preview |
-| Page breaks, print-layout preview, pagination | 3 | IN PROGRESS | | Page breaks done; no preview of pages on screen (PDF export paginates) |
+| Tables (edit) / images (insert, resize) | 3 | IMPLEMENTED — NOT VERIFIED | ui/write/BlockDialogs | Shown inline as a preview, edited in a dialog by tapping; no merge editing |
+| Page size, orientation, margins, header / footer, page numbers | 3 | IMPLEMENTED — NOT VERIFIED | ui/write | Dialog; shown live in the Print layout view |
+| Page breaks, print-layout (page) view, pagination | 3 | IMPLEMENTED — NOT VERIFIED | ui/write/PageHost, EditorController, RichEditText | Three views: Print layout (whole sheet fits the screen width, true margins), Text width, Mobile. Page ends are drawn as dashed guides using the same line-by-line rule as the PDF export. Header shown once at the top and footer / last page number once at the bottom (the PDF prints them on every page). Pictures and tables are drawn inline from an estimate of their size; the real size is known only after export. Not verified on a phone; scale-by-density relies on TextPaint.density |
+| Ribbon toolbar (Home / Insert / Layout / Review / View) | 2 | IMPLEMENTED — NOT VERIFIED | ui/write/WordEditorScreen | |
 | Hyperlinks, footnotes, columns, shapes, text boxes, table of contents | 3 | NOT STARTED | | Model has no link / note support yet |
 | Find & replace, word / character count, undo / redo | 3 | IMPLEMENTED — NOT VERIFIED | ui/write | |
 | Templates (letter, report, CV, invoice, …) | 4 | NOT STARTED | | |
@@ -73,8 +76,8 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 ## Part 9 – Library
 | Feature | Priority | Status | Notes |
 |---|---|---|---|
-| Rename, delete with confirmation | 1 | IMPLEMENTED — NOT VERIFIED | |
-| Folders, move / copy, favourites, tags, sort, list view | 3 | NOT STARTED | |
+| Rename, delete with confirmation, one library for scans and Word files, filter (All / Word / Scans), sort (date / name) | 1 | IMPLEMENTED — NOT VERIFIED | ui/library | Delete is permanent; no PDF kind yet |
+| Folders, move / copy, favourites, tags, grid view | 3 | NOT STARTED | Needs a Room migration |
 | Trash / restore | 3 | NOT STARTED | Needs Room migration |
 | Open DOCX / PDF / TXT / RTF from device | 2 | NOT STARTED | |
 
