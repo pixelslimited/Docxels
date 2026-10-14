@@ -496,19 +496,22 @@ object SpanBridge {
         val source = splitSoftBreaks(paragraphs).ifEmpty { listOf(Paragraph()) }
         val sb = SpannableStringBuilder()
         val ranges = ArrayList<RichOps.Range>()
+        // Spans are applied after all text exists: spans that grow at their end would swallow text appended later.
+        val pending = ArrayList<Triple<Int, Int, RunStyle>>()
         source.forEachIndexed { i, p ->
             val ps = sb.length
             for (run in p.runs) {
                 if (run.text.isEmpty()) continue
                 val s = sb.length
                 sb.append(run.text.replace("\r", ""))
-                applyRun(sb, s, sb.length, run.style)
+                pending += Triple(s, sb.length, run.style)
             }
             val pe = sb.length
             val last = i == source.lastIndex
             if (!last) sb.append('\n')
             ranges += RichOps.Range(ps, pe, !last)
         }
+        for ((a, b, st) in pending) applyRun(sb, a, b, st)
         source.forEachIndexed { i, p ->
             val r = ranges[i]
             sb.setSpan(ParaSpan(ParaAttrs.of(p), density), r.start, r.full, PARA_FLAGS)
