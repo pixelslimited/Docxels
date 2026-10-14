@@ -347,7 +347,9 @@ object RichOps {
      */
     fun set(text: Editable, from: Int, to: Int, attr: CharAttr) {
         clear(text, from, to, attr.kind)
-        val (span, flags) = make(attr)
+        val (span, base) = make(attr)
+        // An empty span must be inclusive at both ends or the text typed at the cursor falls outside it.
+        val flags = if (from == to) (base and MASK.inv()) or Spanned.SPAN_INCLUSIVE_INCLUSIVE else base
         text.setSpan(span, from, to, flags)
     }
 
