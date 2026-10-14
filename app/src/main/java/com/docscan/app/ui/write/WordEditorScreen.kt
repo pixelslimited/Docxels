@@ -176,6 +176,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var counts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val container = com.docscan.app.LocalContainer.current
     var viewMode by remember { mutableStateOf(runCatching { ViewMode.valueOf(container.ui.editorView) }.getOrDefault(ViewMode.PAGE)) }
+    var reading by remember { mutableStateOf(false) }
     var ribbonTab by remember { mutableIntStateOf(0) }
     val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     val snackbar = remember { SnackbarHostState() }
@@ -296,7 +297,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 factory = { ctx ->
                     PageHost(ctx).also { host ->
                         controller.attach(host.edit)
-                        controller.setChipTapListener { i -> editing = i }
+                        controller.setChipTapListener { i -> if (!controller.isReadOnly()) editing = i }
                         controller.setLinkTapListener { a, b, u -> linkActions = Triple(a, b, u) }
                         host.onWidth = { w -> controller.setAvailableWidth(w) }
                     }
@@ -306,6 +307,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     val gutter = when (viewMode) { ViewMode.PAGE -> 12f; ViewMode.TEXT -> 8f; ViewMode.MOBILE -> 0f }
                     host.setDesk(deskColor, (gutter * d).toInt(), (gutter * d).toInt())
                     controller.setViewConfig(viewMode, page)
+                    controller.setReadOnly(reading)
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
@@ -315,13 +317,22 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().clickable { statsOpen = true }.padding(horizontal = 16.dp, vertical = 4.dp),
             )
-            Ribbon(
+            if (reading) {
+                androidx.compose.foundation.layout.Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
+                    Text("Read mode", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.FilledTonalButton(onClick = { reading = false }) { Text("Edit") }
+                }
+            } else Ribbon(
                 c = controller,
                 s = state,
                 tab = ribbonTab,
                 onTab = { ribbonTab = it },
                 viewMode = viewMode,
                 onViewMode = { viewMode = it; container.ui.editorView = it.name },
+                onRead = { reading = true },
                 onTable = { tableOpen = true },
                 onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onPageBreak = { controller.insertPageBreak() },
@@ -446,6 +457,7 @@ private fun Ribbon(
     onTab: (Int) -> Unit,
     viewMode: ViewMode,
     onViewMode: (ViewMode) -> Unit,
+    onRead: () -> Unit,
     onTable: () -> Unit,
     onPicture: () -> Unit,
     onPageBreak: () -> Unit,
@@ -602,6 +614,7 @@ private fun Ribbon(
                     }
                     else -> {
                         RibbonButton(Icons.Default.Menu, "Navigation", onNav)
+                        com.docscan.app.ui.kit.FilterPill("Read mode", false, onRead, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Print layout", viewMode == ViewMode.PAGE, { onViewMode(ViewMode.PAGE) }, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Text width", viewMode == ViewMode.TEXT, { onViewMode(ViewMode.TEXT) }, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Mobile", viewMode == ViewMode.MOBILE, { onViewMode(ViewMode.MOBILE) }, Modifier.padding(horizontal = 4.dp))

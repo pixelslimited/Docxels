@@ -36,6 +36,13 @@ class PageDecor(
 class RichEditText(context: Context) : EditText(context) {
     var onSelection: (() -> Unit)? = null
 
+    /** Read mode: the text can be scrolled, selected and copied but not changed. */
+    var readOnly = false
+
+    init {
+        filters = arrayOf(android.text.InputFilter { _, _, _, _, dest, dstart, dend -> if (readOnly) dest.subSequence(dstart, dend) else null })
+    }
+
     /** Set in the page views; null in the mobile view. */
     var decor: PageDecor? = null
         set(v) {
@@ -657,6 +664,20 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
         }
         view?.setSelection(sel.first.coerceIn(0, t.length), sel.second.coerceIn(0, t.length))
         changed()
+    }
+
+    fun isReadOnly(): Boolean = view?.readOnly == true
+
+    fun setReadOnly(on: Boolean) {
+        val v = view ?: return
+        if (v.readOnly == on) return
+        v.readOnly = on
+        v.showSoftInputOnFocus = !on
+        v.isCursorVisible = !on
+        if (on) {
+            (v.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)
+                ?.hideSoftInputFromWindow(v.windowToken, 0)
+        }
     }
 
     fun currentParagraph(): ParaAttrs {
