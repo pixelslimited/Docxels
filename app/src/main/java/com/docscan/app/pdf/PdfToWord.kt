@@ -238,7 +238,8 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             "garamond" in low -> "Garamond"
             "poppins" in low -> "Poppins"
             "lora" in low -> "Lora"
-            else -> null
+            else -> com.docscan.app.core.word.FontNames.family(f.name)
+                ?: if (d?.isFixedPitch == true) "Courier New" else if (d?.isSerif == true) "Times New Roman" else null
         }
         RunStyle(bold = bold, italic = italic, font = family, color = rgb?.takeIf { it != 0 }, sizePt = (Math.round(tp.fontSizeInPt * 2f) / 2f).coerceIn(6f, 72f))
     }.getOrDefault(RunStyle())
