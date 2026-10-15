@@ -76,5 +76,13 @@ tap "^Paragraph$" 2
 tap "^Justify$" 2; shot 09b_justify_ribbon
 tap "^Close" 2 || adb shell input tap 1010 1450
 sleep 2; shot 09c_justified
+# Export to PDF so the exported pages can be compared with the editor (the file is read back from the app's cache).
+step "export pdf"
+adb shell input tap 1006 212; sleep 2; shot 10a_menu
+tap "Share as PDF" 6 || true
+shot 10b_share
+adb shell input keyevent 4; sleep 1
+adb root >/dev/null 2>&1; sleep 3
+adb pull /data/data/ng.pixelslimited.docxels/cache/exports/sample-letter.pdf "$OUT/export.pdf" 2>&1 | tee -a "$OUT/log.txt" || true
 adb logcat -d -s AndroidRuntime:E > "$OUT/crashes3.txt" 2>&1 || true
 adb logcat -d -s System.out:I > "$OUT/measure-log.txt" 2>&1 || true
