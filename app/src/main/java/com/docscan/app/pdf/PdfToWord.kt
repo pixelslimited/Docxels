@@ -31,6 +31,7 @@ import com.tom_roush.pdfbox.pdmodel.font.PDFont
 import com.docscan.app.core.word.Align
 import com.docscan.app.core.word.ImageBlock
 import com.docscan.app.core.word.RunStyle
+import com.docscan.app.core.word.PageImage
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
@@ -57,7 +58,11 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
         doc.use {
             val total = doc.numberOfPages
             require(total > 0) { "That PDF has no pages." }
-            val setup = pageSetupOf(doc)
+            val setup0 = pageSetupOf(doc)
+            // Pictures drawn in the same place on several pages are the letterhead (top) or footer artwork (bottom).
+            val pagePics = withContext(Dispatchers.Default) { (0 until total).map { runCatching { findPics(doc, it) }.getOrDefault(emptyList()) } }
+            val (setup, repeated) = withContext(Dispatchers.Default) { letterheadFrom(pagePics, total, setup0) }
+            var letterheadFound = repeated.isNotEmpty()
             val blocks = ArrayList<Block>()
             var ocrPages = 0
             var pictures = 0
@@ -72,7 +77,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
                         val segs = withContext(Dispatchers.Default) { extract(doc, i, scale) }
                         val chars = segs.sumOf { it.text.length }
                         val pageBlocks: List<Block> = if (chars >= MIN_TEXT_CHARS) {
-                            val pics = withContext(Dispatchers.Default) { pictureBlocks(doc, i, scale, bitmap.width, bitmap.height, setup) }
+                            val pics = withContext(Dispatchers.Default) { pictureBlocks(pagePics[i], repeated, bitmap.height, bitmap.width, setup) }
                             pictures += pics.size
                             textPage(bitmap, segs, setup, pics)
                         } else {
@@ -88,6 +93,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             }
             val notes = ArrayList<String>()
             if (ocrPages > 0) notes += "$ocrPages page(s) had no text layer and were read with OCR, so check them for mistakes."
+            if (letterheadFound) notes += "Pictures repeated on every page were kept as the letterhead (header and footer artwork)."
             if (pictures > 0) notes += "$pictures picture(s) were carried over. They sit in reading order between the text; text does not wrap around them."
             val out = WordDoc(title = title, blocks = blocks.ifEmpty { listOf(Block.Para(Paragraph())) }, page = setup)
             return PdfConversion(out, notes)
@@ -114,10 +120,16 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
     /** Embedded text of one page as line segments in bitmap pixels. */
     private fun extract(doc: PDDocument, index: Int, scale: Float): List<TextSeg> {
         val out = ArrayList<TextSeg>()
+        val colours = java.util.IdentityHashMap<TextPosition, Int>()
         val stripper = object : PDFTextStripper() {
+            override fun processTextPosition(text: TextPosition) {
+                runCatching { colours[text] = graphicsState.nonStrokingColor.toRGB() and 0xFFFFFF }
+                super.processTextPosition(text)
+            }
+
             override fun writeString(text: String, textPositions: MutableList<TextPosition>) {
                 val glyphs = textPositions.map {
-                    Glyph(it.unicode ?: "", it.xDirAdj * scale, it.yDirAdj * scale, it.widthDirAdj * scale, it.fontSizeInPt.coerceAtLeast(1f) * scale, styleOf(it))
+                    Glyph(it.unicode ?: "", it.xDirAdj * scale, it.yDirAdj * scale, it.widthDirAdj * scale, it.fontSizeInPt.coerceAtLeast(1f) * scale, styleOf(it, colours[it]))
                 }.filter { it.ch.isNotEmpty() }
                 out += PdfLayout.segments(glyphs)
             }
@@ -130,7 +142,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
     }
 
     /** Bold, italic, size and a matching font name from the font the PDF used for this character. */
-    private fun styleOf(tp: TextPosition): RunStyle = runCatching {
+    private fun styleOf(tp: TextPosition, rgb: Int?): RunStyle = runCatching {
         val f: PDFont = tp.font
         val raw = (f.name ?: "").substringAfter('+')
         val low = raw.lowercase()
@@ -151,7 +163,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             "lora" in low -> "Lora"
             else -> null
         }
-        RunStyle(bold = bold, italic = italic, font = family, sizePt = (Math.round(tp.fontSizeInPt * 2f) / 2f).coerceIn(6f, 72f))
+        RunStyle(bold = bold, italic = italic, font = family, color = rgb?.takeIf { it != 0 }, sizePt = (Math.round(tp.fontSizeInPt * 2f) / 2f).coerceIn(6f, 72f))
     }.getOrDefault(RunStyle())
 
     private class Found(val image: PDImageXObject, val x: Float, val y: Float, val w: Float, val h: Float)
@@ -183,41 +195,98 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
         }
     }
 
-    /** The page's pictures as inline picture blocks, each with its top edge in page pixels so it lands in reading order. */
-    private fun pictureBlocks(doc: PDDocument, index: Int, scale: Float, pxW: Int, pxH: Int, setup: PageSetup): List<Pair<Int, Block>> = runCatching {
+    private class PagePic(val key: Any, val fx: Float, val fy: Float, val fw: Float, val fh: Float, val image: PDImageXObject) {
+        /** The same picture in the same place (to a fiftieth of the page) gives the same signature. */
+        val sig: String get() = "${System.identityHashCode(key)}:${(fx * 50).toInt()}:${(fy * 50).toInt()}:${(fw * 50).toInt()}:${(fh * 50).toInt()}"
+    }
+
+    /** Where each picture is drawn on one page, as fractions of the page (y from the top). */
+    private fun findPics(doc: PDDocument, index: Int): List<PagePic> {
         val page = doc.getPage(index)
-        if (((page.rotation % 360) + 360) % 360 != 0) return@runCatching emptyList()
+        if (((page.rotation % 360) + 360) % 360 != 0) return emptyList()
         val box = page.cropBox ?: page.mediaBox
+        val bw = box.width.coerceAtLeast(1f)
+        val bh = box.height.coerceAtLeast(1f)
         val finder = ImageFinder()
         finder.processPage(page)
+        return finder.found.take(MAX_PICTURES_PER_PAGE).map { f ->
+            val w = Math.abs(f.w)
+            val h = Math.abs(f.h)
+            val bottom = minOf(f.y, f.y + f.h)
+            PagePic(f.image.cosObject, (f.x - box.lowerLeftX) / bw, (box.upperRightY - (bottom + h)) / bh, w / bw, h / bh, f.image)
+        }
+    }
+
+    private fun encode(image: PDImageXObject): Pair<ByteArray, String>? = runCatching {
+        val bmp = image.image
+        val longest = maxOf(bmp.width, bmp.height)
+        val shown = if (longest > 1400) android.graphics.Bitmap.createScaledBitmap(bmp, bmp.width * 1400 / longest, bmp.height * 1400 / longest, true) else bmp
+        val bos = java.io.ByteArrayOutputStream()
+        val png = shown.hasAlpha()
+        shown.compress(if (png) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG, 85, bos)
+        Pair(bos.toByteArray(), if (png) "png" else "jpg")
+    }.getOrNull()
+
+    /**
+     * Pictures that sit in the same place on at least two pages (and on a good share of them) become the letterhead
+     * (upper half) or footer artwork (lower half). The top and bottom margins grow to clear them, so the text starts
+     * below the letterhead as it did on the PDF.
+     */
+    private fun letterheadFrom(pages: List<List<PagePic>>, total: Int, setup: PageSetup): Pair<PageSetup, Set<String>> {
+        if (total < 2) return setup to emptySet()
+        val counts = HashMap<String, Int>()
+        val first = HashMap<String, PagePic>()
+        for (pics in pages) for (sig in pics.map { it.sig }.toSet()) counts[sig] = (counts[sig] ?: 0) + 1
+        for (pics in pages) for (p in pics) first.putIfAbsent(p.sig, p)
+        val need = maxOf(2, (total * 0.4f).toInt())
+        val repeated = counts.filter { it.value >= need }.keys
+            .filter { first[it]!!.let { p -> p.fw * p.fh < 0.5f && (p.fy + p.fh <= 0.45f || p.fy >= 0.55f) } }.toSet()
+        if (repeated.isEmpty()) return setup to emptySet()
+        val sw = setup.sheetWidthTwips
+        val sh = setup.sheetHeightTwips
+        val header = ArrayList<PageImage>()
+        val footer = ArrayList<PageImage>()
+        var top = setup.marginTopTwips
+        var bottom = setup.marginBottomTwips
+        for (sig in repeated) {
+            val p = first[sig]!!
+            val (bytes, ext) = encode(p.image) ?: continue
+            val img = PageImage(bytes, ext, (p.fx * sw).toInt(), (p.fy * sh).toInt(), (p.fw * sw).toInt().coerceAtLeast(120), (p.fh * sh).toInt().coerceAtLeast(120), true)
+            if (p.fy + p.fh <= 0.45f) {
+                header += img
+                top = maxOf(top, img.yTwips + img.heightTwips + 240)
+            } else {
+                footer += img
+                bottom = maxOf(bottom, sh - img.yTwips + 240)
+            }
+        }
+        if (header.isEmpty() && footer.isEmpty()) return setup to emptySet()
+        return setup.copy(
+            headerImages = header, footerImages = footer,
+            marginTopTwips = top.coerceAtMost(sh / 3), marginBottomTwips = bottom.coerceAtMost(sh / 3),
+        ) to repeated
+    }
+
+    /** This page's pictures as inline picture blocks, each with its top edge in page pixels so it lands in reading order. */
+    private fun pictureBlocks(pics: List<PagePic>, repeated: Set<String>, pxH: Int, pxW: Int, setup: PageSetup): List<Pair<Int, Block>> {
         val out = ArrayList<Pair<Int, Block>>()
-        for (f in finder.found.take(MAX_PICTURES_PER_PAGE)) {
-            val left = ((f.x - box.lowerLeftX) * scale)
-            val top = ((box.upperRightY - (f.y + f.h)) * scale)
-            val w = f.w * scale
-            val h = f.h * scale
+        for (p in pics) {
+            if (p.sig in repeated) continue
+            val w = p.fw * pxW
+            val h = p.fh * pxH
             if (w < 24f || h < 24f) continue
             // A picture covering the whole page is the page's own backdrop (searchable scans); the text is already extracted.
-            if (w * h > 0.85f * pxW * pxH) continue
-            val bmp = runCatching { f.image.image }.getOrNull() ?: continue
-            val bytes = runCatching {
-                val longest = maxOf(bmp.width, bmp.height)
-                val shown = if (longest > 1400) android.graphics.Bitmap.createScaledBitmap(bmp, bmp.width * 1400 / longest, bmp.height * 1400 / longest, true) else bmp
-                val bos = java.io.ByteArrayOutputStream()
-                val png = shown.hasAlpha()
-                shown.compress(if (png) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG, 85, bos)
-                Pair(bos.toByteArray(), if (png) "png" else "jpg")
-            }.getOrNull() ?: continue
-            val fullTwips = setup.sheetWidthTwips.toFloat()
-            var wt = (w / pxW * fullTwips).toInt().coerceAtLeast(240)
-            var ht = (h / pxW * fullTwips).toInt().coerceAtLeast(240)
+            if (p.fw * p.fh > 0.85f) continue
+            val (bytes, ext) = encode(p.image) ?: continue
+            var wt = (p.fw * setup.sheetWidthTwips).toInt().coerceAtLeast(240)
+            var ht = (p.fh * setup.sheetHeightTwips).toInt().coerceAtLeast(240)
             if (wt > setup.contentWidthTwips) { ht = ht * setup.contentWidthTwips / wt; wt = setup.contentWidthTwips }
-            val cx = (left + w / 2f) / pxW
+            val cx = p.fx + p.fw / 2f
             val align = when { cx in 0.4f..0.6f -> Align.CENTER; cx > 0.66f -> Align.RIGHT; else -> Align.LEFT }
-            out += top.toInt() to Block.Image(ImageBlock(bytes.first, bytes.second, wt, ht, align))
+            out += (p.fy * pxH).toInt() to Block.Image(ImageBlock(bytes, ext, wt, ht, align))
         }
-        out
-    }.getOrDefault(emptyList())
+        return out
+    }
 
     private suspend fun textPage(bitmap: android.graphics.Bitmap, segs: List<TextSeg>, setup: PageSetup, pics: List<Pair<Int, Block>> = emptyList()): List<Block> {
         val cells = withContext(Dispatchers.Default) {
