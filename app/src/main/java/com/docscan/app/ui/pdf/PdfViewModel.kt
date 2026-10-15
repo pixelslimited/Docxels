@@ -213,6 +213,42 @@ class PdfViewModel(private val container: AppContainer, appContext: Context) : V
         }
     }
 
+    fun stamp(marks: List<com.docscan.app.pdf.PdfMark>) {
+        val src = _sources.value.firstOrNull() ?: return
+        if (marks.isEmpty()) { say("Tap the page to place something first."); return }
+        run("Saving…", "Could not add these to the PDF.") {
+            val out = outFile(src.name + "-signed")
+            tools.stamp(src.file, marks, out)
+            listOf(out)
+        }
+    }
+
+    fun compress(level: PdfTools.Compression) {
+        val src = _sources.value.firstOrNull() ?: return
+        viewModelScope.launch {
+            _busy.value = "Compressing…"
+            val before = src.file.length()
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    val out = outFile(src.name + "-compressed")
+                    val n = tools.compress(src.file, level, out)
+                    Triple(out, n, out.length())
+                }
+            }
+            outcome.onSuccess { (out, n, after) ->
+                if (n == 0 || after >= before) {
+                    out.delete()
+                    _message.value = "This PDF has no pictures that can be made smaller."
+                } else {
+                    _results.value = listOf(out)
+                    val pct = ((before - after) * 100 / before).toInt()
+                    _message.value = "Smaller by $pct% (${before / 1024} KB → ${after / 1024} KB)."
+                }
+            }.onFailure { _message.value = "Could not compress this PDF." }
+            _busy.value = null
+        }
+    }
+
     fun share(files: List<File>) = ShareHelper.share(context, files, Mime.PDF)
 
     fun saveToPhone(files: List<File>) {

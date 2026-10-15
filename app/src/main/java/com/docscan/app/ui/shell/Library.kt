@@ -60,6 +60,11 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { onReady(withContext(Dispatchers.IO) { container.words.create() }) }
     }
 
+    fun newFromTemplate(id: String, onReady: (String) -> Unit) {
+        val t = com.docscan.app.core.word.Templates.byId(id) ?: return
+        viewModelScope.launch { onReady(withContext(Dispatchers.IO) { container.words.add(t.build()) }) }
+    }
+
     fun rename(item: LibraryItem, name: String) {
         viewModelScope.launch {
             when (item.kind) {

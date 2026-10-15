@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.RotateRight
@@ -68,7 +69,7 @@ fun ToolsScreen(actions: Actions) {
         ToolDef(Icons.Default.FolderOpen, "Open PDF", t.blue, false, { actions.pdfTool("view") }),
         ToolDef(Icons.Default.CallMerge, "Merge PDFs", t.blue, false, { actions.pdfTool("merge") }),
         ToolDef(Icons.Default.ContentCut, "Split PDF", t.blue, false, { actions.pdfTool("split") }),
-        ToolDef(Icons.Default.Compress, "Compress", t.blue, true, planned("Compress")),
+        ToolDef(Icons.Default.Compress, "Compress", t.blue, false, { actions.pdfTool("compress") }),
         ToolDef(Icons.Default.SwapVert, "Reorder pages", t.blue, false, { actions.pdfTool("organize") }),
         ToolDef(Icons.Default.RotateRight, "Rotate pages", t.blue, false, { actions.pdfTool("rotate") }),
         ToolDef(Icons.Default.Lock, "Password protect", t.blue, false, { actions.pdfTool("protect") }),
@@ -83,9 +84,9 @@ fun ToolsScreen(actions: Actions) {
     )
     val write = listOf(
         ToolDef(Icons.Default.Edit, "New document", t.orange, false, actions.newDoc),
-        ToolDef(Icons.Default.Draw, "Sign a PDF", t.orange, true, planned("Signing")),
-        ToolDef(Icons.Default.AutoFixHigh, "Fill form", t.orange, true, planned("Form filling")),
-        ToolDef(Icons.Default.TextSnippet, "Templates", t.orange, true, planned("Templates")),
+        ToolDef(Icons.Default.Draw, "Sign a PDF", t.orange, false, { actions.pdfTool("sign") }),
+        ToolDef(Icons.Default.AutoFixHigh, "Fill form", t.orange, false, { actions.pdfTool("sign") }),
+        ToolDef(Icons.Default.NoteAdd, "Templates", t.orange, false, actions.templates),
     )
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp).padding(bottom = 24.dp)) {

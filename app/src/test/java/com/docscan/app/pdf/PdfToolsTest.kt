@@ -93,4 +93,24 @@ class PdfToolsTest {
         tools.unprotect(locked, "secret1", open)
         assertEquals(listOf(100, 101), widths(open))
     }
+
+    @Test fun stampAddsTextAndTick() {
+        val a = makePdf("s.pdf", 2, 300f)
+        val out = File(tmp.root, "stamped.pdf")
+        tools.stamp(a, listOf(PdfMark(1, PdfMark.Kind.TEXT, 0.2f, 0.3f, 0.05f, "Kelvin Codes"), PdfMark(0, PdfMark.Kind.CHECK, 0.5f, 0.5f, 0.05f)), out)
+        PDDocument.load(out).use { d ->
+            assertEquals(2, d.numberOfPages)
+            val text = com.tom_roush.pdfbox.text.PDFTextStripper().also { it.startPage = 2; it.endPage = 2 }.getText(d)
+            assertTrue(text, text.contains("Kelvin Codes"))
+        }
+    }
+
+    @Test fun stampRefusesTurnedPages() {
+        val a = makePdf("r.pdf", 1)
+        val turned = File(tmp.root, "turned.pdf")
+        tools.rotate(a, listOf(0), 90, turned)
+        assertThrows(IllegalArgumentException::class.java) {
+            tools.stamp(turned, listOf(PdfMark(0, PdfMark.Kind.CHECK, 0.1f, 0.1f, 0.05f)), File(tmp.root, "x.pdf"))
+        }
+    }
 }

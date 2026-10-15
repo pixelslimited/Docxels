@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DocumentScanner
@@ -77,6 +80,7 @@ enum class Tab { HOME, DOCS, TOOLS, SETTINGS }
 /** Everything the three main screens can ask the app to do. */
 class Actions(
     val newDoc: () -> Unit,
+    val templates: () -> Unit,
     val scan: () -> Unit,
     val importMenu: () -> Unit,
     val importPhotos: () -> Unit,
@@ -107,6 +111,7 @@ fun MainShell(
     val message by vm.message.collectAsState()
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var importSheet by remember { mutableStateOf(false) }
+    var templateSheet by remember { mutableStateOf(false) }
     var pick by remember { mutableStateOf<Pick?>(null) }
     val snackbar = remember { SnackbarHostState() }
 
@@ -132,6 +137,7 @@ fun MainShell(
     val actions = remember(vm) {
         Actions(
             newDoc = { vm.newWord(onOpenWord) },
+            templates = { templateSheet = true },
             scan = { vm.startScan(onScanDoc) },
             importMenu = { importSheet = true },
             importPhotos = { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -174,6 +180,20 @@ fun MainShell(
     }
 
     BusyOverlay(visible = busy != null, label = busy ?: "")
+    }
+
+    if (templateSheet) {
+        ModalBottomSheet(onDismissRequest = { templateSheet = false }) {
+            Column(Modifier.padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
+                Text("Templates", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+                com.docscan.app.core.word.Templates.all.forEach { t ->
+                    SheetRow(Icons.Default.NoteAdd, t.label, t.blurb) {
+                        templateSheet = false
+                        vm.newFromTemplate(t.id, onOpenWord)
+                    }
+                }
+            }
+        }
     }
 
     if (importSheet) {

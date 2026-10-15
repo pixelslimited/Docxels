@@ -122,7 +122,7 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
 
 /** Editor: choose a saved letterhead (and where it goes) or a saved signature. */
 @Composable
-fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: String) -> Unit, onDismiss: () -> Unit) {
+fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: String) -> Unit, onDismiss: () -> Unit, signLabel: String = "Place on the signing line") {
     val context = LocalContext.current
     val store = remember(signature) { SavedAssets(context, if (signature) "signatures" else "letterheads") }
     val items = remember(signature) { store.list() }
@@ -141,7 +141,7 @@ fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: Strin
                         Thumb(store, item, signature, Modifier.fillMaxWidth())
                         if (bytes != null) {
                             if (signature) {
-                                TextButton(onClick = { onPick(bytes, "sign") }) { Text("Place on the signing line") }
+                                TextButton(onClick = { onPick(bytes, "sign") }) { Text(signLabel) }
                             } else {
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     TextButton(onClick = { onPick(bytes, "first") }) { Text("First page") }

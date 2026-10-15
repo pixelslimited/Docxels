@@ -4,11 +4,32 @@ import android.content.Context
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
+import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
+import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
+import com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory
+import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+
+/**
+ * Something to put on a PDF page. Positions are fractions of the page as it is shown: [left] and [top] of the page width and
+ * height, [size] of the page width (the picture's width, or the text's font size).
+ */
+class PdfMark(
+    val page: Int,
+    val kind: Kind,
+    val left: Float,
+    val top: Float,
+    val size: Float,
+    val text: String = "",
+    val image: ByteArray? = null,
+) {
+    enum class Kind { TEXT, CHECK, IMAGE }
+}
 
 /** Thrown when a PDF needs a password that was not given or was wrong. */
 class PdfPasswordException : Exception("This PDF is password protected")
@@ -124,6 +145,93 @@ class PdfTools(context: Context) {
             val policy = StandardProtectionPolicy(password, password, AccessPermission())
             policy.encryptionKeyLength = 256
             doc.protect(policy)
+            doc.save(output)
+        }
+    }
+
+    /** How hard [compress] squeezes the pictures inside a PDF. */
+    enum class Compression(val label: String, val quality: Int, val maxSide: Int) {
+        LIGHT("Light (best quality)", 80, 2400),
+        MEDIUM("Medium (balanced)", 60, 1700),
+        STRONG("Strong (smallest file)", 40, 1200),
+    }
+
+    /**
+     * Makes the pictures in a PDF smaller (re-saved as JPEG at lower quality and size). Text, vector drawings and
+     * pictures with transparency are left alone. Returns the number of pictures that were replaced.
+     */
+    fun compress(input: File, level: Compression, output: File, password: String? = null): Int {
+        var replaced = 0
+        load(input, password).use { doc ->
+            val done = HashSet<Any>()
+            for (page in doc.pages) {
+                val res = page.resources ?: continue
+                for (name in res.xObjectNames.toList()) {
+                    val x = runCatching { res.getXObject(name) }.getOrNull() as? PDImageXObject ?: continue
+                    if (!done.add(x.cosObject)) continue
+                    if (x.softMask != null || x.isStencil || x.width * x.height < 40_000) continue
+                    val bmp = runCatching { x.image }.getOrNull() ?: continue
+                    val scale = minOf(1f, level.maxSide.toFloat() / maxOf(bmp.width, bmp.height))
+                    val small = if (scale < 1f) android.graphics.Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt().coerceAtLeast(1), (bmp.height * scale).toInt().coerceAtLeast(1), true) else bmp
+                    val jpeg = runCatching { JPEGFactory.createFromImage(doc, small, level.quality / 100f) }.getOrNull()
+                    if (small !== bmp) small.recycle()
+                    bmp.recycle()
+                    if (jpeg != null) { res.put(name, jpeg); replaced++ }
+                }
+            }
+            doc.save(output)
+        }
+        return replaced
+    }
+
+    /**
+     * Draws [marks] (signature pictures, typed text, ticks) onto the pages, keeping everything else as it was. A drawn
+     * signature is only a picture: it is not a certified digital signature.
+     */
+    fun stamp(input: File, marks: List<PdfMark>, output: File, password: String? = null) {
+        require(marks.isNotEmpty()) { "Nothing to add yet" }
+        load(input, password).use { doc ->
+            for ((pageIndex, group) in marks.groupBy { it.page }) {
+                require(pageIndex in 0 until doc.numberOfPages) { "Page out of range" }
+                val page = doc.getPage(pageIndex)
+                require(page.rotation % 360 == 0) { "Page ${pageIndex + 1} is turned. Use Rotate pages to turn it upright first." }
+                val box = page.cropBox ?: page.mediaBox
+                val w = box.width
+                val h = box.height
+                PDPageContentStream(doc, page, PDPageContentStream.AppendMode.APPEND, true, true).use { cs ->
+                    for (m in group) {
+                        val x = box.lowerLeftX + m.left * w
+                        val size = m.size * w
+                        when (m.kind) {
+                            PdfMark.Kind.IMAGE -> {
+                                val bytes = m.image ?: continue
+                                val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
+                                val ih = size * bmp.height / bmp.width
+                                val img = LosslessFactory.createFromImage(doc, bmp)
+                                bmp.recycle()
+                                cs.drawImage(img, x, box.lowerLeftY + h - m.top * h - ih, size, ih)
+                            }
+                            PdfMark.Kind.TEXT -> {
+                                val line = m.text.map { if (it.code in 32..126 || it.code in 160..255) it else '?' }.joinToString("")
+                                cs.beginText()
+                                cs.setFont(PDType1Font.HELVETICA, size)
+                                cs.setNonStrokingColor(0f, 0f, 0f)
+                                cs.newLineAtOffset(x, box.lowerLeftY + h - m.top * h - size * 0.8f)
+                                cs.showText(line)
+                                cs.endText()
+                            }
+                            PdfMark.Kind.CHECK -> {
+                                cs.beginText()
+                                cs.setFont(PDType1Font.ZAPF_DINGBATS, size)
+                                cs.setNonStrokingColor(0f, 0f, 0f)
+                                cs.newLineAtOffset(x, box.lowerLeftY + h - m.top * h - size * 0.8f)
+                                cs.showText("4")
+                                cs.endText()
+                            }
+                        }
+                    }
+                }
+            }
             doc.save(output)
         }
     }

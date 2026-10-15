@@ -74,6 +74,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.docscan.app.export.Mime
 import com.docscan.app.pdf.PdfPreview
+import com.docscan.app.pdf.PdfTools
 import com.docscan.app.ui.kit.GradientButton
 import com.docscan.app.ui.kit.SoftButton
 import com.docscan.app.ui.kit.docCard
@@ -86,6 +87,8 @@ enum class PdfMode(val route: String, val title: String, val hint: String, val m
     SPLIT("split", "Split PDF", "Cut one PDF into several, or pull out just the pages you want.", false),
     ROTATE("rotate", "Rotate pages", "Turn all pages, or only the ones you list.", false),
     ORGANIZE("organize", "Reorder & delete pages", "Move pages up or down, or remove the ones you do not want.", false),
+    SIGN("sign", "Sign & fill PDF", "Put your saved signature, text, the date or ticks on any page, then save a copy.", false),
+    COMPRESS("compress", "Compress PDF", "Make a PDF with big pictures smaller. Text stays sharp; pictures are re-saved at lower quality.", false),
     PROTECT("protect", "Password protect", "Lock a PDF with a password (AES-256). Keep the password safe: it cannot be recovered.", false);
 
     companion object {
@@ -153,6 +156,8 @@ fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit) {
                             PdfMode.SPLIT -> SplitBody(vm, sources[0]) { viewing = it }
                             PdfMode.ROTATE -> RotateBody(vm, sources[0]) { viewing = it }
                             PdfMode.ORGANIZE -> OrganizeBody(vm, sources[0])
+                            PdfMode.SIGN -> SignBody(vm, sources[0])
+                            PdfMode.COMPRESS -> CompressBody(vm, sources[0]) { viewing = it }
                             PdfMode.PROTECT -> ProtectBody(vm, sources[0]) { viewing = it }
                             PdfMode.VIEW -> Unit
                         }
@@ -333,6 +338,24 @@ private fun RotateBody(vm: PdfViewModel, s: PdfSource, onView: (PdfSource) -> Un
             GradientButton("Rotate right 90°", onClick = { vm.rotate(range, 90) }, modifier = Modifier.fillMaxWidth())
             SoftButton("Rotate left 90°", DocxelsTheme.tints.blue, onClick = { vm.rotate(range, -90) }, modifier = Modifier.fillMaxWidth())
             SoftButton("Rotate 180°", DocxelsTheme.tints.blue, onClick = { vm.rotate(range, 180) }, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun CompressBody(vm: PdfViewModel, s: PdfSource, onView: (PdfSource) -> Unit) {
+    var level by rememberSaveable { mutableStateOf(PdfTools.Compression.MEDIUM.name) }
+    Column(Modifier.fillMaxSize().padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FileHeader(s, onView)
+        Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Current size: ${s.file.length() / 1024} KB", style = MaterialTheme.typography.bodyMedium)
+            PdfTools.Compression.entries.forEach { c ->
+                Row(Modifier.fillMaxWidth().clickable { level = c.name }, verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.RadioButton(selected = level == c.name, onClick = { level = c.name })
+                    Text(c.label)
+                }
+            }
+            GradientButton("Compress PDF", onClick = { vm.compress(PdfTools.Compression.valueOf(level)) }, modifier = Modifier.fillMaxWidth())
         }
     }
 }
