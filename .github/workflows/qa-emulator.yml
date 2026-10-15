@@ -62,4 +62,6 @@ jobs:
           mkdir -p qa-out
           echo "emulator step finished; run ${{ github.run_number }}" >> qa-out/status.txt
           ls qa-out
-          gh release upload qa-shots qa-out/* --repo "$SITE" --clobber
+          # An empty file makes the upload fail and stops every file after it, so give empty ones a line of text.
+          for f in qa-out/*; do [ -s "$f" ] || echo "(empty)" > "$f"; done
+          for f in qa-out/*; do gh release upload qa-shots "$f" --repo "$SITE" --clobber || echo "upload failed: $f"; done
