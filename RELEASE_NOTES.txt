@@ -34,3 +34,4 @@
 90|Opening a Word file with footnotes or endnotes no longer loses them: each note is numbered [n] in the text and its words are listed under Notes at the end.
 91|Build number now shows in Settings: 'Installed: build N' at the top of App updates, 'Build N is available', and after updating it lists what is new in your build.
 92|PDF to Word keeps more of the original: bold, italic, font sizes and common font names, and pictures are carried over in reading order (text does not wrap around them yet).
+93|Theme colour choice in Settings (Word blue, Grey, Black, Green, Teal, Orange, Rose and the Docxels violet); the floating sheets and the tools icon now change colour smoothly; tool groups open only when you tap their name; B3 and B4 paper sizes; update check fixed (the release was left hidden).
