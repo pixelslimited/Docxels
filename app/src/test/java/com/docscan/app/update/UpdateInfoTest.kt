@@ -24,6 +24,12 @@ class UpdateInfoTest {
         assertFalse(i.isNewerThan(20))
     }
 
+    @Test fun whatsNewListsOnlyNewerLines() {
+        val i = UpdateInfo.parse(json().replace("\"Fixes\"", "\"5|old thing\\n6|new thing\\n7|newer thing\\nplain\""))!!
+        assertEquals(listOf("new thing", "newer thing", "plain"), i.whatsNew(5))
+        assertEquals(listOf("plain"), i.whatsNew(7))
+    }
+
     @Test fun refusesUnsafe() {
         assertNull(UpdateInfo.parse(json(url = "http://github.com/a.apk")))
         assertNull(UpdateInfo.parse(json(url = "https://evil.example.com/a.apk")))

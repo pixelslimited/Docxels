@@ -8,6 +8,9 @@ SITE="${SITE_REPO:-iCode010101/docxels-site}"
 BASE="https://github.com/$SITE/releases/latest/download"
 SHA=$(sha256sum "$APK" | cut -d' ' -f1)
 SIZE=$(stat -c %s "$APK")
+# What's new: the whole RELEASE_NOTES.txt (lines "build|text"); the app shows the lines newer than the installed build.
+NOTES_FILE="$(dirname "$0")/../RELEASE_NOTES.txt"
+if [ -f "$NOTES_FILE" ]; then NOTES_JSON=$(tail -n 40 "$NOTES_FILE" | jq -Rs .); else NOTES_JSON='"Improvements and fixes."'; fi
 
 # Patches: one from each of the last few builds, so a phone that skipped a build still gets a small download.
 KEEP=5
@@ -43,7 +46,7 @@ if [ "${#PATCH_ITEMS[@]}" -gt 0 ]; then
 fi
 
 cat > update.json <<JSON
-{"versionCode":$CODE,"versionName":"0.2.$CODE","sha256":"$SHA","size":$SIZE,"apkUrl":"$BASE/Docxels.apk","notes":"${NOTES:-Improvements and fixes.}"$PATCH_JSON}
+{"versionCode":$CODE,"versionName":"0.2.$CODE","sha256":"$SHA","size":$SIZE,"apkUrl":"$BASE/Docxels.apk","notes":$NOTES_JSON$PATCH_JSON}
 JSON
 cp "$APK" Docxels.apk 2>/dev/null || true
 gh release delete latest --repo "$SITE" --yes --cleanup-tag || true

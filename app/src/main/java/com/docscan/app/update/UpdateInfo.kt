@@ -19,6 +19,19 @@ data class UpdateInfo(
     fun patchFor(installed: Long): Patch? =
         (patches + listOfNotNull(patch)).firstOrNull { it.fromVersionCode == installed && it.size * 10 < size * 8 }
 
+    /** The notes newer than [installed]: lines written "build|text". Notes without that form are returned whole. */
+    fun whatsNew(installed: Long): List<String> {
+        val out = ArrayList<String>()
+        for (raw in notes.lines()) {
+            val line = raw.trim()
+            if (line.isEmpty()) continue
+            val bar = line.indexOf('|')
+            val code = if (bar > 0) line.substring(0, bar).trim().toLongOrNull() else null
+            if (code == null) out += line else if (code > installed) out += line.substring(bar + 1).trim()
+        }
+        return out
+    }
+
     data class Patch(val fromVersionCode: Long, val url: String, val sha256: String, val size: Long)
 
     companion object {
@@ -42,7 +55,7 @@ data class UpdateInfo(
                 sha256 = sha,
                 size = o.getLong("size"),
                 apkUrl = url,
-                notes = o.optString("notes", "").take(600),
+                notes = o.optString("notes", "").take(8000),
             )
             val parsed = java.net.URI(url)
             val ok = parsed.scheme == "https" && hostAllowed(parsed.host) &&

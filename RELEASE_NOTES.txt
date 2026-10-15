@@ -1,0 +1,20 @@
+65|PDF to Word: convert a PDF into an editable document from Home or Tools (scanned pages are read with OCR).
+65|Home screen redesigned with a featured PDF to Word card and quick tiles.
+65|Screenshots are allowed in the app by default (you can turn protection on in Settings).
+65|Update downloads: only the changed parts are fetched, from any of the last few builds.
+66|Tools in the editor sit behind an icon; tap a tab to open a grid of functions.
+66|Word files with a letterhead in the header or footer now show it, and keep it when saved.
+67|Insert letterhead: pick a picture, it is sized to the page (A4 by default) and repeated on every page.
+67|Insert signature: draw one or add a picture; it goes in front of the text.
+68|Pictures, shapes and signatures can be dragged anywhere on the page (set wrapping to In front of text).
+68|Insert table: tap the grid to pick rows and columns in one step.
+69|Update installer fixed: Install now opens Android's own installer screen.
+70|Merge, split, rotate and reorder PDFs show a preview before saving or sharing; tap a file to view it.
+71|Zoom in the page view: View tab > Zoom (100, 150, 200, 300%).
+72|Line spacing menu: Add / Remove space before and after a paragraph.
+73|New app icon, including the single-colour version for Android themed icons.
+74|Real fonts built in (Calibri-, Cambria-, Arial-, Times-, Courier-compatible plus Lora, Poppins, DejaVu), so choosing a font changes the text.
+74|Picture and shape settings are a panel at the bottom: changes show on the page live, no Save needed.
+74|Bigger tools icon, and the tools bar sits higher above the screen edge.
+75|Pages in print layout are separated by real space, with header, footer and page number on every page.
+76|This list: every update now shows everything new since your version, so you know what to try.

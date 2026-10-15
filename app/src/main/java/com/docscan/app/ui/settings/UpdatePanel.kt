@@ -76,7 +76,11 @@ fun UpdatePanel() {
                 val small = s.info.patchFor(updater.installedCode())
                 val sizeText = if (small != null) "download about ${fmtSize(small.size)}, only the changes" else "download ${fmtSize(s.info.size)}"
                 Text("Version ${s.info.versionName} is available ($sizeText).", style = MaterialTheme.typography.titleSmall)
-                if (s.info.notes.isNotBlank()) Text(s.info.notes, style = MaterialTheme.typography.bodyMedium)
+                val fresh = s.info.whatsNew(updater.installedCode())
+                if (fresh.isNotEmpty()) {
+                    Text("New in this update — try these:", style = MaterialTheme.typography.titleSmall)
+                    fresh.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
+                }
                 Button(onClick = { download(s.info) }) { Text("Download and install") }
             }
             is UpdateState.Downloading -> {
@@ -84,6 +88,11 @@ fun UpdatePanel() {
                 Text("Downloading… ${(s.progress * 100).toInt()}%")
             }
             is UpdateState.Ready -> {
+                val fresh = s.info.whatsNew(updater.installedCode())
+                if (fresh.isNotEmpty()) {
+                    Text("New in this update — try these:", style = MaterialTheme.typography.titleSmall)
+                    fresh.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
+                }
                 Text(if (updater.lastUsedPatch) "Downloaded only the changes and verified." else "Downloaded and verified.")
                 if (!updater.lastUsedPatch && updater.lastPatchNote.isNotBlank()) {
                     Text(updater.lastPatchNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
