@@ -13,6 +13,8 @@ tap() { $UI tap "$1" | tee -a "$OUT/log.txt"; local rc=${PIPESTATUS[0]}; sleep "
 adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
+adb shell settings put global hide_error_dialogs 1
+adb shell settings put secure immersive_mode_confirmations confirmed
 adb install -r "$APK" | tee -a "$OUT/log.txt"
 adb shell pm grant ng.pixelslimited.docxels android.permission.CAMERA 2>/dev/null || true
 adb shell pm grant ng.pixelslimited.docxels android.permission.POST_NOTIFICATIONS 2>/dev/null || true
@@ -21,7 +23,7 @@ adb shell monkey -p ng.pixelslimited.docxels -c android.intent.category.LAUNCHER
 # Let the emulator settle, and dismiss "System UI isn't responding" if the slow image shows it.
 for i in $(seq 1 40); do [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ] && break; sleep 3; done
 sleep 30
-dismiss() { for i in 1 2 3; do $UI tap "^Wait$" >/dev/null 2>&1 && sleep 2 || break; done; }
+dismiss() { for i in 1 2 3 4; do { $UI tap "^Wait$" || $UI tap "^Got it$"; } >/dev/null 2>&1 && sleep 2 || break; done; }
 dismiss
 step home; shot 01_home
 
@@ -49,12 +51,13 @@ adb logcat -d -s AndroidRuntime:E > "$OUT/crashes2.txt" 2>&1 || true
 step "pdf to word"
 adb shell am force-stop ng.pixelslimited.docxels; sleep 2
 adb push "$(dirname "$0")/sample-letter.pdf" /sdcard/Download/sample-letter.pdf >/dev/null
+adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/sample-letter.pdf >/dev/null 2>&1
 adb shell monkey -p ng.pixelslimited.docxels -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 8
 dismiss
 tap "^Home$" 2
 if tap "PDF to Word" 4; then
   shot 05_picker
-  tap "sample-letter" 3 || { tap "Downloads" 3; shot 05b_downloads; tap "sample-letter" 3; }
+  tap "sample-letter" 3 || { tap "Show roots" 2; tap "^Downloads$" 3; shot 05b_downloads; tap "sample-letter" 3; }
   for i in 1 2 3 4 5 6; do shot "06_progress_$i"; sleep 2; done
   sleep 15
   shot 07_converted

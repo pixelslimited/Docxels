@@ -7,6 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: qa-emulator
+  cancel-in-progress: false
+
 jobs:
   emulator:
     runs-on: ubuntu-latest
