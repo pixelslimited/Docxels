@@ -700,6 +700,16 @@ private fun Ribbon(
             Toggle(icon, label, on, click)
         }
     }
+    // A heading that starts a new group of tools in the grid (hidden in the compact bar).
+    @Composable
+    fun Group(title: String) {
+        if (grid) Text(
+            title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
+        )
+    }
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
         Column {
             if (!open) {
@@ -723,6 +733,7 @@ private fun Ribbon(
             val items: @Composable () -> Unit = {
                 when (tab) {
                     0 -> {
+                        Group("Styles")
                         Box {
                             Btn("Style", glyph = s.style.label) { styleMenu = true }
                             DropdownMenu(expanded = styleMenu, onDismissRequest = { styleMenu = false }) {
@@ -731,14 +742,13 @@ private fun Ribbon(
                                 }
                             }
                         }
+                        Group("Font")
                         Btn("Bold", Icons.Default.FormatBold, on = s.bold) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
                         Btn("Italic", Icons.Default.FormatItalic, on = s.italic) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
                         Btn("Underline", Icons.Default.FormatUnderlined, on = s.underline) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
                         Btn("Smaller", glyph = "A−") { c.sizeStep(-1) }
                         Btn("Size", glyph = if (s.sizePt % 1f == 0f) s.sizePt.toInt().toString() else s.sizePt.toString(), close = true) { onSize() }
                         Btn("Larger", glyph = "A+") { c.sizeStep(1) }
-                        Btn("Bullets", Icons.AutoMirrored.Filled.FormatListBulleted, on = s.list == ListKind.BULLET) { c.toggleList(ListKind.BULLET) }
-                        Btn("Numbering", Icons.Default.FormatListNumbered, on = s.list == ListKind.NUMBER) { c.toggleList(ListKind.NUMBER) }
                         Btn("Font", glyph = s.font ?: "Font", main = false, close = true) { onFont() }
                         Btn("Format painter", Icons.Default.FormatPaint, on = painting, main = false) { onPainter() }
                         Box {
@@ -787,15 +797,20 @@ private fun Ribbon(
                                 TextButton(onClick = { fillMenu = false; customFor = 2 }) { Text("More colours…") }
                             }
                         }
+                        Group("Paragraph")
+                        Btn("Bullets", Icons.AutoMirrored.Filled.FormatListBulleted, on = s.list == ListKind.BULLET) { c.toggleList(ListKind.BULLET) }
+                        Btn("Numbering", Icons.Default.FormatListNumbered, on = s.list == ListKind.NUMBER) { c.toggleList(ListKind.NUMBER) }
                         Btn("Align left", Icons.Default.FormatAlignLeft, on = s.align == Align.LEFT, main = false) { c.setAlign(Align.LEFT) }
                         Btn("Align centre", Icons.Default.FormatAlignCenter, on = s.align == Align.CENTER, main = false) { c.setAlign(Align.CENTER) }
                         Btn("Align right", Icons.Default.FormatAlignRight, on = s.align == Align.RIGHT, main = false) { c.setAlign(Align.RIGHT) }
                         Btn("Justify", Icons.Default.FormatAlignJustify, on = s.align == Align.JUSTIFY, main = false) { c.setAlign(Align.JUSTIFY) }
                         Btn("Outdent", Icons.Default.FormatIndentDecrease, main = false) { c.indent(-1) }
                         Btn("Indent", Icons.Default.FormatIndentIncrease, main = false) { c.indent(1) }
+                        Group("Clear")
                         Btn("Clear formatting", Icons.Default.FormatClear, main = false) { c.clearFormatting() }
                     }
                     1 -> {
+                        Group("Illustrations")
                         Btn("Table", Icons.Default.TableChart, close = true) { onTable() }
                         Btn("Picture", Icons.Default.Image, close = true) { onPicture() }
                         Box {
@@ -806,6 +821,7 @@ private fun Ribbon(
                                 }
                             }
                         }
+                        Group("Letterhead and signature")
                         Box {
                             Btn("Letterhead", Icons.Default.Description) { letterMenu = true }
                             DropdownMenu(expanded = letterMenu, onDismissRequest = { letterMenu = false }) {
@@ -826,13 +842,16 @@ private fun Ribbon(
                                 DropdownMenuItem(text = { Text("From a picture") }, onClick = { signMenu = false; open = false; onSignature("picture") })
                             }
                         }
+                        Group("Text and page")
                         Btn("Page break", Icons.Default.InsertPageBreak, close = true) { onPageBreak() }
                         Btn("Link", Icons.Default.Link, close = true) { onLink() }
                         Btn("Date & time", Icons.Default.Event, close = true) { onDate() }
                         Btn("Symbol", Icons.Default.Functions, close = true) { onSymbol() }
                     }
                     2 -> {
+                        Group("Page")
                         Btn("Page setup", Icons.Default.Description, close = true) { onPageSetup() }
+                        Group("Paragraph")
                         Btn("Paragraph", Icons.Default.FormatAlignLeft, close = true) { onParagraph() }
                         Box {
                             Btn("Line spacing", Icons.Default.FormatLineSpacing) { spacingMenu = true }
@@ -853,6 +872,7 @@ private fun Ribbon(
                         }
                         Btn("Outdent", Icons.Default.FormatIndentDecrease) { c.indent(-1) }
                         Btn("Indent", Icons.Default.FormatIndentIncrease) { c.indent(1) }
+                        Group("Borders and shading")
                         Box {
                             Btn("Shading", Icons.Default.FormatColorFill) { shadeMenu = true }
                             DropdownMenu(expanded = shadeMenu, onDismissRequest = { shadeMenu = false }) {
@@ -871,13 +891,18 @@ private fun Ribbon(
                         Btn("Border", Icons.Default.CropSquare) { c.toggleBorder() }
                     }
                     3 -> {
+                        Group("Find")
                         Btn("Find and replace", Icons.Default.Search, close = true) { onFind() }
+                        Group("Proofing")
                         Btn("Word count", Icons.Default.Numbers, close = true) { onCount() }
                     }
                     else -> {
+                        Group("Views")
                         Btn("Page preview", Icons.Default.Description, close = true) { onPreview() }
                         Btn("Navigation", Icons.Default.Menu, close = true) { onNav() }
+                        Group("Zoom")
                         if (viewMode != ViewMode.MOBILE) Btn("Zoom ${(zoom * 100).toInt()}%", Icons.Default.Search) { onZoom() }
+                        Group("Reading")
                         com.docscan.app.ui.kit.FilterPill("Read mode", false, onRead, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Print layout", viewMode == ViewMode.PAGE, { onViewMode(ViewMode.PAGE) }, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Text width", viewMode == ViewMode.TEXT, { onViewMode(ViewMode.TEXT) }, Modifier.padding(horizontal = 4.dp))

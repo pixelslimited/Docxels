@@ -194,3 +194,4 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Installer | IMPLEMENTED — NOT VERIFIED | Updates install through Android's installer screen (session install was refused on one phone). |
 | Touch-responsive home sheets | IMPLEMENTED — NOT VERIFIED | Drag turns and tilts the 3D sheets, a flick spins them with decay, a tap flips them over; they spring back and keep the idle sway (static if animations are off). |
 | Saved letterheads and signatures (Settings) | IMPLEMENTED — NOT VERIFIED | Add from picture, PDF or Word; stored encrypted on the phone only (SecureFiles); delete anytime; insert from the editor's Letterhead (first / continuous / every page) and Signature (signing line) menus. A Word file contributes its first picture only (header/footer positions are not kept). |
+| Ribbon grid groups | IMPLEMENTED — NOT VERIFIED | Tool grid on every tab has labelled group headings (hidden in the compact one-line bar). |
