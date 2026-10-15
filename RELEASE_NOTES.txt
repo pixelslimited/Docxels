@@ -21,3 +21,4 @@
 76|This list: every update now shows everything new since your version, so you know what to try.
 78|Letterhead pictures now show on every page in the editor, not just the first and last.
 79|Letterhead menu: First page only, a separate Continuous letterhead for the pages after the first, or the same on every page; each can be removed on its own.
+80|Fixed: text in the editor ran on one long line off the right edge (introduced with the zoom control in build 74). Lines wrap to the page again.

@@ -45,7 +45,9 @@ class PageHost(context: Context) : ScrollView(context) {
 
     private fun applyZoom() {
         val lp = sheet.layoutParams as FrameLayout.LayoutParams
-        lp.width = if (zoom <= 1.001f || width <= 0) ViewGroup.LayoutParams.MATCH_PARENT else (width * zoom).toInt()
+        // Always an exact width: inside the sideways scroller a MATCH_PARENT child is measured unbounded, and the text
+        // would then run on one line instead of wrapping.
+        lp.width = if (width <= 0) ViewGroup.LayoutParams.MATCH_PARENT else (width * zoom).toInt()
         sheet.layoutParams = lp
     }
 
