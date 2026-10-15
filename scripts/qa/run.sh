@@ -49,6 +49,8 @@ adb logcat -d -s AndroidRuntime:E > "$OUT/crashes2.txt" 2>&1 || true
 
 # Justify the typed paragraph through the ribbon (floating icon, bottom right).
 step justify
+sleep 40  # the emulator types slowly; wait until the whole paragraph is in
+shot 04_typed_full
 adb shell input keyevent 4; sleep 2
 adb shell input tap 980 2170; sleep 2; shot 04a_ribbon
 tap "^Paragraph$" 2; shot 04b_paragraph
