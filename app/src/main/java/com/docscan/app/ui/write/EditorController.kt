@@ -205,6 +205,7 @@ class RichEditText(context: Context) : EditText(context) {
         drawAllPics(canvas, true)
         super.onDraw(canvas)
         drawFloating(canvas, false)
+        drawHandles(canvas)
         val d = decor ?: return
         drawAllPics(canvas, false)
         val ys = pageStarts()
@@ -289,6 +290,68 @@ class RichEditText(context: Context) : EditText(context) {
         return out
     }
 
+    /** The picture / shape / signature whose handles are shown (the one open in its panel), or -1. */
+    var selectedBlock: Int = -1
+        set(v) { field = v; invalidate() }
+
+    /** Called with (block index, resized block, final) while a handle is dragged. */
+    var onResized: ((Int, com.docscan.app.core.word.Block, Boolean) -> Unit)? = null
+
+    private fun selectedRect(): android.graphics.RectF? {
+        if (selectedBlock < 0) return null
+        val l = layout ?: return null
+        val t = text
+        val span = t.getSpans(0, t.length, BlockChipSpan::class.java).firstOrNull { it.index == selectedBlock } ?: return null
+        if (span.sizeTwips() == null) return null
+        val hit = floatingHits().firstOrNull { it.span === span }
+        if (hit != null) return android.graphics.RectF(hit.left, hit.top, hit.left + hit.w, hit.top + hit.h)
+        val (w, h) = span.floatSizePx(paint) ?: return null
+        val start = span.let { t.getSpanStart(it) }
+        val line = l.getLineForOffset(start)
+        val left = paddingLeft + l.getPrimaryHorizontal(start)
+        val bottom = totalPaddingTop + l.getLineBottom(line).toFloat()
+        return android.graphics.RectF(left, bottom - h, left + w, bottom)
+    }
+
+    private val handlePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    private fun handleR() = 11f * resources.displayMetrics.density
+
+    private enum class Grip { NONE, BOTH, WIDTH, HEIGHT }
+    private var grip = Grip.NONE
+    private var gripSpan: BlockChipSpan? = null
+    private var gripW = 0
+    private var gripH = 0
+    private var gripX = 0f
+    private var gripY = 0f
+
+    private fun gripAt(x: Float, y: Float): Grip {
+        val r = selectedRect() ?: return Grip.NONE
+        val reach = handleR() * 2.2f
+        fun near(px: Float, py: Float) = kotlin.math.abs(x - px) <= reach && kotlin.math.abs(y - py) <= reach
+        return when {
+            near(r.right, r.bottom) -> Grip.BOTH
+            near(r.right, r.centerY()) -> Grip.WIDTH
+            near(r.centerX(), r.bottom) -> Grip.HEIGHT
+            else -> Grip.NONE
+        }
+    }
+
+    private fun drawHandles(canvas: android.graphics.Canvas) {
+        val r = selectedRect() ?: return
+        handlePaint.style = android.graphics.Paint.Style.STROKE
+        handlePaint.strokeWidth = 2f * resources.displayMetrics.density
+        handlePaint.color = 0xFF4F46E5.toInt()
+        canvas.drawRect(r, handlePaint)
+        handlePaint.style = android.graphics.Paint.Style.FILL
+        val rad = handleR()
+        for ((px, py) in listOf(r.right to r.bottom, r.right to r.centerY(), r.centerX() to r.bottom)) {
+            handlePaint.color = 0xFFFFFFFF.toInt()
+            canvas.drawCircle(px, py, rad, handlePaint)
+            handlePaint.color = 0xFF4F46E5.toInt()
+            canvas.drawCircle(px, py, rad * 0.62f, handlePaint)
+        }
+    }
+
     private var dragHit: Hit? = null
     private var dragStartX = 0f
     private var dragStartY = 0f
@@ -300,6 +363,16 @@ class RichEditText(context: Context) : EditText(context) {
         if (!readOnly) {
             when (event.actionMasked) {
                 android.view.MotionEvent.ACTION_DOWN -> {
+                    val g = gripAt(event.x, event.y)
+                    if (g != Grip.NONE) {
+                        val sp = text.getSpans(0, text.length, BlockChipSpan::class.java).firstOrNull { it.index == selectedBlock }
+                        val sz = sp?.sizeTwips()
+                        if (sp != null && sz != null) {
+                            grip = g; gripSpan = sp; gripW = sz.first; gripH = sz.second; gripX = event.x; gripY = event.y
+                            parent?.requestDisallowInterceptTouchEvent(true)
+                            return true
+                        }
+                    }
                     val hit = floatingHits().lastOrNull { event.x >= it.left && event.x <= it.left + it.w && event.y >= it.top && event.y <= it.top + it.h }
                     if (hit != null) {
                         dragHit = hit
@@ -313,7 +386,28 @@ class RichEditText(context: Context) : EditText(context) {
                         return true
                     }
                 }
-                android.view.MotionEvent.ACTION_MOVE -> dragHit?.let { h ->
+                android.view.MotionEvent.ACTION_MOVE -> if (grip != Grip.NONE) {
+                    val sp = gripSpan
+                    if (sp != null) {
+                        val k = paint.density * ZOOM / 20f
+                        val dw = ((event.x - gripX) / k).toInt()
+                        val dh = ((event.y - gripY) / k).toInt()
+                        var w = gripW
+                        var h = gripH
+                        when (grip) {
+                            Grip.BOTH -> {
+                                w = (gripW + maxOf(dw, if (gripW > 0) (dh * gripW.toFloat() / gripH.coerceAtLeast(1)).toInt() else 0)).coerceAtLeast(240)
+                                h = if (gripH > 0) (w.toLong() * gripH / gripW.coerceAtLeast(1)).toInt() else 0
+                            }
+                            Grip.WIDTH -> w = (gripW + dw).coerceAtLeast(240)
+                            Grip.HEIGHT -> h = (gripH + dh).coerceAtLeast(120)
+                            else -> {}
+                        }
+                        val nb = sp.withSize(w, h)
+                        if (nb != null) onResized?.invoke(sp.index, nb, false)
+                    }
+                    return true
+                } else dragHit?.let { h ->
                     val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
                     // Keep the object inside the page.
                     val dx = (h.left + event.x - dragStartX).coerceIn(0f, maxOf(0f, width - h.w)) - h.left
@@ -329,7 +423,12 @@ class RichEditText(context: Context) : EditText(context) {
                     }
                     return true
                 }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> dragHit?.let { h ->
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> if (grip != Grip.NONE) {
+                    grip = Grip.NONE
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                    selectedRect()
+                    return true
+                } else dragHit?.let { h ->
                     dragHit = null
                     parent?.requestDisallowInterceptTouchEvent(false)
                     val b = h.span.block
@@ -405,6 +504,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
     fun attach(v: RichEditText) {
         view = v
         v.onFloatMoved = { i, b, fin -> floatMoved(i, b, fin) }
+        v.onResized = { i, b, _ -> resizeBlock(i, b) }
         v.setText(initialText, android.widget.TextView.BufferType.EDITABLE)
         v.setTextSize(TypedValue.COMPLEX_UNIT_PX, StyleDefaults.BODY_SIZE_PT * ZOOM * density)
         v.setTextColor(0xFF1B1B1F.toInt())
@@ -795,6 +895,19 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
 
     /** Index of the block inserted last (for opening it right after inserting). */
     fun lastBlockIndex(): Int? = originals.indices.lastOrNull()
+
+    /** A picture or shape was resized by its handles. */
+    fun resizeBlock(index: Int, block: Block) {
+        val floating = (block as? Block.Image)?.image?.wrap?.floating ?: (block as? Block.Shape)?.shape?.wrap?.floating ?: false
+        if (floating) {
+            val t = text
+            t.getSpans(0, t.length, BlockChipSpan::class.java).firstOrNull { it.index == index }?.block = block
+            floatMoved(index, block, true)
+            view?.invalidate()
+        } else replaceBlock(index, block)
+    }
+
+    fun select(index: Int) { view?.selectedBlock = index }
 
     /** A floating object was dragged: remember its new position (and, once dropped, save). */
     fun floatMoved(index: Int, block: Block, final: Boolean) {

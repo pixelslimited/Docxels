@@ -529,6 +529,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         onInsert = { r, c, h -> insertTable(r, c, h) },
         onDismiss = { tableOpen = false; tableCustom = false },
     )
+    androidx.compose.runtime.LaunchedEffect(editing) { controller.select(editing ?: -1) }
     editing?.let { idx ->
         // The block as it was when the editor opened, so live changes don't reset the editor's own state.
         when (val b = remember(idx) { controller.blockAt(idx) }) {
@@ -541,6 +542,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             )
             is Block.Image -> ImageEditorDialog(
                 initial = b.image,
+                current = (controller.blockAt(idx) as? Block.Image)?.image ?: b.image,
                 contentWidthTwips = page.contentWidthTwips,
                 onSave = { controller.replaceBlock(idx, Block.Image(it)); editing = null },
                 onLive = { controller.replaceBlock(idx, Block.Image(it)) },
@@ -549,6 +551,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             )
             is Block.Shape -> ShapeEditorDialog(
                 initial = b.shape,
+                current = (controller.blockAt(idx) as? Block.Shape)?.shape ?: b.shape,
                 contentWidthTwips = page.contentWidthTwips,
                 onSave = { controller.replaceBlock(idx, Block.Shape(it)); editing = null },
                 onLive = { controller.replaceBlock(idx, Block.Shape(it)) },

@@ -731,6 +731,19 @@ class BlockChipSpan(
         else -> null
     }
 
+    /** Size in twips of a picture or shape (null for anything else). */
+    fun sizeTwips(): Pair<Int, Int>? = when (val b = block) {
+        is com.docscan.app.core.word.Block.Image -> b.image.widthTwips to b.image.heightTwips
+        is com.docscan.app.core.word.Block.Shape -> b.shape.widthTwips to (if (com.docscan.app.core.word.ShapePresets.isLine(b.shape.preset)) 0 else b.shape.heightTwips)
+        else -> null
+    }
+
+    fun withSize(w: Int, h: Int): com.docscan.app.core.word.Block? = when (val b = block) {
+        is com.docscan.app.core.word.Block.Image -> com.docscan.app.core.word.Block.Image(b.image.copy(widthTwips = w.coerceAtLeast(240), heightTwips = h.coerceAtLeast(120)))
+        is com.docscan.app.core.word.Block.Shape -> com.docscan.app.core.word.Block.Shape(b.shape.copy(widthTwips = w.coerceAtLeast(240), heightTwips = if (com.docscan.app.core.word.ShapePresets.isLine(b.shape.preset)) b.shape.heightTwips else h.coerceAtLeast(120)))
+        else -> null
+    }
+
     fun floatSizePx(paint: Paint): Pair<Int, Int>? {
         val w = widthPx(paint) ?: return null
         val h = heightPx(paint) ?: return null

@@ -364,6 +364,7 @@ internal fun SizeControls(
 @Composable
 fun ImageEditorDialog(
     initial: ImageBlock,
+    current: ImageBlock = initial,
     contentWidthTwips: Int,
     onSave: (ImageBlock) -> Unit,
     onLive: (ImageBlock) -> Unit,
@@ -384,6 +385,11 @@ fun ImageEditorDialog(
     }
     fun build(): ImageBlock {
         return cur.copy(widthTwips = wTw, heightTwips = hTw, align = align, wrap = wrap)
+    }
+    // A size changed by dragging the handles on the page shows here too.
+    androidx.compose.runtime.LaunchedEffect(current.widthTwips, current.heightTwips) {
+        if (current.widthTwips != wTw) wTw = current.widthTwips
+        if (current.heightTwips != hTw) hTw = current.heightTwips
     }
     var started by remember { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(wTw, hTw, align, wrap, cur) {
@@ -465,6 +471,7 @@ private val SHAPE_FILLS = listOf(0xDDEBF7, 0xFFF2CC, 0xE2EFDA, 0xFCE4D6, 0xF8CBA
 @Composable
 fun ShapeEditorDialog(
     initial: com.docscan.app.core.word.ShapeBlock,
+    current: com.docscan.app.core.word.ShapeBlock = initial,
     contentWidthTwips: Int,
     onSave: (com.docscan.app.core.word.ShapeBlock) -> Unit,
     onLive: (com.docscan.app.core.word.ShapeBlock) -> Unit,
@@ -483,6 +490,10 @@ fun ShapeEditorDialog(
         val w = wTw.coerceAtLeast(240)
         val h = if (isLine) 0 else hTw.coerceAtLeast(120)
         return initial.copy(widthTwips = w, heightTwips = h, fill = fill, lineColor = line, lineWidthPt = lineWidth, align = align, wrap = wrap)
+    }
+    androidx.compose.runtime.LaunchedEffect(current.widthTwips, current.heightTwips) {
+        if (current.widthTwips != wTw) wTw = current.widthTwips
+        if (current.heightTwips != hTw && !isLine) hTw = current.heightTwips
     }
     var started by remember { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(wTw, hTw, fill, line, lineWidth, align, wrap) {
