@@ -46,4 +46,13 @@ class UiPrefs(context: Context) {
     var editorView: String
         get() = prefs.getString("editor_view", "PAGE") ?: "PAGE"
         set(v) = prefs.edit().putString("editor_view", v).apply()
+
+    /** Format and page fit that the scan export sheet starts with (see Settings > Exporting). */
+    var exportFormat: String
+        get() = prefs.getString("export_format", "PDF") ?: "PDF"
+        set(v) = prefs.edit().putString("export_format", v).apply()
+
+    var exportA4: Boolean
+        get() = prefs.getBoolean("export_a4", true)
+        set(v) = prefs.edit().putBoolean("export_a4", v).apply()
 }

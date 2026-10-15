@@ -115,7 +115,8 @@ fun MainShell(
     var pick by remember { mutableStateOf<Pick?>(null) }
     val snackbar = remember { SnackbarHostState() }
 
-    LaunchedEffect(Unit) { vm.cleanUpEmptyDocuments() }
+    LaunchedEffect(Unit) { vm.cleanUpEmptyDocuments(); vm.emptyOldTrash() }
+    val trash by vm.trash.collectAsState()
     LaunchedEffect(message) {
         message?.let {
             snackbar.showSnackbar(it)
@@ -169,6 +170,7 @@ fun MainShell(
                 )
                 Tab.DOCS -> DocumentsScreen(
                     items = items,
+                    trash = trash,
                     actions = actions,
                     vm = vm,
                     onOpen = { if (it.kind == DocKind.SCAN) onOpenScan(it.id) else onOpenWord(it.id) },

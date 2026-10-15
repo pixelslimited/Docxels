@@ -9,6 +9,8 @@ import com.docscan.app.AppContainer
 import com.docscan.app.core.Geometry
 import com.docscan.app.data.DocKind
 import com.docscan.app.data.ImageIO
+import com.docscan.app.data.ItemMeta
+import com.docscan.app.data.LibraryMeta
 import com.docscan.app.data.LibraryItem
 import com.docscan.app.export.Mime
 import com.docscan.app.export.ShareHelper
@@ -18,11 +20,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private const val TRASH_DAYS = 30
 private const val MAX_IMPORT_BYTES = 50L * 1024 * 1024
 
 /**
@@ -30,13 +34,39 @@ private const val MAX_IMPORT_BYTES = 50L * 1024 * 1024
  * actions the Home, Documents and Tools screens share (create, scan, import, convert, share) live here.
  */
 class LibraryViewModel(private val container: AppContainer) : ViewModel() {
-    val items: StateFlow<List<LibraryItem>> = combine(container.repository.observeHome(), container.words.items) { scans, words ->
+    private val everything: StateFlow<List<LibraryItem>> = combine(container.repository.observeHome(), container.words.items, container.libraryMeta.all) { scans, words, meta ->
         val a = scans.map {
-            LibraryItem(DocKind.SCAN, it.document.id, it.document.name, it.document.updatedAt, "${it.pageCount} page${if (it.pageCount == 1) "" else "s"}", it.cover)
+            LibraryItem(DocKind.SCAN, it.document.id, it.document.name, it.document.updatedAt, "${it.pageCount} page${if (it.pageCount == 1) "" else "s"}", it.cover, meta[LibraryMeta.key(DocKind.SCAN, it.document.id)] ?: ItemMeta())
         }
-        val b = words.map { LibraryItem(DocKind.DOCX, it.id, it.title, it.modified, "Word document", null) }
+        val b = words.map { LibraryItem(DocKind.DOCX, it.id, it.title, it.modified, "Word document", null, meta[LibraryMeta.key(DocKind.DOCX, it.id)] ?: ItemMeta()) }
         (a + b).sortedByDescending { it.modified }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Everything that is not in Trash. */
+    val items: StateFlow<List<LibraryItem>> = everything.map { l -> l.filter { it.meta.trashedAt == 0L } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** What is in Trash, newest first. */
+    val trash: StateFlow<List<LibraryItem>> = everything.map { l -> l.filter { it.meta.trashedAt != 0L }.sortedByDescending { it.meta.trashedAt } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setFavourite(item: LibraryItem, on: Boolean) = container.libraryMeta.update(item.kind, item.id) { it.copy(favourite = on) }
+    fun moveToFolder(item: LibraryItem, folder: String) = container.libraryMeta.update(item.kind, item.id) { it.copy(folder = LibraryMeta.cleanName(folder)) }
+    fun setTags(item: LibraryItem, text: String) = container.libraryMeta.update(item.kind, item.id) { m ->
+        m.copy(tags = text.split(',', ' ').map { LibraryMeta.cleanName(it) }.filter { it.isNotEmpty() }.toSet())
+    }
+    fun restore(item: LibraryItem) = container.libraryMeta.update(item.kind, item.id) { it.copy(trashedAt = 0L) }
+
+    /** Items sit in Trash for 30 days, then they are deleted for good. */
+    fun emptyOldTrash() {
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(2_500) // let the lists load first
+            val cutoff = System.currentTimeMillis() - TRASH_DAYS * 86_400_000L
+            everything.value.filter { it.meta.trashedAt != 0L && it.meta.trashedAt < cutoff }.forEach { deleteForever(it) }
+        }
+    }
+
+    fun emptyTrash() { viewModelScope.launch { trash.value.forEach { deleteForever(it) } } }
 
     private val _busy = MutableStateFlow<String?>(null)
     val busy: StateFlow<String?> = _busy
@@ -74,7 +104,13 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /** Moves to Trash; nothing is erased until it is deleted from Trash (or 30 days pass). */
     fun delete(item: LibraryItem) {
+        container.libraryMeta.update(item.kind, item.id) { it.copy(trashedAt = System.currentTimeMillis()) }
+    }
+
+    fun deleteForever(item: LibraryItem) {
+        container.libraryMeta.update(item.kind, item.id) { it.copy(trashedAt = 0L) }
         viewModelScope.launch {
             when (item.kind) {
                 DocKind.SCAN -> container.repository.deleteDocument(item.id)

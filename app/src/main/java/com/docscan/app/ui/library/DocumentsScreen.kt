@@ -21,7 +21,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -62,11 +66,11 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private enum class Filter { ALL, WORD, SCANS }
+private enum class Filter { ALL, WORD, SCANS, FAVOURITES, TRASH }
 private enum class Sort(val label: String) { DATE("Date modified"), NAME("Name") }
 
 @Composable
-fun DocumentsScreen(items: List<LibraryItem>, actions: Actions, vm: LibraryViewModel, onOpen: (LibraryItem) -> Unit) {
+fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions: Actions, vm: LibraryViewModel, onOpen: (LibraryItem) -> Unit) {
     val context = LocalContext.current
     val t = DocxelsTheme.tints
     var query by remember { mutableStateOf("") }
@@ -75,21 +79,31 @@ fun DocumentsScreen(items: List<LibraryItem>, actions: Actions, vm: LibraryViewM
     var sortMenu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<LibraryItem?>(null) }
     var deleting by remember { mutableStateOf<LibraryItem?>(null) }
+    var foreverOf by remember { mutableStateOf<LibraryItem?>(null) }
+    var emptying by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf<LibraryItem?>(null) }
+    var tagging by remember { mutableStateOf<LibraryItem?>(null) }
+    var folder by remember { mutableStateOf<String?>(null) }
+    var grid by remember { mutableStateOf(false) }
+    val folders = remember(items) { items.map { it.meta.folder }.filter { it.isNotEmpty() }.distinct().sorted() }
+    if (folder != null && folder !in folders) folder = null
 
-    val shown = remember(items, query, filter, sort) {
-        items
+    val shown = remember(items, trash, query, filter, sort, folder) {
+        (if (filter == Filter.TRASH) trash else items)
             .filter {
                 when (filter) {
-                    Filter.ALL -> true
+                    Filter.ALL, Filter.TRASH -> true
                     Filter.WORD -> it.kind == DocKind.DOCX
                     Filter.SCANS -> it.kind == DocKind.SCAN
+                    Filter.FAVOURITES -> it.meta.favourite
                 }
             }
-            .filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) }
+            .filter { folder == null || filter == Filter.TRASH || it.meta.folder == folder }
+            .filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) || it.meta.tags.any { t -> t.contains(query.trim(), ignoreCase = true) } }
             .let { list -> if (sort == Sort.NAME) list.sortedBy { it.title.lowercase() } else list }
     }
 
-    if (items.isEmpty()) {
+    if (items.isEmpty() && trash.isEmpty()) {
         Column(
             Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -141,8 +155,12 @@ fun DocumentsScreen(items: List<LibraryItem>, actions: Actions, vm: LibraryViewM
                 FilterPill("All", filter == Filter.ALL, { filter = Filter.ALL })
                 FilterPill("Word", filter == Filter.WORD, { filter = Filter.WORD })
                 FilterPill("Scans", filter == Filter.SCANS, { filter = Filter.SCANS })
+                FilterPill("Favourites", filter == Filter.FAVOURITES, { filter = Filter.FAVOURITES })
+                folders.forEach { f -> FilterPill("\uD83D\uDCC1 $f", folder == f, { folder = if (folder == f) null else f }) }
+                FilterPill("Trash${if (trash.isEmpty()) "" else " (${trash.size})"}", filter == Filter.TRASH, { filter = Filter.TRASH })
             }
-            Box(Modifier.padding(horizontal = 20.dp)) {
+            Row(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+              Box(Modifier.weight(1f)) {
                 Text(
                     "Sorted by ${sort.label.lowercase()}  ▾",
                     style = MaterialTheme.typography.labelMedium,
@@ -152,6 +170,17 @@ fun DocumentsScreen(items: List<LibraryItem>, actions: Actions, vm: LibraryViewM
                 DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
                     Sort.entries.forEach { s -> DropdownMenuItem(text = { Text(s.label) }, onClick = { sort = s; sortMenu = false }) }
                 }
+              }
+              if (filter == Filter.TRASH && trash.isNotEmpty()) {
+                  androidx.compose.material3.TextButton(onClick = { emptying = true }) { Text("Empty Trash") }
+              }
+              IconButton(onClick = { grid = !grid }) {
+                  Icon(if (grid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView, contentDescription = if (grid) "Show as list" else "Show as grid")
+              }
+            }
+            if (filter == Filter.TRASH) {
+                Text("Items stay here for 30 days, then they are deleted for good.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 24.dp))
             }
             if (shown.isEmpty()) {
                 Text(
@@ -161,22 +190,40 @@ fun DocumentsScreen(items: List<LibraryItem>, actions: Actions, vm: LibraryViewM
                     modifier = Modifier.padding(24.dp),
                 )
             }
-            LazyColumn(
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(shown, key = { it.kind.name + it.id }) { item ->
-                    LibraryRow(
-                        item,
-                        onClick = { onOpen(item) },
-                        menu = RowMenu(
-                            onRename = { renaming = item },
-                            onDelete = { deleting = item },
-                            onShare = if (item.kind == DocKind.DOCX) ({ vm.shareDocx(context, item) }) else null,
-                            onSharePdf = if (item.kind == DocKind.DOCX) ({ vm.sharePdf(context, item) }) else null,
-                            onToWord = if (item.kind == DocKind.SCAN) ({ vm.scanToWord(item.id) { id -> onOpenWordFromLibrary(actions, id) } }) else null,
-                        ),
-                    )
+            val menuFor: (LibraryItem) -> RowMenu = { item ->
+                if (filter == Filter.TRASH) RowMenu(
+                    onRename = {}, onDelete = { foreverOf = item }, onRestore = { vm.restore(item) }, trashed = true,
+                ) else RowMenu(
+                    onRename = { renaming = item },
+                    onDelete = { deleting = item },
+                    onShare = if (item.kind == DocKind.DOCX) ({ vm.shareDocx(context, item) }) else null,
+                    onSharePdf = if (item.kind == DocKind.DOCX) ({ vm.sharePdf(context, item) }) else null,
+                    onToWord = if (item.kind == DocKind.SCAN) ({ vm.scanToWord(item.id) { id -> onOpenWordFromLibrary(actions, id) } }) else null,
+                    onFavourite = { vm.setFavourite(item, !item.meta.favourite) },
+                    onMove = { moving = item },
+                    onTags = { tagging = item },
+                )
+            }
+            if (grid) {
+                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(150.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(shown.size, key = { shown[it].kind.name + shown[it].id }) { idx ->
+                        val item = shown[idx]
+                        LibraryTile(item, onClick = { if (filter != Filter.TRASH) onOpen(item) }, menu = menuFor(item))
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(shown, key = { it.kind.name + it.id }) { item ->
+                        LibraryRow(item, onClick = { if (filter != Filter.TRASH) onOpen(item) }, menu = menuFor(item))
+                    }
                 }
             }
         }
@@ -187,12 +234,36 @@ fun DocumentsScreen(items: List<LibraryItem>, actions: Actions, vm: LibraryViewM
     }
     deleting?.let { item ->
         ConfirmDialog(
-            title = "Delete document?",
-            message = "\"${item.title}\" will be permanently deleted from this phone.",
-            confirmLabel = "Delete",
+            title = "Move to Trash?",
+            message = "\"${item.title}\" goes to Trash. You can restore it for 30 days.",
+            confirmLabel = "Move to Trash",
             onConfirm = { vm.delete(item); deleting = null },
             onDismiss = { deleting = null },
         )
+    }
+    foreverOf?.let { item ->
+        ConfirmDialog(
+            title = "Delete for good?",
+            message = "\"${item.title}\" will be permanently deleted from this phone. This cannot be undone.",
+            confirmLabel = "Delete",
+            onConfirm = { vm.deleteForever(item); foreverOf = null },
+            onDismiss = { foreverOf = null },
+        )
+    }
+    if (emptying) {
+        ConfirmDialog(
+            title = "Empty Trash?",
+            message = "Everything in Trash will be permanently deleted from this phone.",
+            confirmLabel = "Empty Trash",
+            onConfirm = { vm.emptyTrash(); emptying = false },
+            onDismiss = { emptying = false },
+        )
+    }
+    moving?.let { item ->
+        FolderDialog(item, folders, onPick = { vm.moveToFolder(item, it); moving = null }, onDismiss = { moving = null })
+    }
+    tagging?.let { item ->
+        TextInputDialog("Tags (separate with commas)", item.meta.tags.joinToString(", "), "Save", onConfirm = { vm.setTags(item, it); tagging = null }, onDismiss = { tagging = null })
     }
 }
 
@@ -202,6 +273,11 @@ private fun onOpenWordFromLibrary(actions: Actions, id: String) = actions.openWo
 class RowMenu(
     val onRename: () -> Unit,
     val onDelete: () -> Unit,
+    val onRestore: (() -> Unit)? = null,
+    val trashed: Boolean = false,
+    val onFavourite: (() -> Unit)? = null,
+    val onMove: (() -> Unit)? = null,
+    val onTags: (() -> Unit)? = null,
     val onShare: (() -> Unit)? = null,
     val onSharePdf: (() -> Unit)? = null,
     val onToWord: (() -> Unit)? = null,
@@ -216,9 +292,12 @@ fun LibraryRow(item: LibraryItem, onClick: () -> Unit, menu: RowMenu?) {
     ) {
         DocBadge(item.kind)
         Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-            Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                if (item.meta.favourite) Icon(Icons.Default.Star, contentDescription = "Favourite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp).size(16.dp))
+            }
             Text(
-                "${friendlyDate(item.modified)} · ${item.detail}",
+                "${friendlyDate(item.modified)} · ${item.detail}${if (item.meta.folder.isNotEmpty()) " · " + item.meta.folder else ""}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -228,15 +307,67 @@ fun LibraryRow(item: LibraryItem, onClick: () -> Unit, menu: RowMenu?) {
             Box {
                 IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
                 DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    menu.onToWord?.let { f -> DropdownMenuItem(text = { Text("Convert to Word") }, onClick = { open = false; f() }) }
-                    DropdownMenuItem(text = { Text("Rename") }, onClick = { open = false; menu.onRename() })
-                    menu.onShare?.let { f -> DropdownMenuItem(text = { Text("Share as .docx") }, onClick = { open = false; f() }) }
-                    menu.onSharePdf?.let { f -> DropdownMenuItem(text = { Text("Share as PDF") }, onClick = { open = false; f() }) }
-                    DropdownMenuItem(text = { Text("Delete") }, onClick = { open = false; menu.onDelete() })
+                    ItemMenuItems(item, menu) { open = false }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ItemMenuItems(item: LibraryItem, menu: RowMenu, close: () -> Unit) {
+    if (menu.trashed) {
+        menu.onRestore?.let { f -> DropdownMenuItem(text = { Text("Restore") }, onClick = { close(); f() }) }
+        DropdownMenuItem(text = { Text("Delete for good") }, onClick = { close(); menu.onDelete() })
+        return
+    }
+    menu.onFavourite?.let { f -> DropdownMenuItem(text = { Text(if (item.meta.favourite) "Remove from favourites" else "Add to favourites") }, onClick = { close(); f() }) }
+    menu.onToWord?.let { f -> DropdownMenuItem(text = { Text("Convert to Word") }, onClick = { close(); f() }) }
+    DropdownMenuItem(text = { Text("Rename") }, onClick = { close(); menu.onRename() })
+    menu.onMove?.let { f -> DropdownMenuItem(text = { Text("Move to folder…") }, onClick = { close(); f() }) }
+    menu.onTags?.let { f -> DropdownMenuItem(text = { Text("Tags…") }, onClick = { close(); f() }) }
+    menu.onShare?.let { f -> DropdownMenuItem(text = { Text("Share as .docx") }, onClick = { close(); f() }) }
+    menu.onSharePdf?.let { f -> DropdownMenuItem(text = { Text("Share as PDF") }, onClick = { close(); f() }) }
+    DropdownMenuItem(text = { Text("Move to Trash") }, onClick = { close(); menu.onDelete() })
+}
+
+@Composable
+fun LibraryTile(item: LibraryItem, onClick: () -> Unit, menu: RowMenu?) {
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().docCard().clickable(onClick = onClick).padding(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            DocBadge(item.kind)
+            Box(Modifier.weight(1f))
+            if (item.meta.favourite) Icon(Icons.Default.Star, contentDescription = "Favourite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            if (menu != null) {
+                Box {
+                    IconButton(onClick = { open = true }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
+                    DropdownMenu(expanded = open, onDismissRequest = { open = false }) { ItemMenuItems(item, menu) { open = false } }
+                }
+            }
+        }
+        Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, modifier = Modifier.padding(top = 8.dp))
+        Text(friendlyDate(item.modified), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        if (item.meta.folder.isNotEmpty()) Text("\uD83D\uDCC1 ${item.meta.folder}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    }
+}
+
+@Composable
+private fun FolderDialog(item: LibraryItem, folders: List<String>, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Move to folder") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (item.meta.folder.isNotEmpty()) androidx.compose.material3.TextButton(onClick = { onPick("") }) { Text("Take out of \"${item.meta.folder}\"") }
+                folders.filter { it != item.meta.folder }.forEach { f -> androidx.compose.material3.TextButton(onClick = { onPick(f) }) { Text("\uD83D\uDCC1 $f") } }
+                androidx.compose.material3.OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("New folder name") })
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { if (name.isNotBlank()) onPick(name) }, enabled = name.isNotBlank()) { Text("Create and move") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 fun friendlyDate(millis: Long): String {

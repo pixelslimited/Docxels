@@ -330,6 +330,17 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                                 },
                             )
                             DropdownMenuItem(
+                                text = { Text("Print") },
+                                onClick = {
+                                    menu = false
+                                    val d = controller.toDoc(title, page)
+                                    scope.launch {
+                                        runCatching { com.docscan.app.export.PrintHelper.printPdf(context, vm.pdfFile(d, context), title) }
+                                            .onFailure { snackbar.showSnackbar("Could not start printing.") }
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Share as .docx") },
                                 onClick = {
                                     menu = false

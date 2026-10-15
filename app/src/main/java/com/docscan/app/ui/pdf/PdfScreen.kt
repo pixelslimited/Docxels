@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -132,6 +133,8 @@ fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit) {
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
                     if (mode == PdfMode.VIEW && sources.isNotEmpty()) {
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        IconButton(onClick = { com.docscan.app.export.PrintHelper.printPdf(ctx, sources[0].file, sources[0].name) }) { Icon(Icons.Default.Print, "Print") }
                         IconButton(onClick = { vm.share(listOf(sources[0].file)) }) { Icon(Icons.Default.Share, "Share") }
                     }
                     IconButton(onClick = pick) { Icon(Icons.Default.FolderOpen, "Choose PDF") }

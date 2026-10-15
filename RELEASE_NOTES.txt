@@ -49,3 +49,9 @@
 118|Converted documents: line spacing no longer grows line by line, so letters stay on the same number of pages as the PDF.
 118|Justify now works in the editor: wrapped lines of a justified paragraph reach the right margin; the last line stays left-aligned.
 118|PDF export now justifies paragraphs the same way the workspace does.
+134|Templates: Tools > Templates starts a letter, report, CV, invoice, memo or meeting minutes with placeholders to fill in.
+134|Compress PDF: Tools > Compress makes a PDF with big pictures smaller (three levels) and shows how much was saved.
+134|Sign & fill PDF: Tools > Sign a PDF (or Fill form). Pick your saved signature, type text, add today's date or a tick, tap the page to place it, drag to adjust, then save a copy.
+134|Print: Print from the editor's menu or the PDF viewer.
+134|Settings: choose the export format and A4 fit that the scan export sheet starts with.
+134|Library: favourites, folders, tags, grid view; search also finds tags. Deleting now moves a document to Trash for 30 days (restore, delete for good, or empty Trash).

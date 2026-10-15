@@ -234,7 +234,10 @@ private fun PageCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean) -> Unit) {
-    var options by remember { mutableStateOf(ExportOptions()) }
+    val ui = com.docscan.app.LocalContainer.current.ui
+    var options by remember {
+        mutableStateOf(ExportOptions(format = runCatching { DocFormat.valueOf(ui.exportFormat) }.getOrDefault(DocFormat.PDF), a4 = ui.exportA4))
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Export", style = MaterialTheme.typography.titleLarge)

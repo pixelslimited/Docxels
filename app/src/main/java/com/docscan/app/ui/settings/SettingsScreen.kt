@@ -113,6 +113,17 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 }
             }
 
+            Section("Exporting scans")
+            Text("The export sheet starts with this format.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            var fmt by remember { mutableStateOf(container.ui.exportFormat) }
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.docscan.app.export.DocFormat.entries.forEach { f ->
+                    com.docscan.app.ui.kit.FilterPill(f.label, fmt == f.name, { fmt = f.name; container.ui.exportFormat = f.name })
+                }
+            }
+            var a4 by remember { mutableStateOf(container.ui.exportA4) }
+            ToggleRow(title = "Fit PDF pages to A4", body = "Off keeps each scan's own proportions.", checked = a4, onChange = { a4 = it; container.ui.exportA4 = it })
+
             Section("Letterheads")
             SavedAssetsPanel(signature = false, say = { say(it) })
             Section("Signatures")
