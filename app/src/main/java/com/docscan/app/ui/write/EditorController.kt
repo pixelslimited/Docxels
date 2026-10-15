@@ -55,10 +55,24 @@ class PageDecor(
 class PageGapSpan : android.text.style.LineHeightSpan {
     var starts: Set<Int> = emptySet()
     var gapPx = 0
+
+    // The metrics this span left after the previous line and what it added: the layout can hand the next line the
+    // metrics we already enlarged, and adding the gap again would put a page gap on every line that follows.
+    private var left: IntArray? = null
+    private var added = 0
+
     override fun chooseHeight(text: CharSequence, start: Int, end: Int, spanstartv: Int, lineHeight: Int, fm: android.graphics.Paint.FontMetricsInt) {
+        left?.let { l ->
+            if (added != 0 && fm.ascent == l[0] && fm.top == l[1]) { fm.ascent += added; fm.top += added }
+        }
         if (gapPx > 0 && start in starts) {
             fm.ascent -= gapPx
             fm.top -= gapPx
+            added = gapPx
+            left = intArrayOf(fm.ascent, fm.top)
+        } else {
+            added = 0
+            left = null
         }
     }
 }
@@ -93,6 +107,7 @@ class RichEditText(context: Context) : EditText(context) {
     }
     private val small = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF8A8F9C.toInt() }
 
+    private var diagPrints = 0 // TEMPORARY diagnostic for the justify page-count bug; remove once understood
     private val gapSpan = PageGapSpan()
     private var spacingFlip = false
 
@@ -212,6 +227,13 @@ class RichEditText(context: Context) : EditText(context) {
             spacingFlip = !spacingFlip
             setLineSpacing(if (spacingFlip) 0.01f else 0f, 1f) // forces the layout to be rebuilt with the new gaps
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        }
+        if (diagPrints < 6 && gapSpan.starts.size > 3) {
+            diagPrints++
+            val l = layout!!
+            val sb = StringBuilder("DocxelsQA pages lines=${l.lineCount} starts=${gapSpan.starts.size} gap=${gapSpan.gapPx} gaps=${text.getSpans(0, text.length, GapSpan::class.java).size} h=")
+            for (i in 0 until minOf(l.lineCount, 70)) sb.append(l.getLineBottom(i) - l.getLineTop(i)).append(if (l.getLineStart(i) in gapSpan.starts) "* " else " ")
+            System.out.println(sb)
         }
         // Whole sheets only: the page always ends where a printed page would end.
         val ys = scanPages().first
