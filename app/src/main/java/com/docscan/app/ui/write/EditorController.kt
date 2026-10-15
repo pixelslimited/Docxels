@@ -92,7 +92,6 @@ class RichEditText(context: Context) : EditText(context) {
     }
     private val small = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF8A8F9C.toInt() }
 
-    private var diagPrints = 0 // TEMPORARY diagnostic for the justify page-count bug; remove once understood
     private val gapSpan = PageGapSpan()
     private var spacingFlip = false
 
@@ -212,13 +211,6 @@ class RichEditText(context: Context) : EditText(context) {
             spacingFlip = !spacingFlip
             setLineSpacing(if (spacingFlip) 0.01f else 0f, 1f) // forces the layout to be rebuilt with the new gaps
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        }
-        if (diagPrints < 6 && gapSpan.starts.size > 3) {
-            diagPrints++
-            val l = layout!!
-            val sb = StringBuilder("DocxelsQA pages lines=${l.lineCount} starts=${gapSpan.starts.size} gap=${gapSpan.gapPx} gaps=${text.getSpans(0, text.length, GapSpan::class.java).size} h=")
-            for (i in 0 until minOf(l.lineCount, 70)) sb.append(l.getLineBottom(i) - l.getLineTop(i)).append(if (l.getLineStart(i) in gapSpan.starts) "* " else " ")
-            System.out.println(sb)
         }
         // Whole sheets only: the page always ends where a printed page would end.
         val ys = scanPages().first
