@@ -238,10 +238,15 @@ data class PageSetup(
     val contentHeightTwips: Int get() = (sheetHeightTwips - marginTopTwips - marginBottomTwips).coerceAtLeast(720)
 }
 
+/** A font file carried inside a .docx. [style]: 0 regular, 1 bold, 2 italic, 3 bold italic. */
+class EmbeddedFont(val name: String, val style: Int, val bytes: ByteArray)
+
 data class WordDoc(
     val title: String = "Untitled",
     val blocks: List<Block> = listOf(Block.Para(Paragraph())),
     val page: PageSetup = PageSetup(),
+    /** Fonts the file embeds; only set when reading, the editor registers them so the text shows in its own font. */
+    val fonts: List<EmbeddedFont> = emptyList(),
 )
 
 object Twips {

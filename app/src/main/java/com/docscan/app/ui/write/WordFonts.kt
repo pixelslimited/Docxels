@@ -34,7 +34,34 @@ object WordFonts {
     private var assets: AssetManager? = null
     private val cache = HashMap<String, Typeface?>()
 
-    fun init(context: Context) { assets = context.applicationContext.assets }
+    private var customDir: java.io.File? = null
+
+    fun init(context: Context) {
+        assets = context.applicationContext.assets
+        customDir = java.io.File(context.applicationContext.filesDir, "docfonts").apply { mkdirs() }
+    }
+
+    private fun customFile(name: String, style: Int) =
+        customDir?.let { java.io.File(it, name.lowercase().replace(Regex("[^a-z0-9]"), "_") + "_" + style + ".ttf") }
+
+    /** Keeps a font that came inside a Word file so text in that font shows in it, now and the next time the document opens. */
+    fun addCustom(name: String, style: Int, bytes: ByteArray) {
+        val f = customFile(name, style and 3) ?: return
+        runCatching {
+            if (!f.exists() || f.length() != bytes.size.toLong()) f.writeBytes(bytes)
+            synchronized(cache) { cache.remove("custom:" + f.name) }
+        }
+    }
+
+    private fun custom(name: String, style: Int): Typeface? {
+        val st = style and 3
+        for (s in listOf(st, 0)) {
+            val f = customFile(name, s)?.takeIf { it.exists() } ?: continue
+            val tf = synchronized(cache) { cache.getOrPut("custom:" + f.name) { runCatching { Typeface.createFromFile(f) }.getOrNull() } } ?: continue
+            return if (s == st) tf else Typeface.create(tf, st)
+        }
+        return null
+    }
 
     fun find(name: String): Family? {
         val n = name.trim().lowercase()
@@ -45,6 +72,7 @@ object WordFonts {
 
     /** The typeface for a font name and a [Typeface] style (0 normal, 1 bold, 2 italic, 3 both), or null if not built in. */
     fun typeface(name: String, style: Int): Typeface? {
+        custom(name, style)?.let { return it }
         val fam = find(name) ?: return null
         val am = assets ?: return null
         val st = style and 3

@@ -119,6 +119,20 @@ object DocxReader {
         return out.toByteArray()
     }
 
+    /** Undoes Word's font scrambling: the first 32 bytes are XORed with the (reversed) GUID in the font key. Null if the result is not a font. */
+    fun deobfuscateFont(data: ByteArray, fontKey: String): ByteArray? {
+        val hex = fontKey.filter { it.isLetterOrDigit() }
+        if (hex.length != 32 || data.size < 64 || data.size > 8_000_000) return null
+        val raw = ByteArray(16)
+        for (i in 0 until 16) raw[i] = (hex.substring(i * 2, i * 2 + 2).toIntOrNull(16) ?: return null).toByte()
+        val key = raw.reversedArray()
+        val out = data.copyOf()
+        for (i in 0 until 32) out[i] = (out[i].toInt() xor key[i % 16].toInt()).toByte()
+        val tag = String(out, 0, 4, Charsets.ISO_8859_1)
+        val ok = (out[0].toInt() == 0 && out[1].toInt() == 1 && out[2].toInt() == 0 && out[3].toInt() == 0) || tag == "true" || tag == "OTTO" || tag == "ttcf"
+        return if (ok) out else null
+    }
+
     fun read(bytes: ByteArray, fallbackTitle: String = "Untitled"): WordDoc =
         read(ByteArrayInputStream(bytes), fallbackTitle)
 
@@ -167,7 +181,7 @@ object DocxReader {
             appendNotes(dir, blocks)
             if (blocks.isEmpty()) blocks += Block.Para(Paragraph())
             val title = xml("docProps/core.xml")?.find("title")?.text?.toString()?.trim().orEmpty()
-            return WordDoc(title.ifEmpty { fallbackTitle }, blocks, page)
+            return WordDoc(title.ifEmpty { fallbackTitle }, blocks, page, readEmbeddedFonts(dir))
         }
 
         /** Footnote and endnote text, added under a "Notes" heading with the [n] numbers cited in the text. */
@@ -261,6 +275,26 @@ object DocxReader {
             val fromDefaults = fontOf(root.child("docDefaults")?.child("rPrDefault")?.child("rPr"))
             val fromNormal = fontOf(defaultStyleId?.let { map[it]?.rPr })
             defaultFont = (fromNormal ?: fromDefaults)?.takeIf { !it.equals(StyleDefaults.BODY_FONT, ignoreCase = true) }
+        }
+
+        /** Fonts the file carries (word/fonts/*.odttf, scrambled with the font key); unreadable ones are skipped. */
+        fun readEmbeddedFonts(dir: String): List<EmbeddedFont> {
+            val base = if (dir.isEmpty()) "" else "$dir/"
+            val table = xml(base + "fontTable.xml") ?: return emptyList()
+            val frels = readRels(base + "_rels/fontTable.xml.rels", dir)
+            if (frels.isEmpty()) return emptyList()
+            val out = ArrayList<EmbeddedFont>()
+            for (f in table.childrenNamed("font")) {
+                val name = f.attr("name") ?: continue
+                for ((tag, style) in listOf("embedRegular" to 0, "embedBold" to 1, "embedItalic" to 2, "embedBoldItalic" to 3)) {
+                    val e = f.child(tag) ?: continue
+                    val data = frels[e.attr("id") ?: continue]?.let { parts[it] } ?: continue
+                    val key = e.attr("fontKey") ?: continue
+                    val plain = deobfuscateFont(data, key) ?: continue
+                    out += EmbeddedFont(name, style, plain)
+                }
+            }
+            return out
         }
 
         fun readTheme() {

@@ -56,3 +56,16 @@ class FontsTest {
         assertEquals("Verdana", (doc.blocks[1] as Block.Para).paragraph.runs.first().style.font)
     }
 }
+
+class EmbeddedFontTest {
+    @Test fun scrambledFontIsRestored() {
+        val guid = "{3F2504E0-4F89-41D3-9A0C-0305E82C3301}"
+        val plain = ByteArray(100) { if (it < 4) byteArrayOf(0, 1, 0, 0)[it] else (it * 7).toByte() }
+        val hex = guid.filter { it.isLetterOrDigit() }
+        val key = ByteArray(16) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }.reversedArray()
+        val scrambled = plain.copyOf()
+        for (i in 0 until 32) scrambled[i] = (scrambled[i].toInt() xor key[i % 16].toInt()).toByte()
+        org.junit.Assert.assertArrayEquals(plain, DocxReader.deobfuscateFont(scrambled, guid))
+        org.junit.Assert.assertNull(DocxReader.deobfuscateFont(scrambled, "{00000000-0000-0000-0000-000000000000}"))
+    }
+}
