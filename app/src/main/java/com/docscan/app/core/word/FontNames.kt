@@ -2,7 +2,7 @@ package com.docscan.app.core.word
 
 /** Turns the internal font name a PDF carries ("ABCDEF+BookmanOldStyle-BoldItalic") into the family Word would use. */
 object FontNames {
-    private val styleWords = Regex("(?i)(bold|italic|oblique|regular|semibold|demibold|medium|light|black|heavy|condensed|narrow|book|ital|bd|it)$")
+    private val styleWords = Regex("(?i)(bold|italic|oblique|regular|bolditalic)$")
 
     /** Null when the name is only a code ("F1", "TT3", "Font12") so the caller can choose by the font's flags instead. */
     fun family(raw: String?): String? {
