@@ -37,7 +37,7 @@ object OcrLayout {
     fun page(
         blocks: List<OcrBlockIn>, tables: List<OcrTable>, pageWidth: Int, contentWidthTwips: Int,
         extra: List<Pair<Int, Block>> = emptyList(),
-        shapes: List<OcrShape> = emptyList(), twipsPerPx: Float = 0f, marginLeftTwips: Int = 0,
+        shapes: List<OcrShape> = emptyList(), twipsPerPx: Float = 0f, marginLeftTwips: Int = 0, marginTopTwips: Int = 0,
     ): List<Block> {
         val text = blocks.filter { b -> b.lines.any { it.text.isNotBlank() } }
             .filter { b -> tables.none { insideTable(b, it) } }
@@ -73,6 +73,7 @@ object OcrLayout {
         // Paragraph gaps as space before; floating shapes keep their place relative to the content above them.
         val out = ArrayList<Block>()
         var prevBottom: Int? = null
+        val topPx = if (keepSpacing) (marginTopTwips / twipsPerPx).toInt() else 0
         for (it in ordered) {
             if (it.floating) {
                 val s = it.shape!!
@@ -88,12 +89,16 @@ object OcrLayout {
                 val first = blocks.firstOrNull()
                 if (first is Block.Para && first.paragraph.spaceAfterPt == 0f) {
                     val gapPt = (it.top - prevBottom) * ptPerPx
-                    val pt = if (gapPt > 3f) (gapPt - 2f).coerceAtMost(72f) else 0f
+                    val pt = if (gapPt > 3f) (gapPt - 2f).coerceAtMost(400f) else 0f
                     blocks = listOf(Block.Para(first.paragraph.copy(spaceBeforePt = pt))) + blocks.drop(1)
                 }
             } else if (keepSpacing) {
+                // The first line of the page keeps its distance from the top margin (room left for a letterhead).
                 val first = blocks.firstOrNull()
-                if (first is Block.Para && first.paragraph.spaceAfterPt == 0f) blocks = listOf(Block.Para(first.paragraph.copy(spaceBeforePt = 0f))) + blocks.drop(1)
+                if (first is Block.Para && first.paragraph.spaceAfterPt == 0f) {
+                    val pt = ((it.top - topPx) * ptPerPx).coerceIn(0f, 400f)
+                    blocks = listOf(Block.Para(first.paragraph.copy(spaceBeforePt = if (pt > 3f) pt else 0f))) + blocks.drop(1)
+                }
             }
             out += blocks
             prevBottom = it.bottom

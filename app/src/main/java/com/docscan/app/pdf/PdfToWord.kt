@@ -95,7 +95,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             }
             val notes = ArrayList<String>()
             if (ocrPages > 0) notes += "$ocrPages page(s) had no text layer and were read with OCR, so check them for mistakes."
-            if (letterheadFound) notes += "Pictures repeated on every page were kept as the letterhead (header and footer artwork)."
+            if (letterheadFound) notes += "Pictures repeated across pages were kept as the letterhead and page artwork. Artwork found only on some pages is placed on page 1."
             if (pictures > 0) notes += "$pictures picture(s) were carried over. They sit in reading order between the text; text does not wrap around them."
             val out = WordDoc(title = title, blocks = blocks.ifEmpty { listOf(Block.Para(Paragraph())) }, page = setup)
             return PdfConversion(out, notes)
@@ -279,30 +279,50 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
         for (pics in pages) for (sig in pics.map { it.sig }.toSet()) counts[sig] = (counts[sig] ?: 0) + 1
         for (pics in pages) for (p in pics) first.putIfAbsent(p.sig, p)
         val need = maxOf(2, (total * 0.4f).toInt())
-        val repeated = counts.filter { it.value >= need }.keys
-            .filter { first[it]!!.let { p -> p.fw * p.fh < 0.5f && (p.fy + p.fh <= 0.45f || p.fy >= 0.55f) } }.toSet()
+        val onFirstPage = pages.firstOrNull()?.map { it.sig }?.toSet() ?: emptySet()
+        val repeated = counts.filter { it.value >= need }.keys.filter { sig ->
+            val p = first[sig]!!
+            val area = p.fw * p.fh
+            val small = area < 0.5f && (p.fy + p.fh <= 0.45f || p.fy >= 0.55f)
+            // Page-sized artwork (a full letterhead, a faint background) is kept too when it really repeats.
+            small || area >= 0.5f
+        }.toSet()
         if (repeated.isEmpty()) return setup to emptySet()
         val sw = setup.sheetWidthTwips
         val sh = setup.sheetHeightTwips
         val header = ArrayList<PageImage>()
         val footer = ArrayList<PageImage>()
+        val firstHeader = ArrayList<PageImage>()
+        val firstFooter = ArrayList<PageImage>()
         var top = setup.marginTopTwips
         var bottom = setup.marginBottomTwips
+        var firstOnly = false
         for (sig in repeated) {
             val p = first[sig]!!
             val (bytes, ext) = encode(p.image) ?: continue
             val img = PageImage(bytes, ext, (p.fx * sw).toInt(), (p.fy * sh).toInt(), (p.fw * sw).toInt().coerceAtLeast(120), (p.fh * sh).toInt().coerceAtLeast(120), true)
-            if (p.fy + p.fh <= 0.45f) {
-                header += img
-                top = maxOf(top, img.yTwips + img.heightTwips + 240)
+            val big = p.fw * p.fh >= 0.5f
+            val everyPage = counts[sig]!! >= total
+            val atTop = p.fy + p.fh / 2f < 0.5f
+            if (big && !everyPage) {
+                // Only some pages carry it (a letterhead on each letter's first page): it goes on the first page.
+                if (sig in onFirstPage) { firstHeader += img; firstOnly = true }
+                continue
+            }
+            if (atTop) {
+                header += img; firstHeader += img
+                if (!big) top = maxOf(top, img.yTwips + img.heightTwips + 240)
             } else {
-                footer += img
-                bottom = maxOf(bottom, sh - img.yTwips + 240)
+                footer += img; firstFooter += img
+                if (!big) bottom = maxOf(bottom, sh - img.yTwips + 240)
             }
         }
-        if (header.isEmpty() && footer.isEmpty()) return setup to emptySet()
+        if (header.isEmpty() && footer.isEmpty() && firstHeader.isEmpty()) return setup to emptySet()
         return setup.copy(
             headerImages = header, footerImages = footer,
+            differentFirstPage = firstOnly || setup.differentFirstPage,
+            firstHeaderImages = if (firstOnly) firstHeader else emptyList(),
+            firstFooterImages = if (firstOnly) firstFooter else emptyList(),
             marginTopTwips = top.coerceAtMost(sh / 3), marginBottomTwips = bottom.coerceAtMost(sh / 3),
         ) to repeated
     }
@@ -381,7 +401,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             tables.none { cx in it.left..it.right && cy in it.top..it.bottom }
         }
         val twipsPerPx = setup.sheetWidthTwips.toFloat() / bitmap.width
-        return OcrLayout.page(PdfLayout.blocks(segs), tables, bitmap.width, setup.contentWidthTwips, pics, free, twipsPerPx, setup.marginLeftTwips)
+        return OcrLayout.page(PdfLayout.blocks(segs), tables, bitmap.width, setup.contentWidthTwips, pics, free, twipsPerPx, setup.marginLeftTwips, setup.marginTopTwips)
     }
 
     companion object {
