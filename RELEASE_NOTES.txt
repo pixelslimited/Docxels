@@ -25,3 +25,4 @@
 81|Home: floating 3D paper sheets in the top card (they stay still if you turn animations off on your phone).
 82|Letterhead and signature can now come from a picture, a PDF page or a Word file. Signature import has a preview with a Remove background switch.
 83|Home: removed the duplicate PDF to Word card (it is in the Convert and scan row).
+84|Every new or converted document is A4 (a PDF to Word result no longer takes the odd page size of the PDF).

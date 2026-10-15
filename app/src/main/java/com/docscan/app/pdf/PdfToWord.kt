@@ -84,11 +84,10 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
         return if (rot == 90 || rot == 270) box.height to box.width else box.width to box.height
     }
 
+    /** Converted documents are always A4; only the orientation follows the PDF's first page. */
     private fun pageSetupOf(doc: PDDocument): PageSetup {
         val (w, h) = pageDims(doc.getPage(0))
-        val wt = (w * 20).toInt().coerceIn(2000, 31000)
-        val ht = (h * 20).toInt().coerceIn(2000, 31000)
-        return PageSetup(widthTwips = minOf(wt, ht), heightTwips = maxOf(wt, ht), landscape = wt > ht)
+        return PageSetup(landscape = w > h)
     }
 
     private fun hasPictures(page: com.tom_roush.pdfbox.pdmodel.PDPage): Boolean = runCatching {
