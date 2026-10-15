@@ -31,19 +31,74 @@ object OcrLayout {
     private val BULLET = Regex("""^\s*([•·▪◦●○■\-–—*])\s+(.*)$""")
     private val NUMBER = Regex("""^\s*(\d{1,3}|[a-zA-Z])[.)]\s+(.*)$""")
 
-    fun page(blocks: List<OcrBlockIn>, tables: List<OcrTable>, pageWidth: Int, contentWidthTwips: Int, extra: List<Pair<Int, Block>> = emptyList()): List<Block> {
+    /** A drawn line or box from the PDF, in page pixels; [shape] carries size and colours, the offsets are set here. */
+    data class OcrShape(val left: Int, val top: Int, val right: Int, val bottom: Int, val shape: ShapeBlock)
+
+    fun page(
+        blocks: List<OcrBlockIn>, tables: List<OcrTable>, pageWidth: Int, contentWidthTwips: Int,
+        extra: List<Pair<Int, Block>> = emptyList(),
+        shapes: List<OcrShape> = emptyList(), twipsPerPx: Float = 0f, marginLeftTwips: Int = 0,
+    ): List<Block> {
         val text = blocks.filter { b -> b.lines.any { it.text.isNotBlank() } }
             .filter { b -> tables.none { insideTable(b, it) } }
         val allLines = text.flatMap { it.lines }.filter { it.text.isNotBlank() }
         val body = if (allLines.isEmpty()) 1f else median(allLines.map { it.height.toFloat() })
         val bodyLeft = if (text.isEmpty()) 0 else text.map { it.left }.sorted()[text.size / 4]
+        val ptPerPx = twipsPerPx / 20f
+        val keepSpacing = twipsPerPx > 0f
 
-        class Item(val top: Int, val blocks: List<Block>)
+        class Item(val top: Int, val bottom: Int, val blocks: List<Block>, val floating: Boolean = false, val shape: OcrShape? = null)
         val items = ArrayList<Item>()
-        text.forEachIndexed { i, b -> items += Item(b.top, blockToParagraphs(b, body, pageWidth, bodyLeft, firstOnPage = i == 0).map { Block.Para(it) }) }
-        for (t in tables) items += Item(t.top, listOfNotNull(tableBlock(t, contentWidthTwips)))
-        for ((top, b) in extra) items += Item(top, listOf(b))
-        return items.sortedBy { it.top }.flatMap { it.blocks }
+        text.forEachIndexed { i, b ->
+            var paras = blockToParagraphs(b, body, pageWidth, bodyLeft, firstOnPage = i == 0).map { Block.Para(it) }
+            if (keepSpacing && paras.isNotEmpty()) {
+                val ls = b.lines.filter { it.text.isNotBlank() }
+                val mult = if (ls.size >= 2) {
+                    val pitch = (ls.last().top - ls.first().top).toFloat() / (ls.size - 1)
+                    val h = ls.map { it.height }.average().toFloat()
+                    (pitch / (1.2f * h)).coerceIn(0.8f, 2.5f).let { Math.round(it * 20f) / 20f }.let { if (it in 0.95f..1.1f) null else it }
+                } else null
+                paras = paras.map { Block.Para(it.paragraph.copy(spaceAfterPt = 0f, lineSpacing = mult ?: it.paragraph.lineSpacing)) }
+            }
+            items += Item(b.top, b.bottom, paras)
+        }
+        for (t in tables) items += Item(t.top, t.bottom, listOfNotNull(tableBlock(t, contentWidthTwips)))
+        for ((top, b) in extra) {
+            val h = if (b is Block.Image && twipsPerPx > 0f) (b.image.heightTwips / twipsPerPx).toInt() else 0
+            items += Item(top, top + h, listOf(b))
+        }
+        for (sh in shapes) items += Item(sh.top, sh.bottom, emptyList(), floating = true, shape = sh)
+        val ordered = items.sortedBy { it.top }
+
+        // Paragraph gaps as space before; floating shapes keep their place relative to the content above them.
+        val out = ArrayList<Block>()
+        var prevBottom: Int? = null
+        for (it in ordered) {
+            if (it.floating) {
+                val s = it.shape!!
+                val anchorY = prevBottom ?: 0
+                out += Block.Shape(s.shape.copy(
+                    offsetXTwips = Math.round((s.left * twipsPerPx) - marginLeftTwips).coerceAtLeast(0),
+                    offsetYTwips = Math.round((s.top - anchorY) * twipsPerPx),
+                ))
+                continue
+            }
+            var blocks = it.blocks
+            if (keepSpacing && prevBottom != null) {
+                val first = blocks.firstOrNull()
+                if (first is Block.Para && first.paragraph.spaceAfterPt == 0f) {
+                    val gapPt = (it.top - prevBottom) * ptPerPx
+                    val pt = if (gapPt > 3f) (gapPt - 2f).coerceAtMost(72f) else 0f
+                    blocks = listOf(Block.Para(first.paragraph.copy(spaceBeforePt = pt))) + blocks.drop(1)
+                }
+            } else if (keepSpacing) {
+                val first = blocks.firstOrNull()
+                if (first is Block.Para && first.paragraph.spaceAfterPt == 0f) blocks = listOf(Block.Para(first.paragraph.copy(spaceBeforePt = 0f))) + blocks.drop(1)
+            }
+            out += blocks
+            prevBottom = it.bottom
+        }
+        return out
     }
 
     private fun insideTable(b: OcrBlockIn, t: OcrTable): Boolean {

@@ -154,7 +154,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
                     f to n.removeSuffix(".pdf").removeSuffix(".PDF")
                 }
                 try {
-                    container.pdfToWord.convert(file, name) { p, total -> _busy.value = "Converting page $p of $total…" }
+                    container.pdfToWord.convert(file, name, { p, total -> _busy.value = "Converting page $p of $total…" }, { t -> _busy.value = t })
                 } finally {
                     file.delete()
                 }

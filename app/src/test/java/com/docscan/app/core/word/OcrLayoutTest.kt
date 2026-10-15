@@ -66,3 +66,21 @@ class OcrLayoutTest {
         assertTrue(OcrLayout.page(emptyList(), emptyList(), pageW, twips).isEmpty())
     }
 }
+
+class OcrLayoutShapesTest {
+    private fun line(t: String, top: Int) = OcrLine(t, 100, top, 400, top + 20)
+
+    @org.junit.Test
+    fun gapsBecomeSpaceBeforeAndShapesFloatBehind() {
+        val blocks = listOf(OcrBlockIn(listOf(line("First paragraph", 100))), OcrBlockIn(listOf(line("Second paragraph", 300))))
+        val rule = OcrLayout.OcrShape(100, 200, 500, 202, ShapeBlock("rect", 8000, 40, 0, 0, 0.25f, wrap = ImageWrap.BEHIND))
+        val out = OcrLayout.page(blocks, emptyList(), 1000, 9000, shapes = listOf(rule), twipsPerPx = 12f, marginLeftTwips = 1000)
+        val paras = out.filterIsInstance<Block.Para>()
+        org.junit.Assert.assertEquals(2, paras.size)
+        org.junit.Assert.assertTrue((paras[1].paragraph.spaceBeforePt ?: 0f) > 10f)
+        val shape = out.filterIsInstance<Block.Shape>().single().shape
+        org.junit.Assert.assertEquals(200, shape.offsetXTwips)
+        org.junit.Assert.assertEquals(ImageWrap.BEHIND, shape.wrap)
+        org.junit.Assert.assertTrue(out.indexOf(Block.Shape(shape)) in 1 until out.size)
+    }
+}

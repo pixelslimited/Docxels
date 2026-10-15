@@ -16,20 +16,17 @@ import com.docscan.app.imaging.TableDetector
 import com.docscan.app.imaging.toRgbMat
 import com.docscan.app.ocr.ScanToWord
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import com.tom_roush.pdfbox.contentstream.PDFStreamEngine
-import com.tom_roush.pdfbox.contentstream.operator.DrawObject
-import com.tom_roush.pdfbox.contentstream.operator.Operator
-import com.tom_roush.pdfbox.contentstream.operator.state.Concatenate
-import com.tom_roush.pdfbox.contentstream.operator.state.Restore
-import com.tom_roush.pdfbox.contentstream.operator.state.Save
-import com.tom_roush.pdfbox.contentstream.operator.state.SetGraphicsStateParameters
-import com.tom_roush.pdfbox.contentstream.operator.state.SetMatrix
-import com.tom_roush.pdfbox.cos.COSBase
+import com.tom_roush.pdfbox.contentstream.PDFGraphicsStreamEngine
 import com.tom_roush.pdfbox.cos.COSName
-import com.tom_roush.pdfbox.pdmodel.graphics.form.PDFormXObject
+import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImage
+import android.graphics.Path
+import android.graphics.PointF
 import com.tom_roush.pdfbox.pdmodel.font.PDFont
 import com.docscan.app.core.word.Align
 import com.docscan.app.core.word.ImageBlock
+import com.docscan.app.core.word.ImageWrap
+import com.docscan.app.core.word.ShapeBlock
 import com.docscan.app.core.word.RunStyle
 import com.docscan.app.core.word.PageImage
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -51,7 +48,7 @@ class PdfConversion(val doc: WordDoc, val notes: List<String>)
 class PdfToWord(context: Context, private val scan: ScanToWord) {
     init { PDFBoxResourceLoader.init(context.applicationContext) }
 
-    suspend fun convert(file: File, title: String, onProgress: (Int, Int) -> Unit): PdfConversion {
+    suspend fun convert(file: File, title: String, onProgress: (Int, Int) -> Unit, onStatus: (String) -> Unit = {}): PdfConversion {
         val doc = withContext(Dispatchers.IO) {
             try { PDDocument.load(file, "") } catch (e: InvalidPasswordException) { throw PdfPasswordException() }
         }
@@ -60,7 +57,9 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             require(total > 0) { "That PDF has no pages." }
             val setup0 = pageSetupOf(doc)
             // Pictures drawn in the same place on several pages are the letterhead (top) or footer artwork (bottom).
-            val pagePics = withContext(Dispatchers.Default) { (0 until total).map { runCatching { findPics(doc, it) }.getOrDefault(emptyList()) } }
+            onStatus("Studying the pages: pictures, lines and boxes…")
+            val parts = withContext(Dispatchers.Default) { (0 until total).map { runCatching { findParts(doc, it) }.getOrNull() } }
+            val pagePics = parts.map { it?.pics ?: emptyList() }
             val (setup, repeated) = withContext(Dispatchers.Default) { letterheadFrom(pagePics, total, setup0) }
             var letterheadFound = repeated.isNotEmpty()
             val blocks = ArrayList<Block>()
@@ -69,6 +68,9 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             PdfPreview(file).use { preview ->
                 for (i in 0 until total) {
                     onProgress(i + 1, total)
+                    val nPics = pagePics[i].size
+                    val nLines = parts[i]?.shapes?.size ?: 0
+                    onStatus("Page ${i + 1} of $total · reading text" + (if (nPics > 0) " · placing $nPics picture(s)" else "") + (if (nLines > 0) " · drawing $nLines line(s)/box(es)" else ""))
                     val bitmap = preview.render(i, ScanToWord.SIDE)
                     try {
                         val pdfPage = doc.getPage(i)
@@ -79,7 +81,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
                         val pageBlocks: List<Block> = if (chars >= MIN_TEXT_CHARS) {
                             val pics = withContext(Dispatchers.Default) { pictureBlocks(pagePics[i], repeated, bitmap.height, bitmap.width, setup) }
                             pictures += pics.size
-                            textPage(bitmap, segs, setup, pics)
+                            textPage(bitmap, segs, setup, pics, parts[i]?.let { shapesOf(it, scale, bitmap.width, bitmap.height) } ?: emptyList())
                         } else {
                             ocrPages++
                             scan.pageBlocks(bitmap, setup)
@@ -168,31 +170,66 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
 
     private class Found(val image: PDImageXObject, val x: Float, val y: Float, val w: Float, val h: Float)
 
-    /** Walks one page's drawing commands and notes where each picture is drawn (PDF points, y from the bottom). */
-    private class ImageFinder : PDFStreamEngine() {
+    /** A line or box the page draws, in PDF points (origin bottom-left). [fill] / [stroke] are RGB or null. */
+    class Vec(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val fill: Int?, val stroke: Int?, val widthPt: Float)
+
+    /** Walks one page's drawing commands and notes every picture, ruled line and box, with where and how it is drawn. */
+    private class PageGraphics(page: PDPage) : PDFGraphicsStreamEngine(page) {
         val found = ArrayList<Found>()
-        init {
-            addOperator(Concatenate())
-            addOperator(DrawObject())
-            addOperator(SetGraphicsStateParameters())
-            addOperator(Save())
-            addOperator(Restore())
-            addOperator(SetMatrix())
+        val vecs = ArrayList<Vec>()
+        var curvesSkipped = 0
+        private var path = ArrayList<ArrayList<PointF>>()
+        private var cur = ArrayList<PointF>()
+        private var at = PointF(0f, 0f)
+
+        private fun rgb(get: () -> Int): Int? = runCatching { get() and 0xFFFFFF }.getOrNull()
+
+        override fun appendRectangle(p0: PointF, p1: PointF, p2: PointF, p3: PointF) {
+            flushSub()
+            path.add(arrayListOf(PointF(p0.x, p0.y), PointF(p1.x, p1.y), PointF(p2.x, p2.y), PointF(p3.x, p3.y), PointF(p0.x, p0.y)))
+            at = p0
         }
 
-        override fun processOperator(operator: Operator, operands: MutableList<COSBase>) {
-            if (operator.name == "Do" && operands.isNotEmpty()) {
-                val x = resources.getXObject(operands[0] as COSName)
-                if (x is PDImageXObject) {
-                    val m = graphicsState.currentTransformationMatrix
-                    found += Found(x, m.translateX, m.translateY, m.scalingFactorX, m.scalingFactorY)
-                } else if (x is PDFormXObject) {
-                    showForm(x)
-                }
-            } else {
-                super.processOperator(operator, operands)
-            }
+        override fun drawImage(pdImage: PDImage) {
+            if (pdImage !is PDImageXObject) return
+            val m = graphicsState.currentTransformationMatrix
+            found += Found(pdImage, m.translateX, m.translateY, m.scalingFactorX, m.scalingFactorY)
         }
+
+        override fun clip(windingRule: Path.FillType) {}
+        override fun moveTo(x: Float, y: Float) { flushSub(); cur.add(PointF(x, y)); at = PointF(x, y) }
+        override fun lineTo(x: Float, y: Float) { cur.add(PointF(x, y)); at = PointF(x, y) }
+        override fun curveTo(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float) { curvesSkipped++; cur.add(PointF(x3, y3)); at = PointF(x3, y3) }
+        override fun getCurrentPoint(): PointF = at
+        override fun closePath() { cur.firstOrNull()?.let { cur.add(PointF(it.x, it.y)) } }
+        override fun endPath() { path = ArrayList(); cur = ArrayList() }
+        override fun shadingFill(shadingName: COSName) {}
+
+        private fun flushSub() {
+            if (cur.size >= 2) path.add(cur)
+            cur = ArrayList()
+        }
+
+        private fun paint(fill: Boolean, stroke: Boolean) {
+            flushSub()
+            val f = if (fill) rgb { graphicsState.nonStrokingColor.toRGB() } else null
+            val st = if (stroke) rgb { graphicsState.strokingColor.toRGB() } else null
+            val lw = graphicsState.lineWidth.coerceAtLeast(0.25f)
+            for (sub in path) {
+                if (vecs.size >= MAX_VECTORS_PER_PAGE) break
+                val xs = sub.map { it.x }
+                val ys = sub.map { it.y }
+                val minX = xs.min(); val maxX = xs.max(); val minY = ys.min(); val maxY = ys.max()
+                val axisAligned = sub.size <= 5 && sub.zipWithNext().all { (p, q) -> Math.abs(p.x - q.x) < 0.5f || Math.abs(p.y - q.y) < 0.5f }
+                if (!axisAligned) { curvesSkipped++; continue }
+                vecs += Vec(minX, minY, maxX, maxY, f, st, lw)
+            }
+            path = ArrayList()
+        }
+
+        override fun strokePath() = paint(false, true)
+        override fun fillPath(windingRule: Path.FillType) = paint(true, false)
+        override fun fillAndStrokePath(windingRule: Path.FillType) = paint(true, true)
     }
 
     private class PagePic(val key: Any, val fx: Float, val fy: Float, val fw: Float, val fh: Float, val image: PDImageXObject) {
@@ -200,21 +237,24 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
         val sig: String get() = "${System.identityHashCode(key)}:${(fx * 50).toInt()}:${(fy * 50).toInt()}:${(fw * 50).toInt()}:${(fh * 50).toInt()}"
     }
 
-    /** Where each picture is drawn on one page, as fractions of the page (y from the top). */
-    private fun findPics(doc: PDDocument, index: Int): List<PagePic> {
+    private class PageParts(val pics: List<PagePic>, val shapes: List<Vec>, val boxW: Float, val boxH: Float, val llx: Float, val ury: Float, val skippedCurves: Int)
+
+    /** Where each picture and drawn line / box is on one page. Pictures are fractions of the page (y from the top). */
+    private fun findParts(doc: PDDocument, index: Int): PageParts {
         val page = doc.getPage(index)
-        if (((page.rotation % 360) + 360) % 360 != 0) return emptyList()
         val box = page.cropBox ?: page.mediaBox
         val bw = box.width.coerceAtLeast(1f)
         val bh = box.height.coerceAtLeast(1f)
-        val finder = ImageFinder()
-        finder.processPage(page)
-        return finder.found.take(MAX_PICTURES_PER_PAGE).map { f ->
+        if (((page.rotation % 360) + 360) % 360 != 0) return PageParts(emptyList(), emptyList(), bw, bh, box.lowerLeftX, box.upperRightY, 0)
+        val g = PageGraphics(page)
+        g.processPage(page)
+        val pics = g.found.take(MAX_PICTURES_PER_PAGE).map { f ->
             val w = Math.abs(f.w)
             val h = Math.abs(f.h)
             val bottom = minOf(f.y, f.y + f.h)
             PagePic(f.image.cosObject, (f.x - box.lowerLeftX) / bw, (box.upperRightY - (bottom + h)) / bh, w / bw, h / bh, f.image)
         }
+        return PageParts(pics, g.vecs, bw, bh, box.lowerLeftX, box.upperRightY, g.curvesSkipped)
     }
 
     private fun encode(image: PDImageXObject): Pair<ByteArray, String>? = runCatching {
@@ -268,6 +308,36 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
     }
 
     /** This page's pictures as inline picture blocks, each with its top edge in page pixels so it lands in reading order. */
+    /** The page's drawn lines and boxes as floating shapes behind the text, in page pixels. */
+    private fun shapesOf(p: PageParts, scale: Float, pxW: Int, pxH: Int): List<OcrLayout.OcrShape> {
+        val out = ArrayList<OcrLayout.OcrShape>()
+        val seen = HashSet<String>()
+        val twipsPerPt = 20f
+        fun white(c: Int) = (c shr 16 and 255) > 245 && (c shr 8 and 255) > 245 && (c and 255) > 245
+        for (v in p.shapes) {
+            val wPt = v.x2 - v.x1
+            val hPt = v.y2 - v.y1
+            if (wPt * hPt > 0.85f * p.boxW * p.boxH) continue
+            val thin = minOf(wPt, hPt) < 2.5f
+            if (!thin && v.fill != null && white(v.fill) && v.stroke == null) continue
+            val shape = if (thin) {
+                val c = v.fill ?: v.stroke ?: 0
+                if (white(c)) continue
+                ShapeBlock("rect", (wPt * twipsPerPt).toInt().coerceAtLeast(20), (hPt * twipsPerPt).toInt().coerceAtLeast(20), c, c, 0.25f, wrap = ImageWrap.BEHIND)
+            } else {
+                if (v.fill == null && v.stroke == null) continue
+                val fill = v.fill?.takeIf { !white(it) }
+                if (fill == null && v.stroke == null) continue
+                ShapeBlock("rect", (wPt * twipsPerPt).toInt(), (hPt * twipsPerPt).toInt(), fill, v.stroke ?: fill ?: 0, if (v.stroke != null) v.widthPt.coerceIn(0.25f, 6f) else 0.25f, wrap = ImageWrap.BEHIND)
+            }
+            val left = ((v.x1 - p.llx) * scale).toInt()
+            val top = ((p.ury - v.y2) * scale).toInt()
+            if (!seen.add("$left,$top,${(wPt).toInt()},${(hPt).toInt()}")) continue
+            out += OcrLayout.OcrShape(left, top, left + (wPt * scale).toInt(), top + (hPt * scale).toInt(), shape)
+        }
+        return out
+    }
+
     private fun pictureBlocks(pics: List<PagePic>, repeated: Set<String>, pxH: Int, pxW: Int, setup: PageSetup): List<Pair<Int, Block>> {
         val out = ArrayList<Pair<Int, Block>>()
         for (p in pics) {
@@ -288,7 +358,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
         return out
     }
 
-    private suspend fun textPage(bitmap: android.graphics.Bitmap, segs: List<TextSeg>, setup: PageSetup, pics: List<Pair<Int, Block>> = emptyList()): List<Block> {
+    private suspend fun textPage(bitmap: android.graphics.Bitmap, segs: List<TextSeg>, setup: PageSetup, pics: List<Pair<Int, Block>> = emptyList(), shapes: List<OcrLayout.OcrShape> = emptyList()): List<Block> {
         val cells = withContext(Dispatchers.Default) {
             val mat = bitmap.toRgbMat()
             try { TableDetector.detectCells(mat) } finally { mat.release() }
@@ -305,12 +375,19 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
                 tables += OcrTable(bounds.x, bounds.y, bounds.x + bounds.w, bounds.y + bounds.h, texts, fractions)
             }
         }
-        return OcrLayout.page(PdfLayout.blocks(segs), tables, bitmap.width, setup.contentWidthTwips, pics)
+        val free = shapes.filter { sh ->
+            val cx = (sh.left + sh.right) / 2
+            val cy = (sh.top + sh.bottom) / 2
+            tables.none { cx in it.left..it.right && cy in it.top..it.bottom }
+        }
+        val twipsPerPx = setup.sheetWidthTwips.toFloat() / bitmap.width
+        return OcrLayout.page(PdfLayout.blocks(segs), tables, bitmap.width, setup.contentWidthTwips, pics, free, twipsPerPx, setup.marginLeftTwips)
     }
 
     companion object {
         /** A page with fewer characters than this is treated as a scan. */
         const val MIN_TEXT_CHARS = 25
         const val MAX_PICTURES_PER_PAGE = 40
+        const val MAX_VECTORS_PER_PAGE = 120
     }
 }
