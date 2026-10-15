@@ -17,4 +17,5 @@
 74|Picture and shape settings are a panel at the bottom: changes show on the page live, no Save needed.
 74|Bigger tools icon, and the tools bar sits higher above the screen edge.
 75|Pages in print layout are separated by real space, with header, footer and page number on every page.
+76|The tools toggle is now the Docxels icon, at the right edge of the editor.
 76|This list: every update now shows everything new since your version, so you know what to try.

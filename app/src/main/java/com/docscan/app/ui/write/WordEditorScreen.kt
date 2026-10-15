@@ -660,8 +660,12 @@ private fun Ribbon(
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
         Column {
             if (!open) {
-                Box(Modifier.fillMaxWidth().height(52.dp).clickable { open = true; grid = true }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Apps, contentDescription = "Show tools", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
+                Box(Modifier.fillMaxWidth().height(56.dp).clickable { open = true; grid = true }.padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.app_icon),
+                        contentDescription = "Show tools",
+                        modifier = Modifier.size(44.dp),
+                    )
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
