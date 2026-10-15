@@ -23,3 +23,4 @@
 79|Letterhead menu: First page only, a separate Continuous letterhead for the pages after the first, or the same on every page; each can be removed on its own.
 80|Fixed: text in the editor ran on one long line off the right edge (introduced with the zoom control in build 74). Lines wrap to the page again.
 81|Home: floating 3D paper sheets in the top card (they stay still if you turn animations off on your phone).
+82|Letterhead and signature can now come from a picture, a PDF page or a Word file. Signature import has a preview with a Remove background switch.

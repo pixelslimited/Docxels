@@ -517,6 +517,61 @@ fun ShapeEditorDialog(
 }
 
 
+
+/**
+ * Brings in a signature from a picture, a PDF page or a Word file, with a preview. "Remove background" turns the
+ * white paper transparent and trims the picture to the ink; switch it off to keep the picture as it is.
+ */
+@Composable
+fun SignatureImportDialog(source: Bitmap, onInsert: (ByteArray, Int, Int) -> Unit, onDismiss: () -> Unit) {
+    var removeBg by remember { mutableStateOf(true) }
+    val result: Bitmap? = remember(source, removeBg) {
+        runCatching {
+            val w = source.width
+            val h = source.height
+            if (!removeBg) {
+                source
+            } else {
+                val px = IntArray(w * h)
+                source.getPixels(px, 0, w, 0, 0, w, h)
+                val ink = com.docscan.app.core.SignatureInk.whiteToAlpha(px)
+                val b = com.docscan.app.core.SignatureInk.inkBounds(ink, w, h)
+                if (b == null) null
+                else Bitmap.createBitmap(Bitmap.createBitmap(ink, w, h, Bitmap.Config.ARGB_8888), b[0], b[1], b[2] - b[0], b[3] - b[1])
+            }
+        }.getOrNull()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Signature") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.fillMaxWidth().height(150.dp).background(Color(0xFFD9DCE3)), contentAlignment = Alignment.Center) {
+                    if (result != null) Image(result.asImageBitmap(), contentDescription = "Signature preview", modifier = Modifier.fillMaxSize().padding(8.dp))
+                    else Text("No signature found in this picture.", style = MaterialTheme.typography.bodySmall)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Remove background", modifier = Modifier.weight(1f))
+                    androidx.compose.material3.Switch(removeBg, { removeBg = it })
+                }
+                Text(
+                    "It goes in front of the text. Drag it where you want it. Best on a dark signature on plain white paper.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = result != null, onClick = {
+                val r = result ?: return@TextButton
+                val out = java.io.ByteArrayOutputStream()
+                r.compress(Bitmap.CompressFormat.PNG, 100, out)
+                onInsert(out.toByteArray(), r.width, r.height)
+            }) { Text("Insert") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
 /** A pad to sign with a finger. Returns a transparent PNG of just the ink. */
 @androidx.compose.runtime.Composable
 fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> Unit) {

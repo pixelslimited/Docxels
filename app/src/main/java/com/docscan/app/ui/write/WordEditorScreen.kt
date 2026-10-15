@@ -213,28 +213,13 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
 
     // Letterhead: one picture, stretched to the paper, repeated behind the text of every page (or just the first).
     var letterheadMode by remember { mutableStateOf("all") }
-    val letterheadPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    val letterheadPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val mode = letterheadMode
         val setup = page
         scope.launch {
-            val img = withContext(Dispatchers.IO) {
-                runCatching {
-                    val bmp = ImageIO.decodeUri(context, uri, 2000) ?: error("unreadable")
-                    val alpha = bmp.hasAlpha()
-                    val out = java.io.ByteArrayOutputStream()
-                    bmp.compress(if (alpha) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG, 88, out)
-                    val sw = setup.sheetWidthTwips
-                    val sh = setup.sheetHeightTwips
-                    val pageAspect = sh.toFloat() / sw
-                    val aspect = bmp.height.toFloat() / bmp.width.coerceAtLeast(1)
-                    // Close to the page shape: fill the sheet exactly. Otherwise fit the width and keep the proportions.
-                    val h = if (kotlin.math.abs(aspect - pageAspect) / pageAspect < 0.15f) sh else minOf(sh, (sw * aspect).toInt())
-                    bmp.recycle()
-                    com.docscan.app.core.word.PageImage(out.toByteArray(), if (alpha) "png" else "jpg", 0, 0, sw, h, behind = true)
-                }.getOrNull()
-            }
-            if (img == null) { snackbar.showSnackbar("Could not read that picture."); return@launch }
+            val lh = PageSources.letterhead(context, uri, setup)
+            if (lh == null) { snackbar.showSnackbar("Could not find a letterhead in that file."); return@launch }
             val p0 = page
             // Switching to separate first / later pages: keep what the first page already shows.
             val split = if (p0.differentFirstPage) p0 else p0.copy(
@@ -242,10 +227,20 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 firstHeaderText = p0.headerText, firstFooterText = p0.footerText, firstPageNumbers = p0.pageNumbers,
                 firstHeaderImages = p0.headerImages, firstFooterImages = p0.footerImages,
             )
+            val hasFooter = lh.footer.isNotEmpty()
             page = when (mode) {
-                "first" -> split.copy(firstHeaderImages = listOf(img), headerImages = if (p0.differentFirstPage) split.headerImages else emptyList())
-                "rest" -> split.copy(headerImages = listOf(img))
-                else -> p0.copy(headerImages = listOf(img), firstHeaderImages = if (p0.differentFirstPage) listOf(img) else p0.firstHeaderImages)
+                "first" -> split.copy(
+                    firstHeaderImages = lh.header,
+                    headerImages = if (p0.differentFirstPage) split.headerImages else emptyList(),
+                    firstFooterImages = if (hasFooter) lh.footer else split.firstFooterImages,
+                )
+                "rest" -> split.copy(headerImages = lh.header, footerImages = if (hasFooter) lh.footer else split.footerImages)
+                else -> p0.copy(
+                    headerImages = lh.header,
+                    footerImages = if (hasFooter) lh.footer else p0.footerImages,
+                    firstHeaderImages = if (p0.differentFirstPage) lh.header else p0.firstHeaderImages,
+                    firstFooterImages = if (p0.differentFirstPage && hasFooter) lh.footer else p0.firstFooterImages,
+                )
             }
             snackbar.showSnackbar(
                 when (mode) {
@@ -256,30 +251,12 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             )
         }
     }
-    val signaturePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    var signSource by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val signaturePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val block = withContext(Dispatchers.IO) {
-                runCatching {
-                    val bmp = ImageIO.decodeUri(context, uri, 1200) ?: error("unreadable")
-                    val w = bmp.width
-                    val h = bmp.height
-                    val px = IntArray(w * h)
-                    bmp.getPixels(px, 0, w, 0, 0, w, h)
-                    bmp.recycle()
-                    val ink = com.docscan.app.core.SignatureInk.whiteToAlpha(px)
-                    val b = com.docscan.app.core.SignatureInk.inkBounds(ink, w, h) ?: error("no ink")
-                    val cw = b[2] - b[0]
-                    val ch = b[3] - b[1]
-                    val crop = android.graphics.Bitmap.createBitmap(ink, w, h, android.graphics.Bitmap.Config.ARGB_8888)
-                        .let { android.graphics.Bitmap.createBitmap(it, b[0], b[1], cw, ch) }
-                    val out = java.io.ByteArrayOutputStream()
-                    crop.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                    val tw = 2800
-                    ImageBlock(out.toByteArray(), "png", tw, (tw.toLong() * ch / cw).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT)
-                }.getOrNull()
-            }
-            if (block == null) snackbar.showSnackbar("Could not find a signature in that picture.") else controller.insertBlock(Block.Image(block))
+            val bmp = PageSources.bitmap(context, uri, 1600)
+            if (bmp == null) snackbar.showSnackbar("Could not read a picture from that file.") else signSource = bmp
         }
     }
     var signPad by remember { mutableStateOf(false) }
@@ -433,12 +410,12 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                         }
                     } else {
                         letterheadMode = mode
-                        letterheadPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        letterheadPicker.launch(PageSources.MIMES)
                     }
                 },
                 onSignature = { mode ->
                     if (mode == "draw") signPad = true
-                    else signaturePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    else signaturePicker.launch(PageSources.MIMES)
                 },
                 onTable = { tableOpen = true },
                 onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -469,6 +446,17 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
 
     previewDoc?.let { d -> PagePreview(vm, d) { previewDoc = null } }
+    signSource?.let { src ->
+        SignatureImportDialog(
+            source = src,
+            onInsert = { bytes, w, h ->
+                signSource = null
+                val tw = 2800
+                controller.insertBlock(Block.Image(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT)))
+            },
+            onDismiss = { signSource = null },
+        )
+    }
     if (signPad) {
         SignaturePadDialog(
             onDone = { bytes, w, h ->
