@@ -3,7 +3,7 @@ package com.docscan.app.core.word
 import kotlin.math.abs
 
 /** One recognised line of text with its box in page pixels. */
-data class OcrLine(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int) {
+data class OcrLine(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int, val runs: List<Run> = emptyList()) {
     val height: Int get() = (bottom - top).coerceAtLeast(1)
 }
 
@@ -31,7 +31,7 @@ object OcrLayout {
     private val BULLET = Regex("""^\s*([•·▪◦●○■\-–—*])\s+(.*)$""")
     private val NUMBER = Regex("""^\s*(\d{1,3}|[a-zA-Z])[.)]\s+(.*)$""")
 
-    fun page(blocks: List<OcrBlockIn>, tables: List<OcrTable>, pageWidth: Int, contentWidthTwips: Int): List<Block> {
+    fun page(blocks: List<OcrBlockIn>, tables: List<OcrTable>, pageWidth: Int, contentWidthTwips: Int, extra: List<Pair<Int, Block>> = emptyList()): List<Block> {
         val text = blocks.filter { b -> b.lines.any { it.text.isNotBlank() } }
             .filter { b -> tables.none { insideTable(b, it) } }
         val allLines = text.flatMap { it.lines }.filter { it.text.isNotBlank() }
@@ -42,6 +42,7 @@ object OcrLayout {
         val items = ArrayList<Item>()
         text.forEachIndexed { i, b -> items += Item(b.top, blockToParagraphs(b, body, pageWidth, bodyLeft, firstOnPage = i == 0).map { Block.Para(it) }) }
         for (t in tables) items += Item(t.top, listOfNotNull(tableBlock(t, contentWidthTwips)))
+        for ((top, b) in extra) items += Item(top, listOf(b))
         return items.sortedBy { it.top }.flatMap { it.blocks }
     }
 
@@ -92,6 +93,8 @@ object OcrLayout {
         val sb = StringBuilder()
         for (l in lines) join(sb, l.text)
         val content = sb.toString().trim()
+        // Text with its own look (PDF fonts): keep bold, italic, size and font run by run.
+        val styled = if (lines.all { it.runs.isNotEmpty() }) joinRuns(lines) else null
         val style = when {
             lines.size <= 3 && content.length <= 90 && ratio >= 2.0f && firstOnPage -> ParaStyle.TITLE
             lines.size <= 3 && content.length <= 90 && ratio >= 1.6f -> ParaStyle.H1
@@ -101,7 +104,29 @@ object OcrLayout {
         val indent = if (style == ParaStyle.NORMAL && align == Align.LEFT && b.left - bodyLeft > pageW * 0.04f) {
             ((b.left - bodyLeft).toFloat() / pageW * 8000).toInt().coerceIn(0, 2880) / 360 * 360
         } else 0
-        return listOf(Paragraph(listOf(Run(content)), style, if (style == ParaStyle.NORMAL || align == Align.CENTER) align else Align.LEFT, indentLeftTwips = indent))
+        val outRuns = if (styled != null && style == ParaStyle.NORMAL) styled else if (styled != null) listOf(Run(content, styled.firstOrNull()?.style?.copy(sizePt = null) ?: RunStyle())) else listOf(Run(content))
+        return listOf(Paragraph(outRuns, style, if (style == ParaStyle.NORMAL || align == Align.CENTER) align else Align.LEFT, indentLeftTwips = indent))
+    }
+
+    /** The lines' styled runs as one paragraph, joining a hyphenated word break and otherwise separating lines by a space. */
+    private fun joinRuns(lines: List<OcrLine>): List<Run> {
+        val out = ArrayList<Run>()
+        fun add(r: Run) {
+            val last = out.lastOrNull()
+            if (last != null && last.style == r.style) out[out.size - 1] = Run(last.text + r.text, r.style) else out += r
+        }
+        for (l in lines) {
+            val first = l.runs.first()
+            val lastRun = out.lastOrNull()
+            if (lastRun != null) {
+                val t = lastRun.text
+                if (t.endsWith("-") && t.length >= 2 && t[t.length - 2].isLetter() && first.text.firstOrNull()?.isLowerCase() == true) {
+                    out[out.size - 1] = Run(t.dropLast(1), lastRun.style)
+                } else add(Run(" ", lastRun.style))
+            }
+            l.runs.forEach { add(it) }
+        }
+        return out.filter { it.text.isNotEmpty() }
     }
 
     /** Appends a line, joining a word split by a hyphen at the line end. */

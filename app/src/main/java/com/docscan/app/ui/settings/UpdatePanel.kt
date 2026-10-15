@@ -65,6 +65,16 @@ fun UpdatePanel() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        val installed = updater.installedCode()
+        val prefs = remember { context.getSharedPreferences("docxels_updates", android.content.Context.MODE_PRIVATE) }
+        Text("Installed: build $installed (version 0.2.$installed)", style = MaterialTheme.typography.titleSmall)
+        // Right after updating, show which build this is and what it brought.
+        val savedFor = prefs.getLong("notes_for", -1L)
+        val savedNotes = prefs.getString("notes", "").orEmpty().lines().filter { it.isNotBlank() }
+        if (savedFor == installed && savedNotes.isNotEmpty()) {
+            Text("You are now on build $installed. New in this update — try these:", style = MaterialTheme.typography.titleSmall)
+            savedNotes.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
+        }
         when (s) {
             UpdateState.Idle -> OutlinedButton(onClick = ::check) { Text("Check for updates") }
             UpdateState.Checking -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Checking…") }
@@ -75,8 +85,9 @@ fun UpdatePanel() {
             is UpdateState.Available -> {
                 val small = s.info.patchFor(updater.installedCode())
                 val sizeText = if (small != null) "download about ${fmtSize(small.size)}, only the changes" else "download ${fmtSize(s.info.size)}"
-                Text("Version ${s.info.versionName} is available ($sizeText).", style = MaterialTheme.typography.titleSmall)
+                Text("Build ${s.info.versionCode} (version ${s.info.versionName}) is available ($sizeText).", style = MaterialTheme.typography.titleSmall)
                 val fresh = s.info.whatsNew(updater.installedCode())
+                prefs.edit().putLong("notes_for", s.info.versionCode).putString("notes", fresh.joinToString("\n")).apply()
                 if (fresh.isNotEmpty()) {
                     Text("New in this update — try these:", style = MaterialTheme.typography.titleSmall)
                     fresh.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }

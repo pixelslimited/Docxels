@@ -32,3 +32,5 @@
 88|Editor: Letterhead and Signature menus now have "My saved letterheads" (first page, continuous or every page) and "My saved signatures" (placed on the signing line).
 89|Editor tools grid is now divided into labelled groups on every tab (Home: Styles, Font, Paragraph, Clear; Insert: Illustrations, Letterhead and signature, Text and page; Layout, Review and View groups too).
 90|Opening a Word file with footnotes or endnotes no longer loses them: each note is numbered [n] in the text and its words are listed under Notes at the end.
+91|Build number now shows in Settings: 'Installed: build N' at the top of App updates, 'Build N is available', and after updating it lists what is new in your build.
+92|PDF to Word keeps more of the original: bold, italic, font sizes and common font names, and pictures are carried over in reading order (text does not wrap around them yet).

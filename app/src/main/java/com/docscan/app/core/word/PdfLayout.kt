@@ -3,10 +3,10 @@ package com.docscan.app.core.word
 import kotlin.math.abs
 
 /** One glyph of embedded PDF text, in page pixels: [x] left edge, [baseline] y of the baseline, [w] advance width, [size] font size. */
-data class Glyph(val ch: String, val x: Float, val baseline: Float, val w: Float, val size: Float)
+data class Glyph(val ch: String, val x: Float, val baseline: Float, val w: Float, val size: Float, val style: RunStyle = RunStyle())
 
 /** A run of text on one line with no large gap inside it (so table cells and columns stay apart). */
-data class TextSeg(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int, val size: Float) {
+data class TextSeg(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int, val size: Float, val runs: List<Run> = emptyList()) {
     val cx: Int get() = (left + right) / 2
     val cy: Int get() = (top + bottom) / 2
 }
@@ -20,6 +20,7 @@ object PdfLayout {
     fun segments(line: List<Glyph>): List<TextSeg> {
         val out = ArrayList<TextSeg>()
         var cur = StringBuilder()
+        var runs = ArrayList<Run>()
         var first: Glyph? = null
         var last: Glyph? = null
         var maxSize = 0f
@@ -29,24 +30,38 @@ object PdfLayout {
             val text = cur.toString().trim()
             if (text.isNotEmpty()) {
                 val fs = maxSize.coerceAtLeast(1f)
-                out += TextSeg(text, f.x.toInt(), (f.baseline - 0.85f * fs).toInt(), (l.x + l.w).toInt(), (f.baseline + 0.25f * fs).toInt(), fs)
+                out += TextSeg(text, f.x.toInt(), (f.baseline - 0.85f * fs).toInt(), (l.x + l.w).toInt(), (f.baseline + 0.25f * fs).toInt(), fs, trimRuns(runs))
             }
-            cur = StringBuilder(); first = null; last = null; maxSize = 0f
+            cur = StringBuilder(); runs = ArrayList(); first = null; last = null; maxSize = 0f
+        }
+        fun put(text: String, style: RunStyle) {
+            val lastRun = runs.lastOrNull()
+            if (lastRun != null && lastRun.style == style) runs[runs.size - 1] = Run(lastRun.text + text, style) else runs += Run(text, style)
         }
         for (g in line) {
             val prev = last
             if (prev != null) {
                 val gap = g.x - (prev.x + prev.w)
                 if (gap > 1.6f * maxOf(g.size, prev.size)) flush()
-                else if (gap > 0.18f * g.size && !cur.endsWith(" ") && g.ch != " ") cur.append(' ')
+                else if (gap > 0.18f * g.size && !cur.endsWith(" ") && g.ch != " ") { cur.append(' '); put(" ", prev.style) }
             }
             if (first == null) first = g
             cur.append(g.ch)
+            put(g.ch, g.style)
             last = g
             maxSize = maxOf(maxSize, g.size)
         }
         flush()
         return out
+    }
+
+    /** Removes leading and trailing spaces from a list of runs and drops runs left empty. */
+    fun trimRuns(runs: List<Run>): List<Run> {
+        if (runs.isEmpty()) return runs
+        val l = ArrayList(runs)
+        l[0] = Run(l[0].text.trimStart(), l[0].style)
+        l[l.size - 1] = Run(l.last().text.trimEnd(), l.last().style)
+        return l.filter { it.text.isNotEmpty() }
     }
 
     /** Groups segments into blocks (paragraph-like stacks of lines) in reading order. */
@@ -69,7 +84,7 @@ object PdfLayout {
                 home.right = maxOf(home.right, s.right)
             }
         }
-        return open.map { b -> OcrBlockIn(b.lines.map { OcrLine(it.text, it.left, it.top, it.right, it.bottom) }) }
+        return open.map { b -> OcrBlockIn(b.lines.map { OcrLine(it.text, it.left, it.top, it.right, it.bottom, it.runs) }) }
     }
 
     /** Text of every segment whose centre lies inside the cell, top-to-bottom then left-to-right. */

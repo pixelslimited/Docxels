@@ -52,4 +52,18 @@ class PdfLayoutTest {
         val first = (out.first() as Block.Para).paragraph
         assertTrue(first.style != ParaStyle.NORMAL)
     }
+
+    @Test fun boldWordKeepsItsOwnRunThroughToTheParagraph() {
+        val bold = RunStyle(bold = true, sizePt = 12f)
+        val plain = RunStyle(sizePt = 12f)
+        val g = "Dear ".mapIndexed { i, c -> Glyph(c.toString(), 10f + i * 6f, 50f, 6f, 12f, plain) } +
+            "Sir".mapIndexed { i, c -> Glyph(c.toString(), 40f + i * 6f, 50f, 6f, 12f, bold) }
+        val segs = PdfLayout.segments(g)
+        assertEquals("Dear Sir", segs[0].text)
+        assertEquals(listOf("Dear ", "Sir"), segs[0].runs.map { it.text })
+        val blocks = OcrLayout.page(PdfLayout.blocks(segs), emptyList(), 600, 9000)
+        val para = (blocks.single() as Block.Para).paragraph
+        assertEquals(true, para.runs.last().style.bold)
+        assertEquals("Dear Sir", para.runs.joinToString("") { it.text })
+    }
 }
