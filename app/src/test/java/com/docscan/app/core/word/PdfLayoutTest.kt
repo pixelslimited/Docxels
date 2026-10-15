@@ -67,3 +67,10 @@ class PdfLayoutTest {
         assertEquals("Dear Sir", para.runs.joinToString("") { it.text })
     }
 }
+
+class PdfSpaceTest {
+    @Test fun nonBreakingSpacesBecomeOrdinarySpaces() {
+        val g = listOf(Glyph("A", 10f, 50f, 6f, 12f), Glyph(" ", 16f, 50f, 6f, 12f), Glyph("B", 22f, 50f, 6f, 12f))
+        assertEquals("A B", PdfLayout.segments(g).single().text)
+    }
+}

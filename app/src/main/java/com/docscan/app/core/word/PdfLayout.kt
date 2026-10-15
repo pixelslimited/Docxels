@@ -38,7 +38,9 @@ object PdfLayout {
             val lastRun = runs.lastOrNull()
             if (lastRun != null && lastRun.style == style) runs[runs.size - 1] = Run(lastRun.text + text, style) else runs += Run(text, style)
         }
-        for (g in line) {
+        for (g0 in line) {
+            // Non-breaking and other odd spaces in a PDF become ordinary spaces, so the text can wrap in the editor.
+            val g = if (g0.ch.isNotEmpty() && g0.ch.all { it.isWhitespace() || it == '\u00A0' || it == '\u202F' }) g0.copy(ch = " ") else g0
             val prev = last
             if (prev != null) {
                 val gap = g.x - (prev.x + prev.w)
