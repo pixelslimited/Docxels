@@ -162,6 +162,10 @@ class ParaSpan(val attrs: ParaAttrs, private val density: Float) : LeadingMargin
             fm.descent += extra
             fm.bottom += extra
         }
+        // The blank room between sheets goes on the first line of each page after the first.
+        sp.getSpans(start, end, PageGapSpan::class.java).firstOrNull()?.let { g ->
+            if (g.gapPx > 0 && start in g.starts) { fm.ascent -= g.gapPx; fm.top -= g.gapPx }
+        }
         if (start <= s) {
             val before = pxPt(attrs.spaceBeforePt ?: StyleDefaults.spaceBeforePt(attrs.style)).roundToInt()
             fm.ascent -= before

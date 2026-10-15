@@ -51,30 +51,15 @@ class PageDecor(
     val pageGapPx: Float get() = bottomMarginPx + deskGapPx + topMarginPx
 }
 
-/** Adds the blank room between two sheets to the first line of each page, so pages are really apart on screen. */
-class PageGapSpan : android.text.style.LineHeightSpan {
+/**
+ * Where each page after the first begins and how much blank room (bottom margin + strip + top margin) its first line
+ * carries, so pages are really apart on screen. It is only data kept in the text: [ParaSpan.chooseHeight] adds the
+ * room, so one piece of code changes each line's height and can undo its own change when the layout hands a line the
+ * metrics it already enlarged (two spans changing the same line cannot do that reliably).
+ */
+class PageGapSpan {
     var starts: Set<Int> = emptySet()
     var gapPx = 0
-
-    // The metrics this span left after the previous line and what it added: the layout can hand the next line the
-    // metrics we already enlarged, and adding the gap again would put a page gap on every line that follows.
-    private var left: IntArray? = null
-    private var added = 0
-
-    override fun chooseHeight(text: CharSequence, start: Int, end: Int, spanstartv: Int, lineHeight: Int, fm: android.graphics.Paint.FontMetricsInt) {
-        left?.let { l ->
-            if (added != 0 && fm.ascent == l[0] && fm.top == l[1]) { fm.ascent += added; fm.top += added }
-        }
-        if (gapPx > 0 && start in starts) {
-            fm.ascent -= gapPx
-            fm.top -= gapPx
-            added = gapPx
-            left = intArrayOf(fm.ascent, fm.top)
-        } else {
-            added = 0
-            left = null
-        }
-    }
 }
 
 class DecorPic(val image: com.docscan.app.core.word.PageImage, val bitmap: android.graphics.Bitmap)
