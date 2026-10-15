@@ -44,3 +44,5 @@
 117|Tables: a live properties panel (rows, columns, cell text and shading, merge, widths, position, borders), and drag a table sideways to place it or up and down to move it between paragraphs.
 117|PDF to Word keeps the letterhead on every letter's first page, not only page 1.
 118|Progress card ("Page N of M…") fixed: readable text in dark theme, themed card colour, and a sensible width.
+118|Page view: text now wraps at the right margin in converted and opened documents (the page was being laid out as one endless line).
+118|Pinch the page to zoom from 100% to 300%.

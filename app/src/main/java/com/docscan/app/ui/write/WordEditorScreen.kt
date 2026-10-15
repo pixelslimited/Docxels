@@ -378,6 +378,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                         controller.setChipTapListener { i -> if (!controller.isReadOnly()) editing = i }
                         controller.setLinkTapListener { a, b, u -> linkActions = Triple(a, b, u) }
                         host.onWidth = { w -> controller.setAvailableWidth(w) }
+                        host.onPinch = { z -> zoom = z }
                     }
                 },
                 update = { host ->
@@ -385,6 +386,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     val gutter = when (viewMode) { ViewMode.PAGE -> 12f; ViewMode.TEXT -> 8f; ViewMode.MOBILE -> 0f }
                     host.setDesk(deskColor, (gutter * d).toInt(), (gutter * d).toInt())
                     val z = if (viewMode == ViewMode.MOBILE) 1f else zoom
+                    host.pinchEnabled = viewMode != ViewMode.MOBILE
                     host.setZoom(z)
                     controller.setZoom(z)
                     controller.setViewConfig(viewMode, page)

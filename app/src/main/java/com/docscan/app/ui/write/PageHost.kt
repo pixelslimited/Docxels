@@ -30,6 +30,39 @@ class PageHost(context: Context) : ScrollView(context) {
     /** Called with the width available to the editor whenever it changes. */
     var onWidth: ((Int) -> Unit)? = null
 
+    /** Called with the new zoom (1 to 3) while the person pinches the page. */
+    var onPinch: ((Float) -> Unit)? = null
+    var pinchEnabled = true
+    private var pinchZoom = 1f
+    private var pinching = false
+    private val scaler = android.view.ScaleGestureDetector(context, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: android.view.ScaleGestureDetector): Boolean { pinchZoom = zoom; return pinchEnabled }
+        override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
+            pinchZoom = (pinchZoom * detector.scaleFactor).coerceIn(1f, 3f)
+            val q = Math.round(pinchZoom * 20f) / 20f // steps of 5% so the text is not re-laid out on every tiny move
+            if (q != zoom) { setZoom(q); onPinch?.invoke(q) }
+            return true
+        }
+    })
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (pinchEnabled) {
+            scaler.onTouchEvent(ev)
+            if (scaler.isInProgress && !pinching) {
+                pinching = true
+                val c = android.view.MotionEvent.obtain(ev)
+                c.action = android.view.MotionEvent.ACTION_CANCEL
+                super.dispatchTouchEvent(c) // the editor was handling the first finger; let it go
+                c.recycle()
+            }
+            if (pinching) {
+                if (ev.actionMasked == android.view.MotionEvent.ACTION_UP || ev.actionMasked == android.view.MotionEvent.ACTION_CANCEL) pinching = false
+                return true
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     init {
         isFillViewport = true
         overScrollMode = OVER_SCROLL_NEVER
@@ -77,11 +110,6 @@ class PageHost(context: Context) : ScrollView(context) {
             sheet.forcedWidth = target
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-    }
-
-    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
-        super.onLayout(changed, l, t, r, b)
-        System.out.println("DocxelsQA host w=$width sheetW=${sheet.width} sheetLp=${sheet.layoutParams.width} editW=${edit.width} zoom=$zoom")
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
