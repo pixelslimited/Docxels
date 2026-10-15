@@ -182,6 +182,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var pageOpen by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val container = com.docscan.app.LocalContainer.current
+    var zoom by remember { mutableStateOf(1f) }
     var viewMode by remember { mutableStateOf(runCatching { ViewMode.valueOf(container.ui.editorView) }.getOrDefault(ViewMode.PAGE)) }
     var reading by remember { mutableStateOf(false) }
     var previewDoc by remember { mutableStateOf<WordDoc?>(null) }
@@ -373,6 +374,9 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     val d = host.resources.displayMetrics.density
                     val gutter = when (viewMode) { ViewMode.PAGE -> 12f; ViewMode.TEXT -> 8f; ViewMode.MOBILE -> 0f }
                     host.setDesk(deskColor, (gutter * d).toInt(), (gutter * d).toInt())
+                    val z = if (viewMode == ViewMode.MOBILE) 1f else zoom
+                    host.setZoom(z)
+                    controller.setZoom(z)
                     controller.setViewConfig(viewMode, page)
                     controller.setReadOnly(reading)
                 },
@@ -399,6 +403,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onTab = { ribbonTab = it },
                 viewMode = viewMode,
                 onViewMode = { viewMode = it; container.ui.editorView = it.name },
+                zoom = zoom,
+                onZoom = { zoom = when { zoom < 1.25f -> 1.5f; zoom < 1.75f -> 2f; zoom < 2.5f -> 3f; else -> 1f } },
                 onRead = { reading = true },
                 onPreview = { previewDoc = controller.toDoc(title, page) },
                 onLetterhead = { mode ->
@@ -583,6 +589,8 @@ private fun Ribbon(
     onTab: (Int) -> Unit,
     viewMode: ViewMode,
     onViewMode: (ViewMode) -> Unit,
+    zoom: Float,
+    onZoom: () -> Unit,
     onRead: () -> Unit,
     onPreview: () -> Unit,
     onLetterhead: (String) -> Unit,
@@ -803,6 +811,7 @@ private fun Ribbon(
                     else -> {
                         Btn("Page preview", Icons.Default.Description, close = true) { onPreview() }
                         Btn("Navigation", Icons.Default.Menu, close = true) { onNav() }
+                        if (viewMode != ViewMode.MOBILE) Btn("Zoom ${(zoom * 100).toInt()}%", Icons.Default.Search) { onZoom() }
                         com.docscan.app.ui.kit.FilterPill("Read mode", false, onRead, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Print layout", viewMode == ViewMode.PAGE, { onViewMode(ViewMode.PAGE) }, Modifier.padding(horizontal = 4.dp))
                         com.docscan.app.ui.kit.FilterPill("Text width", viewMode == ViewMode.TEXT, { onViewMode(ViewMode.TEXT) }, Modifier.padding(horizontal = 4.dp))

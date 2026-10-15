@@ -166,7 +166,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Optional Google sign-in / Pro features / AI-assisted writing | DEFERRED | On hold by the owner while it needs paid services. The app works fully without an account. |
 | Share as plain text (.txt) and RTF | IMPLEMENTED — NOT VERIFIED | Output logic TESTED in `PlainExportTest`. Text drops formatting; RTF keeps character/paragraph formatting and tables but not pictures or headers/footers. |
 | Read mode (view without editing) | IMPLEMENTED — NOT VERIFIED | Blocks typing and table/picture editing; text can still be selected and copied. |
-| Zoom control | NOT STARTED | Page view uses a fixed zoom today. |
+| Zoom control | IMPLEMENTED — NOT VERIFIED | View tab: "Zoom" cycles 100 / 150 / 200 / 300% in Print layout and Text width; the page scrolls sideways when zoomed. No pinch gesture yet. |
 | Comments, track changes, footnotes, TOC, styles pane, sections, headers/footers beyond one line, RTL, spellcheck options | NOT STARTED | Later phases. |
 | PDF to Word | IMPLEMENTED — NOT VERIFIED | Pages with a text layer are rebuilt from the PDF's own text (PdfBox) via PdfLayout + OcrLayout: headings from font size, lists, alignment, ruled tables. Pages with no text are read with OCR. Pure-Kotlin layout is unit-tested (PdfLayoutTest); the phone path is untried. Limits: pictures/drawings are not carried over (the user is told), multi-column pages come out in top-to-bottom order, bold/italic/colour not read from the PDF, password-protected PDFs must be unlocked first. |
 | Dashboard redesign | IMPLEMENTED — NOT VERIFIED | Home now has a featured PDF to Word card and a Convert row. |

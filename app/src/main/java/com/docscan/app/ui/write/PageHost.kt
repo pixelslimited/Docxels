@@ -13,6 +13,8 @@ import android.widget.ScrollView
 class PageHost(context: Context) : ScrollView(context) {
     val edit = RichEditText(context)
     private val sheet = FrameLayout(context)
+    private val across = android.widget.HorizontalScrollView(context)
+    private var zoom = 1f
 
     /** Called with the width available to the editor whenever it changes. */
     var onWidth: ((Int) -> Unit)? = null
@@ -20,7 +22,11 @@ class PageHost(context: Context) : ScrollView(context) {
     init {
         isFillViewport = true
         overScrollMode = OVER_SCROLL_NEVER
-        addView(sheet, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        across.isFillViewport = true
+        across.overScrollMode = OVER_SCROLL_NEVER
+        across.isHorizontalScrollBarEnabled = false
+        addView(across, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        across.addView(sheet, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         sheet.addView(edit, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
 
@@ -29,8 +35,21 @@ class PageHost(context: Context) : ScrollView(context) {
         sheet.setPadding(gutterPx, verticalGutterPx, gutterPx, verticalGutterPx)
     }
 
+    /** Zoom above 1 makes the sheet wider than the screen; it then scrolls sideways. */
+    fun setZoom(z: Float) {
+        if (z == zoom) return
+        zoom = z
+        applyZoom()
+    }
+
+    private fun applyZoom() {
+        val lp = sheet.layoutParams as FrameLayout.LayoutParams
+        lp.width = if (zoom <= 1.001f || width <= 0) ViewGroup.LayoutParams.MATCH_PARENT else (width * zoom).toInt()
+        sheet.layoutParams = lp
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (w > 0) onWidth?.invoke(w)
+        if (w > 0) { applyZoom(); onWidth?.invoke(w) }
     }
 }

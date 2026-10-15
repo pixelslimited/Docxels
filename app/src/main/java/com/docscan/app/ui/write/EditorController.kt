@@ -428,6 +428,16 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
         configure()
     }
 
+    private var zoomFactor = 1f
+
+    /** 1 = the sheet fits the screen; larger values magnify the page view (the host scrolls sideways). */
+    fun setZoom(z: Float) {
+        val f = z.coerceIn(1f, 3f)
+        if (f == zoomFactor) return
+        zoomFactor = f
+        configure()
+    }
+
     fun setAvailableWidth(px: Int) {
         if (px == availWidth) return
         availWidth = px
@@ -443,7 +453,8 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
         if (availWidth <= 0) return
         val d0 = baseDensity
         val gutter = when (mode) { ViewMode.PAGE -> 12f * d0; ViewMode.TEXT -> 8f * d0; ViewMode.MOBILE -> 0f }
-        val usable = (availWidth - 2 * gutter).coerceAtLeast(1f)
+        val zoomK = if (mode == ViewMode.MOBILE) 1f else zoomFactor
+        val usable = (availWidth * zoomK - 2 * gutter).coerceAtLeast(1f)
         val sheetPt = pageSetup.sheetWidthTwips / 20f
         val contentPt = pageSetup.contentWidthTwips / 20f
         val eff = when (mode) {
