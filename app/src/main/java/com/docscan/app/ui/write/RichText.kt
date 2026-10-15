@@ -141,10 +141,21 @@ class ParaSpan(val attrs: ParaAttrs, private val density: Float) : LeadingMargin
         else -> Layout.Alignment.ALIGN_NORMAL
     }
 
+    // What this span left in the font metrics after the previous line, and what it added. The layout can hand the next
+    // line the metrics we already enlarged; adding again would make every wrapped line taller than the one before.
+    private var leftMetrics: IntArray? = null
+    private var addedMetrics = IntArray(4)
+
     override fun chooseHeight(text: CharSequence, start: Int, end: Int, spanstartv: Int, lineHeight: Int, fm: Paint.FontMetricsInt) {
         val sp = text as? Spanned ?: return
         val s = sp.getSpanStart(this)
         val e = sp.getSpanEnd(this)
+        leftMetrics?.let { left ->
+            if (fm.ascent == left[0] && fm.top == left[1] && fm.descent == left[2] && fm.bottom == left[3]) {
+                fm.ascent -= addedMetrics[0]; fm.top -= addedMetrics[1]; fm.descent -= addedMetrics[2]; fm.bottom -= addedMetrics[3]
+            }
+        }
+        val ascent0 = fm.ascent; val top0 = fm.top; val descent0 = fm.descent; val bottom0 = fm.bottom
         val mult = attrs.lineSpacing ?: StyleDefaults.LINE_SPACING
         if (mult > 1f) {
             val extra = ((mult - 1f) * (fm.descent - fm.ascent)).roundToInt()
@@ -161,6 +172,8 @@ class ParaSpan(val attrs: ParaAttrs, private val density: Float) : LeadingMargin
             fm.descent += after
             fm.bottom += after
         }
+        addedMetrics = intArrayOf(fm.ascent - ascent0, fm.top - top0, fm.descent - descent0, fm.bottom - bottom0)
+        leftMetrics = intArrayOf(fm.ascent, fm.top, fm.descent, fm.bottom)
     }
 
     private fun defaultAfter() = if (attrs.list != ListKind.NONE) 0f else StyleDefaults.spaceAfterPt(attrs.style)
