@@ -44,3 +44,22 @@ adb shell input text "$LONG$LONG$LONG"; sleep 3
 dismiss
 shot 04_typed_paragraph
 adb logcat -d -s AndroidRuntime:E > "$OUT/crashes2.txt" 2>&1 || true
+
+# PDF to Word on a sample letter: letterhead on odd pages, artwork on every page, a rule and spaced paragraphs.
+step "pdf to word"
+adb shell am force-stop ng.pixelslimited.docxels; sleep 2
+adb push "$(dirname "$0")/sample-letter.pdf" /sdcard/Download/sample-letter.pdf >/dev/null
+adb shell monkey -p ng.pixelslimited.docxels -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 8
+dismiss
+tap "^Home$" 2
+if tap "PDF to Word" 4; then
+  shot 05_picker
+  tap "sample-letter" 3 || { tap "Downloads" 3; shot 05b_downloads; tap "sample-letter" 3; }
+  for i in 1 2 3 4 5 6; do shot "06_progress_$i"; sleep 2; done
+  sleep 15
+  shot 07_converted
+  adb shell input swipe 540 1800 540 600 300; sleep 2; shot 08_converted_scrolled
+else
+  echo "PDF to Word tile not found"
+fi
+adb logcat -d -s AndroidRuntime:E > "$OUT/crashes3.txt" 2>&1 || true
