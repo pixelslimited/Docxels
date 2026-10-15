@@ -278,6 +278,9 @@ data class ToolbarState(
     val font: String? = null,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
+    /** Whether the paragraph currently has any space before / after it (decides the toggle label). */
+    val spaceBefore: Boolean = false,
+    val spaceAfter: Boolean = false,
 )
 
 private class Snap(val blocks: List<Block>, val selStart: Int, val selEnd: Int)
@@ -518,7 +521,11 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
         val attrs = RichOps.attrsOf(t, RichOps.paragraphAt(t, a))
         val size = (RichOps.valueAt(t, a, CharKind.SIZE) as? Float) ?: StyleDefaults.sizePt(attrs.style)
         val vert = RichOps.valueAt(t, a, CharKind.VERT) as? Boolean
+        val before = (attrs.spaceBeforePt ?: StyleDefaults.spaceBeforePt(attrs.style)) > 0f
+        val after = (attrs.spaceAfterPt ?: if (attrs.list != ListKind.NONE) 0f else StyleDefaults.spaceAfterPt(attrs.style)) > 0f
         _state.value = ToolbarState(
+            spaceBefore = before,
+            spaceAfter = after,
             bold = RichOps.covers(t, a, b, CharKind.BOLD),
             italic = RichOps.covers(t, a, b, CharKind.ITALIC),
             underline = RichOps.covers(t, a, b, CharKind.UNDERLINE),
@@ -608,6 +615,17 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
     fun indent(delta: Int) = paragraphs {
         if (it.list != ListKind.NONE) it.copy(level = (it.level + delta).coerceIn(0, 8))
         else it.copy(indentLeftTwips = (it.indentLeftTwips + delta * 720).coerceIn(0, 7200))
+    }
+
+    /** Toggles the gap above the selected paragraphs: 12 pt when there is none, otherwise none. */
+    fun toggleSpaceBefore() {
+        val add = !_state.value.spaceBefore
+        paragraphs { it.copy(spaceBeforePt = if (add) 12f else 0f) }
+    }
+
+    fun toggleSpaceAfter() {
+        val add = !_state.value.spaceAfter
+        paragraphs { it.copy(spaceAfterPt = if (add) 12f else 0f) }
     }
 
     fun setLineSpacing(mult: Float?) = paragraphs { it.copy(lineSpacing = mult) }

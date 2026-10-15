@@ -783,6 +783,15 @@ private fun Ribbon(
                                 listOf(null to "Default", 1.0f to "Single", 1.15f to "1.15", 1.5f to "1.5", 2.0f to "Double").forEach { (m, label) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { spacingMenu = false; c.setLineSpacing(m) })
                                 }
+                                androidx.compose.material3.HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text(if (s.spaceBefore) "Remove space before paragraph" else "Add space before paragraph") },
+                                    onClick = { spacingMenu = false; c.toggleSpaceBefore() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (s.spaceAfter) "Remove space after paragraph" else "Add space after paragraph") },
+                                    onClick = { spacingMenu = false; c.toggleSpaceAfter() },
+                                )
                             }
                         }
                         Btn("Outdent", Icons.Default.FormatIndentDecrease) { c.indent(-1) }
