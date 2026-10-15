@@ -6,7 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Draw
@@ -482,10 +483,12 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         onDismiss = { tableOpen = false; tableCustom = false },
     )
     editing?.let { idx ->
-        when (val b = controller.blockAt(idx)) {
+        // The block as it was when the editor opened, so live changes don't reset the editor's own state.
+        when (val b = remember(idx) { controller.blockAt(idx) }) {
             is Block.Table -> TableEditorDialog(
                 initial = b.table,
                 onSave = { controller.replaceBlock(idx, Block.Table(it)); editing = null },
+                onLive = { controller.replaceBlock(idx, Block.Table(it)) },
                 onRemove = { controller.removeBlock(idx); editing = null },
                 onDismiss = { editing = null },
             )
@@ -493,6 +496,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 initial = b.image,
                 contentWidthTwips = page.contentWidthTwips,
                 onSave = { controller.replaceBlock(idx, Block.Image(it)); editing = null },
+                onLive = { controller.replaceBlock(idx, Block.Image(it)) },
                 onRemove = { controller.removeBlock(idx); editing = null },
                 onDismiss = { editing = null },
             )
@@ -500,6 +504,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 initial = b.shape,
                 contentWidthTwips = page.contentWidthTwips,
                 onSave = { controller.replaceBlock(idx, Block.Shape(it)); editing = null },
+                onLive = { controller.replaceBlock(idx, Block.Shape(it)) },
                 onRemove = { controller.removeBlock(idx); editing = null },
                 onDismiss = { editing = null },
             )
@@ -652,11 +657,11 @@ private fun Ribbon(
             Toggle(icon, label, on, click)
         }
     }
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
+    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
         Column {
             if (!open) {
-                Box(Modifier.fillMaxWidth().height(36.dp).clickable { open = true; grid = true }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Show tools", modifier = Modifier.size(28.dp))
+                Box(Modifier.fillMaxWidth().height(52.dp).clickable { open = true; grid = true }, contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Apps, contentDescription = "Show tools", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -665,7 +670,7 @@ private fun Ribbon(
                             Tab(selected = tab == i, onClick = { if (tab == i && grid) grid = false else { onTab(i); grid = true } }, text = { Text(label, maxLines = 1) })
                         }
                     }
-                    IconButton(onClick = { open = false }) { Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Hide tools") }
+                    IconButton(onClick = { open = false }, modifier = Modifier.size(52.dp)) { Icon(Icons.Default.Close, contentDescription = "Hide tools", modifier = Modifier.size(30.dp)) }
                 }
             }
             val items: @Composable () -> Unit = {

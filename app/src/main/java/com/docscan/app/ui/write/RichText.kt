@@ -242,7 +242,7 @@ class FontNameSpan(val name: String) : MetricAffectingSpan() {
     override fun updateDrawState(tp: TextPaint) = apply(tp)
     private fun apply(tp: TextPaint) {
         val style = tp.typeface?.style ?: 0
-        tp.typeface = Typeface.create(familyFor(name), style)
+        tp.typeface = WordFonts.typeface(name, style) ?: Typeface.create(familyFor(name), style)
     }
 
     companion object {

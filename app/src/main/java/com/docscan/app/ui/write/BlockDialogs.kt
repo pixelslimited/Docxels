@@ -6,6 +6,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
@@ -124,10 +126,15 @@ private val SHADES = listOf(null, 0xD9E2F3, 0xE2EFDA, 0xFFF2CC, 0xFCE4D6, 0xEDED
 fun TableEditorDialog(
     initial: TableBlock,
     onSave: (TableBlock) -> Unit,
+    onLive: (TableBlock) -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var table by remember { mutableStateOf(initial) }
+    var tableStarted by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(table) {
+        if (tableStarted) { kotlinx.coroutines.delay(150); onLive(table) } else tableStarted = true
+    }
     var sel by remember { mutableStateOf(0 to 0) }
     val merged = remember(initial) { initial.rows.any { r -> r.any { it.colSpan > 1 || it.vMergeStart || it.vMergeContinue } } }
 
@@ -139,10 +146,10 @@ fun TableEditorDialog(
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = { onLive(initial); onDismiss() }) { Text("Undo all") }
                     Text("Table", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
                     TextButton(onClick = onRemove) { Text("Remove") }
-                    TextButton(onClick = { onSave(table) }) { Text("Save") }
+                    TextButton(onClick = { onSave(table) }) { Text("Done") }
                 }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     val (sr, sc) = sel
@@ -268,12 +275,62 @@ fun TableEditorDialog(
     }
 }
 
+
+/**
+ * A panel docked at the bottom of the screen that does not dim or block the page, so every change made in it is
+ * seen on the document straight away. There is no Save step: the page is already up to date; Done just closes it.
+ */
+@Composable
+private fun LivePanel(
+    title: String,
+    onDone: () -> Unit,
+    onRemove: () -> Unit,
+    onRevert: () -> Unit,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = onDone, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
+        val window = (androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+        androidx.compose.runtime.SideEffect {
+            window?.let {
+                it.setGravity(android.view.Gravity.BOTTOM)
+                it.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                it.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
+                it.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            }
+        }
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            tonalElevation = 6.dp,
+            shadowElevation = 12.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.androidx_navPad().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onRevert) { Text("Undo") }
+                    TextButton(onClick = onRemove) { Text("Remove") }
+                    androidx.compose.material3.Button(onClick = onDone) { Text("Done") }
+                }
+                Column(
+                    Modifier.androidx_maxH().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    content = content,
+                )
+            }
+        }
+    }
+}
+
+private fun Modifier.androidx_navPad(): Modifier = this.then(Modifier.navigationBarsPadding())
+private fun Modifier.androidx_maxH(): Modifier = this.then(Modifier.heightIn(max = 300.dp))
+
 /** Size, alignment and removal for an inserted picture. */
 @Composable
 fun ImageEditorDialog(
     initial: ImageBlock,
     contentWidthTwips: Int,
     onSave: (ImageBlock) -> Unit,
+    onLive: (ImageBlock) -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -288,11 +345,23 @@ fun ImageEditorDialog(
         val o = BitmapFactory.Options().apply { inSampleSize = 4 }
         BitmapFactory.decodeByteArray(cur.bytes, 0, cur.bytes.size, o)
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Picture") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    fun build(): ImageBlock {
+        val w = (contentWidthTwips * fraction).toInt().coerceAtLeast(720)
+        val h = (w.toLong() * initial.heightTwips / initial.widthTwips.coerceAtLeast(1)).toInt().coerceAtLeast(360)
+        return cur.copy(widthTwips = w, heightTwips = h, align = align, wrap = wrap)
+    }
+    var started by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(fraction, align, wrap, cur) {
+        if (started) { kotlinx.coroutines.delay(40); onLive(build()) } else started = true
+    }
+    LivePanel(
+        title = "Picture",
+        onDone = { onSave(build()) },
+        onRemove = onRemove,
+        onRevert = { fraction = (initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.1f, 1f); align = initial.align; wrap = initial.wrap; cur = initial },
+    ) {
+        run {
+            run {
                 thumb?.let {
                     Image(
                         it.asImageBitmap(), contentDescription = null,
@@ -351,23 +420,9 @@ fun ImageEditorDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val w = (contentWidthTwips * fraction).toInt().coerceAtLeast(720)
-                val h = (w.toLong() * initial.heightTwips / initial.widthTwips.coerceAtLeast(1)).toInt().coerceAtLeast(360)
-                onSave(cur.copy(widthTwips = w, heightTwips = h, align = align, wrap = wrap))
-            }) { Text("Save") }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onRemove) { Text("Remove") }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
-            }
-        },
-    )
+        }
+    }
 }
-
 
 private val SHAPE_COLORS = listOf(0x1F4E79, 0x7F6000, 0x375623, 0xC55A11, 0xC00000, 0x7030A0, 0x404040, 0x000000)
 private val SHAPE_FILLS = listOf(0xDDEBF7, 0xFFF2CC, 0xE2EFDA, 0xFCE4D6, 0xF8CBAD, 0xEADCF4, 0xD9D9D9, 0xFFFFFF)
@@ -378,6 +433,7 @@ fun ShapeEditorDialog(
     initial: com.docscan.app.core.word.ShapeBlock,
     contentWidthTwips: Int,
     onSave: (com.docscan.app.core.word.ShapeBlock) -> Unit,
+    onLive: (com.docscan.app.core.word.ShapeBlock) -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -389,11 +445,27 @@ fun ShapeEditorDialog(
     var lineWidth by remember { mutableFloatStateOf(initial.lineWidthPt) }
     var align by remember { mutableStateOf(initial.align) }
     var wrap by remember { mutableStateOf(initial.wrap) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(com.docscan.app.core.word.ShapePresets.label(initial.preset)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    fun build(): com.docscan.app.core.word.ShapeBlock {
+        val w = (contentWidthTwips * widthFraction).toInt().coerceAtLeast(240)
+        val h = if (isLine) 0 else (contentWidthTwips * heightFraction).toInt().coerceAtLeast(120)
+        return initial.copy(widthTwips = w, heightTwips = h, fill = fill, lineColor = line, lineWidthPt = lineWidth, align = align, wrap = wrap)
+    }
+    var started by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(widthFraction, heightFraction, fill, line, lineWidth, align, wrap) {
+        if (started) { kotlinx.coroutines.delay(40); onLive(build()) } else started = true
+    }
+    LivePanel(
+        title = com.docscan.app.core.word.ShapePresets.label(initial.preset),
+        onDone = { onSave(build()) },
+        onRemove = onRemove,
+        onRevert = {
+            widthFraction = (initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.05f, 1f)
+            heightFraction = (initial.heightTwips.toFloat() / contentWidthTwips).coerceIn(0.03f, 1f)
+            fill = initial.fill; line = initial.lineColor; lineWidth = initial.lineWidthPt; align = initial.align; wrap = initial.wrap
+        },
+    ) {
+        run {
+            run {
                 Text("Width ${(widthFraction * 100).toInt()}% of the page")
                 Slider(widthFraction, { widthFraction = it }, valueRange = 0.05f..1f)
                 if (!isLine) {
@@ -440,21 +512,8 @@ fun ShapeEditorDialog(
                     )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val w = (contentWidthTwips * widthFraction).toInt().coerceAtLeast(240)
-                val h = if (isLine) 0 else (contentWidthTwips * heightFraction).toInt().coerceAtLeast(120)
-                onSave(initial.copy(widthTwips = w, heightTwips = h, fill = fill, lineColor = line, lineWidthPt = lineWidth, align = align, wrap = wrap))
-            }) { Text("Save") }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onRemove) { Text("Remove") }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
-            }
-        },
-    )
+        }
+    }
 }
 
 

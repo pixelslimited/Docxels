@@ -1,0 +1,10 @@
+Fonts bundled with Docxels (subset to Latin characters)
+
+Carlito (metric-compatible with Calibri) - (c) Lukasz Dziedzic / Google, SIL Open Font License 1.1
+Caladea (metric-compatible with Cambria) - (c) Andrés Torresi, Carolina Giovanolli, Huerta Tipográfica; Apache License 2.0 / SIL OFL 1.1
+Liberation Sans, Liberation Serif, Liberation Mono - (c) Red Hat, Inc.; SIL Open Font License 1.1
+Lora - (c) The Lora Project Authors (Cyreal); SIL Open Font License 1.1
+Poppins - (c) The Poppins Project Authors (Indian Type Foundry); SIL Open Font License 1.1
+DejaVu Sans, Serif, Sans Mono - (c) Bitstream, Inc. and Tavmjong Bah; Bitstream Vera / DejaVu free license (permits use, copying, embedding and redistribution)
+
+The SIL Open Font License 1.1 is at https://openfontlicense.org

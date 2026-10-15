@@ -53,7 +53,7 @@ val WORD_FONTS = listOf(
     "Aptos", "Book Antiqua", "Comic Sans MS", "Impact",
 )
 
-private fun previewFamily(name: String): FontFamily = when (FontNameSpan.familyFor(name)) {
+private fun previewFamily(name: String): FontFamily = WordFonts.typeface(name, 0)?.let { FontFamily(it) } ?: when (FontNameSpan.familyFor(name)) {
     "serif" -> FontFamily.Serif
     "monospace" -> FontFamily.Monospace
     else -> FontFamily.SansSerif
@@ -68,7 +68,7 @@ fun FontPickerDialog(current: String?, recent: List<String>, onPick: (String?) -
         text = {
             Column {
                 Text(
-                    "Docxels shows the closest font this phone has. The font name is saved in the document, so Word and LibreOffice show the real one.",
+                    "Fonts marked built-in are shown exactly. For the others Docxels shows the closest built-in font, and the name is saved so Word shows the real one.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -76,7 +76,9 @@ fun FontPickerDialog(current: String?, recent: List<String>, onPick: (String?) -
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     if (recent.isNotEmpty()) item { Text("Recent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
                     items(recent) { f -> FontRow(f, f == current) { onPick(f) } }
-                    item { Text("All fonts", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp)) }
+                    item { Text("Built into Docxels", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp)) }
+                    items(WordFonts.builtInNames) { f -> FontRow(f, f == current) { onPick(f) } }
+                    item { Text("Word font names", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp)) }
                     items(WORD_FONTS) { f -> FontRow(f, f == current) { onPick(f) } }
                 }
                 OutlinedTextField(custom, { custom = it }, singleLine = true, label = { Text("Other font name") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))

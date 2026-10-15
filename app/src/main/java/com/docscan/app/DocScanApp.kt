@@ -28,6 +28,7 @@ class DocScanApp : Application() {
         if (!OpenCVLoader.initLocal()) {
             Log.e("DocScan", "OpenCV native libraries failed to load; scanning features will not work")
         }
+        com.docscan.app.ui.write.WordFonts.init(this)
         enableEncryption()
         container = AppContainer(this)
         thread(name = "docxels-housekeeping") {
