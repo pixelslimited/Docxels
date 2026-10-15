@@ -43,3 +43,4 @@
 117|Pictures, signatures and shapes: width and height sliders with a Keep proportions switch, and drag handles on the page (corner keeps proportions, edge handles change one side). Letterheads always stretch to fill the page.
 117|Tables: a live properties panel (rows, columns, cell text and shading, merge, widths, position, borders), and drag a table sideways to place it or up and down to move it between paragraphs.
 117|PDF to Word keeps the letterhead on every letter's first page, not only page 1.
+118|Progress card ("Page N of M…") fixed: readable text in dark theme, themed card colour, and a sensible width.

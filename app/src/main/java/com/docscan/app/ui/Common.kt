@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -124,15 +126,24 @@ fun BusyOverlay(visible: Boolean, label: String) {
             .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.large)
-                .padding(24.dp),
+        androidx.compose.material3.Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = 6.dp,
+            modifier = Modifier.padding(horizontal = 32.dp).widthIn(max = 320.dp),
         ) {
-            CircularProgressIndicator()
-            Spacer(Modifier.height(12.dp))
-            Text(label)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    label, color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
         }
     }
 }
