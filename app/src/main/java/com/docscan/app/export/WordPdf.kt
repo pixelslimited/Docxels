@@ -238,6 +238,14 @@ object WordPdf {
         fun image(img: ImageBlock) {
             val bmp = decode(img.bytes) ?: return
             try {
+                if (img.pageRelative && img.wrap.floating) {
+                    // Pinned to the sheet: drawn at its place on the page the anchor falls on, whatever the margins.
+                    val c = canvas!!
+                    val l = img.offsetXTwips / 20f
+                    val t = img.offsetYTwips / 20f
+                    c.drawBitmap(bmp, null, RectF(l, t, l + img.widthTwips / 20f, t + img.heightTwips / 20f), Paint(Paint.FILTER_BITMAP_FLAG))
+                    return
+                }
                 var w = img.widthTwips / 20f * ZOOM
                 var h = img.heightTwips / 20f * ZOOM
                 if (w > contentW) { h *= contentW / w; w = contentW }

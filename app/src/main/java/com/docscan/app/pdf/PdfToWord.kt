@@ -60,7 +60,8 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             onStatus("Studying the pages: pictures, lines and boxes…")
             val parts = withContext(Dispatchers.Default) { (0 until total).map { runCatching { findParts(doc, it) }.getOrNull() } }
             val pagePics = parts.map { it?.pics ?: emptyList() }
-            val (setup, repeated) = withContext(Dispatchers.Default) { letterheadFrom(pagePics, total, setup0) }
+            val (setup, repeated, artSigs) = withContext(Dispatchers.Default) { letterheadFrom(pagePics, total, setup0) }
+            val artCache = HashMap<String, Block.Image?>()
             var letterheadFound = repeated.isNotEmpty()
             val blocks = ArrayList<Block>()
             var ocrPages = 0
@@ -87,6 +88,17 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
                             scan.pageBlocks(bitmap, setup)
                         }
                         if (i > 0) blocks += Block.PageBreak
+                        // Page-sized artwork that only some pages carry (a letterhead on each letter's first page) is pinned to its page.
+                        for (pic in pagePics[i]) {
+                            if (pic.sig !in artSigs) continue
+                            val art = artCache.getOrPut(pic.sig) {
+                                encode(pic.image)?.let { (bytes, ext) ->
+                                    Block.Image(ImageBlock(bytes, ext, (pic.fw * setup.sheetWidthTwips).toInt(), (pic.fh * setup.sheetHeightTwips).toInt(),
+                                        wrap = ImageWrap.BEHIND, offsetXTwips = (pic.fx * setup.sheetWidthTwips).toInt(), offsetYTwips = (pic.fy * setup.sheetHeightTwips).toInt(), pageRelative = true))
+                                }
+                            }
+                            if (art != null) blocks += art
+                        }
                         blocks += pageBlocks.ifEmpty { listOf(Block.Para(Paragraph(listOf(Run("[Nothing readable on page ${i + 1}]"))))) }
                     } finally {
                         bitmap.recycle()
@@ -95,7 +107,7 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             }
             val notes = ArrayList<String>()
             if (ocrPages > 0) notes += "$ocrPages page(s) had no text layer and were read with OCR, so check them for mistakes."
-            if (letterheadFound) notes += "Pictures repeated across pages were kept as the letterhead and page artwork. Artwork found only on some pages is placed on page 1."
+            if (letterheadFound) notes += "Pictures repeated across pages were kept as the letterhead and page artwork. Artwork that only some pages carry (such as a letterhead on each letter's first page) stays on those pages."
             if (pictures > 0) notes += "$pictures picture(s) were carried over. They sit in reading order between the text; text does not wrap around them."
             val out = WordDoc(title = title, blocks = blocks.ifEmpty { listOf(Block.Para(Paragraph())) }, page = setup)
             return PdfConversion(out, notes)
@@ -335,14 +347,13 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
      * (upper half) or footer artwork (lower half). The top and bottom margins grow to clear them, so the text starts
      * below the letterhead as it did on the PDF.
      */
-    private fun letterheadFrom(pages: List<List<PagePic>>, total: Int, setup: PageSetup): Pair<PageSetup, Set<String>> {
-        if (total < 2) return setup to emptySet()
+    private fun letterheadFrom(pages: List<List<PagePic>>, total: Int, setup: PageSetup): Triple<PageSetup, Set<String>, Set<String>> {
+        if (total < 2) return Triple(setup, emptySet(), emptySet())
         val counts = HashMap<String, Int>()
         val first = HashMap<String, PagePic>()
         for (pics in pages) for (sig in pics.map { it.sig }.toSet()) counts[sig] = (counts[sig] ?: 0) + 1
         for (pics in pages) for (p in pics) first.putIfAbsent(p.sig, p)
         val need = maxOf(2, (total * 0.4f).toInt())
-        val onFirstPage = pages.firstOrNull()?.map { it.sig }?.toSet() ?: emptySet()
         val repeated = counts.filter { it.value >= need }.keys.filter { sig ->
             val p = first[sig]!!
             val area = p.fw * p.fh
@@ -350,16 +361,15 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             // Page-sized artwork (a full letterhead, a faint background) is kept too when it really repeats.
             small || area >= 0.5f
         }.toSet()
-        if (repeated.isEmpty()) return setup to emptySet()
+        if (repeated.isEmpty()) return Triple(setup, emptySet(), emptySet())
         val sw = setup.sheetWidthTwips
         val sh = setup.sheetHeightTwips
         val header = ArrayList<PageImage>()
         val footer = ArrayList<PageImage>()
-        val firstHeader = ArrayList<PageImage>()
-        val firstFooter = ArrayList<PageImage>()
+        val artSigs = HashSet<String>()
+        val kept = HashSet<String>()
         var top = setup.marginTopTwips
         var bottom = setup.marginBottomTwips
-        var firstOnly = false
         for (sig in repeated) {
             val p = first[sig]!!
             val (bytes, ext) = encode(p.image) ?: continue
@@ -368,26 +378,24 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
             val everyPage = counts[sig]!! >= total
             val atTop = p.fy + p.fh / 2f < 0.5f
             if (big && !everyPage) {
-                // Only some pages carry it (a letterhead on each letter's first page): it goes on the first page.
-                if (sig in onFirstPage) { firstHeader += img; firstOnly = true }
+                // Only some pages carry it (a letterhead on each letter's first page): it is pinned to those pages.
+                artSigs += sig; kept += sig
                 continue
             }
+            kept += sig
             if (atTop) {
-                header += img; firstHeader += img
+                header += img
                 if (!big) top = maxOf(top, img.yTwips + img.heightTwips + 240)
             } else {
-                footer += img; firstFooter += img
+                footer += img
                 if (!big) bottom = maxOf(bottom, sh - img.yTwips + 240)
             }
         }
-        if (header.isEmpty() && footer.isEmpty() && firstHeader.isEmpty()) return setup to emptySet()
-        return setup.copy(
+        if (kept.isEmpty()) return Triple(setup, emptySet(), emptySet())
+        return Triple(setup.copy(
             headerImages = header, footerImages = footer,
-            differentFirstPage = firstOnly || setup.differentFirstPage,
-            firstHeaderImages = if (firstOnly) firstHeader else emptyList(),
-            firstFooterImages = if (firstOnly) firstFooter else emptyList(),
             marginTopTwips = top.coerceAtMost(sh / 3), marginBottomTwips = bottom.coerceAtMost(sh / 3),
-        ) to repeated
+        ), kept, artSigs)
     }
 
     /** This page's pictures as inline picture blocks, each with its top edge in page pixels so it lands in reading order. */

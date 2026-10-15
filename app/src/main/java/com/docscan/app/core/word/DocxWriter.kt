@@ -426,11 +426,11 @@ object DocxWriter {
             "<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$cx\" cy=\"$cy\"/></a:xfrm>" +
             "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>" +
             "</a:graphicData></a:graphic>"
-        sb.append("<w:r>").append(drawingXml(id, cx, cy, img.wrap, img.align, frame, img.offsetXTwips, img.offsetYTwips)).append("</w:r></w:p>")
+        sb.append("<w:r>").append(drawingXml(id, cx, cy, img.wrap, img.align, frame, img.offsetXTwips, img.offsetYTwips, img.pageRelative)).append("</w:r></w:p>")
     }
 
     /** `<w:drawing>` holding [frame] either inline or anchored with the chosen text wrap. */
-    private fun drawingXml(id: Int, cx: Long, cy: Long, wrap: ImageWrap, align: Align, frame: String, offX: Int = 0, offY: Int = 0): String {
+    private fun drawingXml(id: Int, cx: Long, cy: Long, wrap: ImageWrap, align: Align, frame: String, offX: Int = 0, offY: Int = 0, pageRel: Boolean = false): String {
         if (wrap == ImageWrap.IN_LINE) {
             return "<w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">" +
                 "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:docPr id=\"$id\" name=\"Picture $id\"/>" + frame + "</wp:inline></w:drawing>"
@@ -448,9 +448,10 @@ object DocxWriter {
         }
         return "<w:drawing><wp:anchor distT=\"0\" distB=\"0\" distL=\"114300\" distR=\"114300\" simplePos=\"0\" relativeHeight=\"${251658240 + id}\" " +
             "behindDoc=\"$behind\" locked=\"0\" layoutInCell=\"1\" allowOverlap=\"1\"><wp:simplePos x=\"0\" y=\"0\"/>" +
-            (if (wrap.floating) "<wp:positionH relativeFrom=\"column\"><wp:posOffset>${offX.toLong() * Twips.EMU_PER_TWIP}</wp:posOffset></wp:positionH>"
+            (if (wrap.floating && pageRel) "<wp:positionH relativeFrom=\"page\"><wp:posOffset>${offX.toLong() * Twips.EMU_PER_TWIP}</wp:posOffset></wp:positionH>"
+            else if (wrap.floating) "<wp:positionH relativeFrom=\"column\"><wp:posOffset>${offX.toLong() * Twips.EMU_PER_TWIP}</wp:posOffset></wp:positionH>"
             else "<wp:positionH relativeFrom=\"column\"><wp:align>$hAlign</wp:align></wp:positionH>") +
-            "<wp:positionV relativeFrom=\"paragraph\"><wp:posOffset>${if (wrap.floating) offY.toLong() * Twips.EMU_PER_TWIP else 0L}</wp:posOffset></wp:positionV>" +
+            "<wp:positionV relativeFrom=\"${if (wrap.floating && pageRel) "page" else "paragraph"}\"><wp:posOffset>${if (wrap.floating) offY.toLong() * Twips.EMU_PER_TWIP else 0L}</wp:posOffset></wp:positionV>" +
             "<wp:extent cx=\"$cx\" cy=\"$cy\"/><wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/>" +
             wrapEl + "<wp:docPr id=\"$id\" name=\"Picture $id\"/>" + frame + "</wp:anchor></w:drawing>"
     }

@@ -10,6 +10,15 @@ class FloatingObjectTest {
     private fun roundTrip(vararg blocks: Block): List<Block> =
         DocxReader.read(java.io.ByteArrayInputStream(DocxWriter.toBytes(WordDoc("t", blocks.toList())))).blocks
 
+    @Test fun pagePinnedPictureKeepsItsSheetPosition() {
+        val img = ImageBlock(png, "png", 11906, 16838, wrap = ImageWrap.BEHIND, offsetXTwips = 0, offsetYTwips = 0, pageRelative = true)
+        val back = roundTrip(Block.Image(img), Block.Para(Paragraph(listOf(Run("Hello")))), Block.PageBreak, Block.Image(img.copy(offsetYTwips = 200)))
+            .filterIsInstance<Block.Image>().map { it.image }
+        assertEquals(2, back.size)
+        assertTrue(back.all { it.pageRelative && it.wrap == ImageWrap.BEHIND })
+        assertEquals(200, back[1].offsetYTwips)
+    }
+
     @Test fun pictureKeepsWhereItWasDropped() {
         val img = ImageBlock(png, "png", 3000, 2000, wrap = ImageWrap.IN_FRONT, offsetXTwips = 1700, offsetYTwips = 900)
         val back = roundTrip(Block.Para(Paragraph(listOf(Run("Hello")))), Block.Image(img)).filterIsInstance<Block.Image>().single().image

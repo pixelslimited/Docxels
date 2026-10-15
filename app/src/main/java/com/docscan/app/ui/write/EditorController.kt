@@ -273,6 +273,17 @@ class RichEditText(context: Context) : EditText(context) {
             val (w, h) = span.floatSizePx(paint) ?: continue
             val (ox, oy) = span.offsetTwips()
             val line = l.getLineForOffset(t.getSpanStart(span))
+            val pageImg = (span.block as? com.docscan.app.core.word.Block.Image)?.image?.takeIf { it.pageRelative }
+            val dec = decor
+            if (pageImg != null && dec != null) {
+                // Pinned to the sheet the anchor falls on, measured from that sheet's top-left corner.
+                val ys = pageStarts()
+                val lineTop = l.getLineTop(line).toFloat()
+                val sheet = ys.indexOfLast { it <= lineTop }.coerceAtLeast(0)
+                val sheetTop = if (sheet == 0) 0f else totalPaddingTop + ys[sheet] + dec.bottomMarginPx + dec.deskGapPx
+                out += Hit(span, ox * k, sheetTop + oy * k, w.toFloat(), h.toFloat())
+                continue
+            }
             out += Hit(span, paddingLeft + ox * k, totalPaddingTop + l.getLineTop(line) + oy * k, w.toFloat(), h.toFloat())
         }
         return out

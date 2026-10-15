@@ -123,9 +123,11 @@ data class ImageBlock(
     /** For floating pictures: distance from the left margin and from the top of the anchor paragraph. */
     val offsetXTwips: Int = 0,
     val offsetYTwips: Int = 0,
+    /** Floating only: the offsets are measured from the top-left corner of the sheet the anchor sits on, not from the margin. */
+    val pageRelative: Boolean = false,
 ) {
     override fun equals(other: Any?): Boolean =
-        other is ImageBlock && extension == other.extension && widthTwips == other.widthTwips &&
+        other is ImageBlock && pageRelative == other.pageRelative && extension == other.extension && widthTwips == other.widthTwips &&
             heightTwips == other.heightTwips && align == other.align && wrap == other.wrap &&
             offsetXTwips == other.offsetXTwips && offsetYTwips == other.offsetYTwips && bytes.contentEquals(other.bytes)
 

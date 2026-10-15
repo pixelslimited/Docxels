@@ -728,6 +728,18 @@ object DocxReader {
                 return x to y
             }
 
+            /** Offsets from the sheet's corner when a picture behind the text is positioned relative to the page on both axes. */
+            fun pageAbsolute(drawing: XNode): Pair<Int, Int>? {
+                val anchor = drawing.find("anchor") ?: return null
+                val ph = anchor.child("positionH")
+                val pv = anchor.child("positionV")
+                if (ph?.attr("relativeFrom") != "page" || pv?.attr("relativeFrom") != "page") return null
+                fun emu(n: XNode?): Int? = n?.text?.toString()?.trim()?.toLongOrNull()?.let { (it / Twips.EMU_PER_TWIP).toInt() }
+                val x = emu(ph.child("posOffset")) ?: return null
+                val y = emu(pv.child("posOffset")) ?: return null
+                return x to y
+            }
+
             fun readShape(drawing: XNode, wsp: XNode) {
                 val extent = drawing.find("extent")
                 val cx = extent?.attr("cx")?.toLongOrNull() ?: 0L
@@ -774,8 +786,9 @@ object DocxReader {
                 val h = if (cy != null && cy > 0) (cy / Twips.EMU_PER_TWIP).toInt() else 3240
                 val wrap = wrapOf(drawing)
                 flush(false)
-                val off = if (wrap.floating) offsetsOf(drawing, w) else (0 to 0)
-                out += Block.Image(ImageBlock(bytes, ext, w.coerceAtLeast(120), h.coerceAtLeast(120), base.align, wrap, off.first, off.second))
+                val abs = if (wrap == ImageWrap.BEHIND) pageAbsolute(drawing) else null
+                val off = abs ?: if (wrap.floating) offsetsOf(drawing, w) else (0 to 0)
+                out += Block.Image(ImageBlock(bytes, ext, w.coerceAtLeast(120), h.coerceAtLeast(120), base.align, wrap, off.first, off.second, pageRelative = abs != null))
                 emitted = true
             }
 
