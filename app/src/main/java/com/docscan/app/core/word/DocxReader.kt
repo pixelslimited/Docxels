@@ -81,7 +81,7 @@ object DocxReader {
         }
         val notes = ArrayList<String>()
         val fn = count(footnotes, "<w:footnote ") - count(footnotes, "w:type=\"separator\"") - count(footnotes, "w:type=\"continuationSeparator\"")
-        if (fn > 0) notes += "footnotes ($fn)"
+        if (fn > 0) notes += "footnotes ($fn) moved to a Notes list at the end"
         if ("word/endnotes.xml" in names) {
             val en = count(doc, "<w:endnoteReference")
             if (en > 0) notes += "endnotes ($en)"
@@ -133,6 +133,8 @@ object DocxReader {
         var defaultStyleId: String? = null
         var numKinds: Map<String, Map<Int, ListKind>> = emptyMap() // numId -> level -> kind
         var page = PageSetup()
+        /** Footnotes and endnotes in the order they are cited; their text is added at the end so nothing is lost. */
+        val cited = ArrayList<Pair<String, String>>() // kind ("footnote"/"endnote") to id
 
         fun xml(path: String): XNode? {
             val bytes = parts[path] ?: return null
@@ -157,9 +159,28 @@ object DocxReader {
 
             val blocks = ArrayList<Block>()
             readBlocks(body, blocks)
+            appendNotes(dir, blocks)
             if (blocks.isEmpty()) blocks += Block.Para(Paragraph())
             val title = xml("docProps/core.xml")?.find("title")?.text?.toString()?.trim().orEmpty()
             return WordDoc(title.ifEmpty { fallbackTitle }, blocks, page)
+        }
+
+        /** Footnote and endnote text, added under a "Notes" heading with the [n] numbers cited in the text. */
+        fun appendNotes(dir: String, blocks: MutableList<Block>) {
+            if (cited.isEmpty()) return
+            val texts = HashMap<String, String>()
+            for (kind in listOf("footnote", "endnote")) {
+                val root = xml((if (dir.isEmpty()) "" else "$dir/") + kind + "s.xml") ?: continue
+                for (n in root.findAll(kind)) {
+                    val id = n.attr("id") ?: continue
+                    texts["$kind:$id"] = n.findAll("p").joinToString(" ") { p -> p.findAll("t").joinToString("") { it.text.toString() } }.trim()
+                }
+            }
+            blocks += Block.Para(Paragraph(listOf(Run("Notes", RunStyle(bold = true)))))
+            cited.forEachIndexed { i, (kind, id) ->
+                val t = texts["$kind:$id"].orEmpty()
+                blocks += Block.Para(Paragraph(listOf(Run("[${i + 1}] $t"))))
+            }
         }
 
         fun findMainPart(): String? {
@@ -661,6 +682,13 @@ object DocxReader {
                         } else addText("\n", style)
                         "cr" -> addText("\n", style)
                         "noBreakHyphen" -> addText("‑", style)
+                        "footnoteReference", "endnoteReference" -> {
+                            val id = c.attr("id")
+                            if (id != null && allowImages) {
+                                cited += c.local.removeSuffix("Reference") to id
+                                addText("[${cited.size}]", style.copy(vertical = VerticalAlign.SUPERSCRIPT))
+                            }
+                        }
                         "drawing", "pict" -> if (allowImages) readImage(c)
                         "AlternateContent" -> if (allowImages) {
                             c.childrenNamed("Choice").firstNotNullOfOrNull { it.child("drawing") }?.let { readImage(it) }

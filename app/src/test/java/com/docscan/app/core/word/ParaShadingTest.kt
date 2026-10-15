@@ -132,4 +132,15 @@ class CompatNotesTest {
         assertEquals(true, notes.any { it.startsWith("tracked changes (2") })
         assertEquals(true, notes.contains("charts"))
     }
+
+    @Test fun footnoteTextIsKeptAtTheEnd() {
+        val bytes = zip(
+            "word/document.xml" to "<w:document><w:body><w:p><w:r><w:t>Claim</w:t></w:r><w:r><w:footnoteReference w:id=\"1\"/></w:r></w:p></w:body></w:document>",
+            "word/footnotes.xml" to "<w:footnotes><w:footnote w:type=\"separator\" w:id=\"-1\"/><w:footnote w:id=\"1\"><w:p><w:r><w:t>See the source.</w:t></w:r></w:p></w:footnote></w:footnotes>",
+        )
+        val text = DocxReader.read(bytes).blocks.filterIsInstance<Block.Para>().joinToString("\n") { p -> p.paragraph.runs.joinToString("") { it.text } }
+        assertEquals(true, text.contains("Claim[1]"))
+        assertEquals(true, text.contains("Notes"))
+        assertEquals(true, text.contains("[1] See the source."))
+    }
 }

@@ -31,3 +31,4 @@
 87|Settings: new Letterheads and Signatures sections. Add them from a picture, a PDF or a Word file (signature backgrounds are removed) and keep them on your phone.
 88|Editor: Letterhead and Signature menus now have "My saved letterheads" (first page, continuous or every page) and "My saved signatures" (placed on the signing line).
 89|Editor tools grid is now divided into labelled groups on every tab (Home: Styles, Font, Paragraph, Clear; Insert: Illustrations, Letterhead and signature, Text and page; Layout, Review and View groups too).
+90|Opening a Word file with footnotes or endnotes no longer loses them: each note is numbered [n] in the text and its words are listed under Notes at the end.
