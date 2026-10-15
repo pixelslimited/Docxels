@@ -47,16 +47,6 @@ dismiss
 shot 04_typed_paragraph
 adb logcat -d -s AndroidRuntime:E > "$OUT/crashes2.txt" 2>&1 || true
 
-# Justify the typed paragraph through the ribbon (floating icon, bottom right).
-step justify
-sleep 40  # the emulator types slowly; wait until the whole paragraph is in
-shot 04_typed_full
-adb shell input keyevent 4; sleep 2
-adb shell input tap 980 2170; sleep 2; shot 04a_ribbon
-tap "^Paragraph$" 2; shot 04b_paragraph
-tap "^Justify$" 2; shot 04c_justify_ribbon
-adb shell input tap 540 200; sleep 1
-
 # PDF to Word on a sample letter: letterhead on odd pages, artwork on every page, a rule and spaced paragraphs.
 step "pdf to word"
 adb shell am force-stop ng.pixelslimited.docxels; sleep 2
@@ -75,5 +65,15 @@ if tap "PDF to Word" 4; then
 else
   echo "PDF to Word tile not found"
 fi
+# Justify the first long paragraph of the converted letter through the ribbon, then look at it.
+step justify
+adb shell input swipe 540 600 540 1800 300; sleep 2
+adb shell input tap 540 950; sleep 2
+adb shell input keyevent 4; sleep 2
+adb shell input tap 980 2170; sleep 2; shot 09a_ribbon
+tap "^Paragraph$" 2
+tap "^Justify$" 2; shot 09b_justify_ribbon
+tap "^Close" 2 || adb shell input tap 1010 1450
+sleep 2; shot 09c_justified
 adb logcat -d -s AndroidRuntime:E > "$OUT/crashes3.txt" 2>&1 || true
 adb logcat -d -s System.out:I > "$OUT/measure-log.txt" 2>&1 || true
