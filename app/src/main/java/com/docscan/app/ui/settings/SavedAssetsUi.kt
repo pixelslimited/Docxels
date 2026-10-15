@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -74,11 +75,10 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
     var source by remember { mutableStateOf<Bitmap?>(null) }
     val word = if (signature) "signature" else "letterhead"
 
-    fun save(bytes: ByteArray) {
-        store.add("${word.replaceFirstChar { it.uppercase() }} ${items.size + 1}", bytes)
-        items = store.list()
-        say("Saved. You can insert it from the editor's ${if (signature) "Signature" else "Letterhead"} menu.")
-    }
+    var pendingBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var renaming by remember { mutableStateOf<SavedAssets.Item?>(null) }
+
+    fun save(bytes: ByteArray) { pendingBytes = bytes } // asks for a name first
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -109,6 +109,7 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Thumb(store, item, signature, Modifier.width(110.dp))
                 Text(item.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                IconButton(onClick = { renaming = item }) { Icon(Icons.Default.Edit, contentDescription = "Rename ${item.name}") }
                 IconButton(onClick = {
                     val bytes = store.bytes(item)
                     if (bytes == null) say("Could not read it.") else {
@@ -126,9 +127,34 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
             Text("  Add a $word")
         }
     }
+    pendingBytes?.let { bytes ->
+        NameDialog("Name this $word", "${word.replaceFirstChar { it.uppercase() }} ${items.size + 1}", "Save",
+            onDone = { n ->
+                store.add(n, bytes); items = store.list(); pendingBytes = null
+                say("Saved as ${SavedAssets.cleanName(n)}. Insert it from the editor's ${if (signature) "Signature" else "Letterhead"} menu.")
+            },
+            onDismiss = { pendingBytes = null })
+    }
+    renaming?.let { item ->
+        NameDialog("Rename $word", item.name, "Rename",
+            onDone = { n -> store.rename(item, n); items = store.list(); renaming = null },
+            onDismiss = { renaming = null })
+    }
     source?.let { src ->
         SignatureImportDialog(src, onInsert = { bytes, _, _ -> source = null; save(bytes) }, onDismiss = { source = null })
     }
+}
+
+@Composable
+private fun NameDialog(title: String, initial: String, action: String, onDone: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { androidx.compose.material3.OutlinedTextField(text, { text = it.take(40) }, singleLine = true, label = { Text("Name") }) },
+        confirmButton = { TextButton(onClick = { onDone(text) }) { Text(action) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /** Editor: choose a saved letterhead (and where it goes) or a saved signature. */
@@ -136,7 +162,13 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
 fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: String) -> Unit, onDismiss: () -> Unit, signLabel: String = "Place on the signing line") {
     val context = LocalContext.current
     val store = remember(signature) { SavedAssets(context, if (signature) "signatures" else "letterheads") }
-    val items = remember(signature) { store.list() }
+    var items by remember(signature) { mutableStateOf(store.list()) }
+    var renaming by remember { mutableStateOf<SavedAssets.Item?>(null) }
+    renaming?.let { item ->
+        NameDialog("Rename", item.name, "Rename",
+            onDone = { n -> store.rename(item, n); items = store.list(); renaming = null },
+            onDismiss = { renaming = null })
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (signature) "My signatures" else "My letterheads") },
@@ -148,7 +180,10 @@ fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: Strin
                 items.forEach { item ->
                     val bytes = remember(item.id) { store.bytes(item) }
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(item.name, style = MaterialTheme.typography.labelLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(item.name, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { renaming = item }) { Icon(Icons.Default.Edit, contentDescription = "Rename ${item.name}") }
+                        }
                         Thumb(store, item, signature, Modifier.fillMaxWidth())
                         if (bytes != null) {
                             if (signature) {

@@ -23,13 +23,26 @@ class SavedAssets(context: Context, kind: String) {
 
     fun add(name: String, bytes: ByteArray): Item {
         val id = System.currentTimeMillis().toString()
-        val clean = name.replace(Regex("[^A-Za-z0-9 .-]"), "").trim().take(40).ifBlank { "Untitled" }
+        val clean = cleanName(name)
         val file = File(dir, "${id}_$clean.img")
         SecureFiles.write(file, bytes)
         return Item("${id}_$clean", clean, file)
     }
 
+    /** Gives a kept item a new name (the picture and its place in the list stay the same). */
+    fun rename(item: Item, name: String): Item {
+        val clean = cleanName(name)
+        val stamp = item.id.substringBefore('_')
+        val target = File(dir, "${stamp}_$clean.img")
+        if (target != item.file && !target.exists()) item.file.renameTo(target)
+        return Item("${stamp}_$clean", clean, if (target.exists()) target else item.file)
+    }
+
     fun bytes(item: Item): ByteArray? = runCatching { SecureFiles.read(item.file) }.getOrNull()
 
     fun delete(item: Item) = SecureFiles.wipe(item.file)
+
+    companion object {
+        fun cleanName(name: String): String = name.replace(Regex("[^\\p{L}\\p{N} .-]"), "").trim().take(40).ifBlank { "Untitled" }
+    }
 }
