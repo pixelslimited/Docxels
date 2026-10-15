@@ -244,6 +244,15 @@ class LookSpan(val style: ParaStyle) : MetricAffectingSpan() {
     }
 }
 
+/**
+ * Extra width for every space in one wrapped line of a justified paragraph, so the line ends exactly at the right
+ * margin. It is a layout aid only: it is never saved, and the editor recomputes it after every layout.
+ */
+class GapSpan(val extra: Float) : MetricAffectingSpan() {
+    override fun updateMeasureState(tp: TextPaint) { tp.wordSpacing = extra }
+    override fun updateDrawState(tp: TextPaint) { tp.wordSpacing = extra }
+}
+
 class PtSizeSpan(val pt: Float) : MetricAffectingSpan() {
     override fun updateMeasureState(tp: TextPaint) { tp.textSize = pt * ZOOM * tp.density }
     override fun updateDrawState(tp: TextPaint) { tp.textSize = pt * ZOOM * tp.density }

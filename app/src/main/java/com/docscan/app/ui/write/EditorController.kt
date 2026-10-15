@@ -142,12 +142,66 @@ class RichEditText(context: Context) : EditText(context) {
         return ys to set
     }
 
+    /**
+     * Justified paragraphs: every wrapped line except the last of its paragraph gets a little extra width in each
+     * space so it ends at the right margin (the last line stays left-aligned, as in Word). Returns true when it
+     * changed anything, so the caller measures again. Safe to run repeatedly: it works out each line's natural width
+     * by taking its own earlier extra off, so a settled layout gives no further changes.
+     */
+    private fun justifyLines(): Boolean {
+        val l = layout ?: return false
+        val t = text ?: return false
+        val existing = t.getSpans(0, t.length, GapSpan::class.java)
+        val used = HashSet<GapSpan>()
+        var changed = false
+        for (line in 0 until l.lineCount) {
+            val s = l.getLineStart(line)
+            val e = l.getLineEnd(line)
+            if (e <= s) continue
+            val para = t.getSpans(s, s + 1, ParaSpan::class.java).firstOrNull() ?: continue
+            if (para.attrs.align != Align.JUSTIFY) continue
+            if (e >= t.getSpanEnd(para) || t[e - 1] == '\n') continue
+            var b = e
+            while (b > s && t[b - 1] == ' ') b--
+            if (b <= s) continue
+            var gaps = 0
+            var plain = true
+            for (i in s until b) {
+                val c = t[i]
+                if (c == ' ') gaps++ else if (c == CHIP_CHAR || c == '\t') plain = false
+            }
+            if (gaps == 0 || !plain) continue
+            val room = l.getParagraphRight(line) - l.getParagraphLeft(line)
+            val mine = existing.firstOrNull { t.getSpanStart(it) == s && t.getSpanEnd(it) == b }
+            val natural = l.getLineMax(line) - (mine?.extra ?: 0f) * gaps
+            // 1.5 px short of the margin so rounding can never push the last word onto the next line.
+            val want = ((room - 1.5f - natural) / gaps).coerceIn(0f, paint.textSize)
+            if (mine != null) {
+                used += mine
+                if (kotlin.math.abs(mine.extra - want) > 0.3f) {
+                    t.removeSpan(mine)
+                    if (want > 0.3f) t.setSpan(GapSpan(want), s, b, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    changed = true
+                }
+            } else if (want > 0.3f) {
+                t.setSpan(GapSpan(want), s, b, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                changed = true
+            }
+        }
+        for (g in existing) if (g !in used) {
+            if (t.getSpanStart(g) >= 0) { t.removeSpan(g); changed = true }
+        }
+        return changed
+    }
+
     /** Y (in layout coordinates) where each page starts; see [scanPages]. */
     fun pageStarts(): List<Float> = scanPages().first
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         syncGap()
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        var fits = 0
+        while (fits++ < 3 && layout != null && justifyLines()) super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val d = decor ?: return
         if (layout == null) return
         var rounds = 0

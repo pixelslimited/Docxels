@@ -47,6 +47,14 @@ dismiss
 shot 04_typed_paragraph
 adb logcat -d -s AndroidRuntime:E > "$OUT/crashes2.txt" 2>&1 || true
 
+# Justify the typed paragraph through the ribbon (floating icon, bottom right).
+step justify
+adb shell input keyevent 4; sleep 2
+adb shell input tap 980 2170; sleep 2; shot 04a_ribbon
+tap "^Paragraph$" 2; shot 04b_paragraph
+tap "^Justify$" 2; shot 04c_justify_ribbon
+adb shell input tap 540 200; sleep 1
+
 # PDF to Word on a sample letter: letterhead on odd pages, artwork on every page, a rule and spaced paragraphs.
 step "pdf to word"
 adb shell am force-stop ng.pixelslimited.docxels; sleep 2
