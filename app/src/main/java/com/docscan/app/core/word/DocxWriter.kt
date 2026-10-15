@@ -21,6 +21,7 @@ object DocxWriter {
 
     fun write(doc: WordDoc, out: OutputStream) {
         val ctx = Ctx()
+        ctx.comments = doc.comments.associateBy { it.id }
         val body = StringBuilder()
         writeBlocks(doc.blocks, body, ctx)
         // Word requires a paragraph after a table that ends the body.
@@ -43,6 +44,7 @@ object DocxWriter {
             rels.append("<Relationship Id=\"rIdImg${i + 1}\" Type=\"$REL/image\" Target=\"media/image${i + 1}.${img.extension}\"/>")
         }
 
+        if (ctx.usedComments.isNotEmpty()) rels.append("<Relationship Id=\"rIdComments\" Type=\"$REL/comments\" Target=\"comments.xml\"/>")
         ctx.links.forEach { (url, id) ->
             rels.append("<Relationship Id=\"$id\" Type=\"$REL/hyperlink\" Target=\"${Xml.escape(url)}\" TargetMode=\"External\"/>")
         }
@@ -88,6 +90,7 @@ object DocxWriter {
         )
         putText("word/styles.xml", stylesXml())
         putText("word/numbering.xml", numberingXml(ctx))
+        if (ctx.usedComments.isNotEmpty()) putText("word/comments.xml", commentsXml(ctx))
         var mediaNo = 0
         val hfExts = LinkedHashSet<String>()
         /** Writes a header/footer part, plus its relationships and pictures when it has any. */
@@ -177,6 +180,8 @@ object DocxWriter {
         var currentNumId = 0
         var drawingId = 1
         val links = LinkedHashMap<String, String>() // address -> relationship id
+        var comments: Map<Int, DocComment> = emptyMap()
+        val usedComments = LinkedHashSet<Int>()
     }
 
     private fun put(zip: ZipOutputStream, name: String, bytes: ByteArray) {
@@ -197,6 +202,7 @@ object DocxWriter {
         sb.append("<Override PartName=\"/word/document.xml\" ContentType=\"$w.document.main+xml\"/>")
         sb.append("<Override PartName=\"/word/styles.xml\" ContentType=\"$w.styles+xml\"/>")
         sb.append("<Override PartName=\"/word/numbering.xml\" ContentType=\"$w.numbering+xml\"/>")
+        if (ctx.usedComments.isNotEmpty()) sb.append("<Override PartName=\"/word/comments.xml\" ContentType=\"$w.comments+xml\"/>")
         if (header) sb.append("<Override PartName=\"/word/header1.xml\" ContentType=\"$w.header+xml\"/>")
         if (footer) sb.append("<Override PartName=\"/word/footer1.xml\" ContentType=\"$w.footer+xml\"/>")
         if (firstHeader) sb.append("<Override PartName=\"/word/header2.xml\" ContentType=\"$w.header+xml\"/>")
@@ -295,7 +301,22 @@ object DocxWriter {
         jc(p.align)?.let { pPr.append("<w:jc w:val=\"$it\"/>") }
         if (pPr.isNotEmpty()) sb.append("<w:pPr>").append(pPr).append("</w:pPr>")
         var open: String? = null
+        var openComment: Int? = null
+        fun closeComment() {
+            val id = openComment ?: return
+            sb.append("<w:commentRangeEnd w:id=\"$id\"/><w:r><w:commentReference w:id=\"$id\"/></w:r>")
+            openComment = null
+        }
         for (run in p.runs) {
+            val cid = run.style.comment?.takeIf { it in ctx.comments && (it == openComment || it !in ctx.usedComments) }
+            if (cid != openComment) {
+                closeComment()
+                if (cid != null) {
+                    sb.append("<w:commentRangeStart w:id=\"$cid\"/>")
+                    ctx.usedComments += cid
+                    openComment = cid
+                }
+            }
             val url = run.style.link?.let { LinkSafety.normalize(it) }
             if (url != open) {
                 if (open != null) sb.append("</w:hyperlink>")
@@ -308,7 +329,22 @@ object DocxWriter {
             writeRun(if (url != null) run.copy(style = run.style.copy(color = run.style.color ?: 0x0563C1, underline = true)) else run, sb)
         }
         if (open != null) sb.append("</w:hyperlink>")
+        closeComment()
         sb.append("</w:p>")
+    }
+
+    private fun commentsXml(ctx: Ctx): String {
+        val sb = StringBuilder(HEAD).append("<w:comments $NS>")
+        for (id in ctx.usedComments) {
+            val c = ctx.comments[id] ?: continue
+            val initials = c.author.split(' ').filter { it.isNotBlank() }.joinToString("") { it.take(1).uppercase() }.take(4)
+            sb.append("<w:comment w:id=\"${c.id}\" w:author=\"${Xml.escape(c.author)}\" w:initials=\"${Xml.escape(initials)}\">")
+            for (line in c.text.split('\n').ifEmpty { listOf("") }) {
+                sb.append("<w:p><w:r><w:t xml:space=\"preserve\">").append(Xml.escape(line)).append("</w:t></w:r></w:p>")
+            }
+            sb.append("</w:comment>")
+        }
+        return sb.append("</w:comments>").toString()
     }
 
     private fun jc(a: Align): String? = when (a) {

@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.foundation.layout.width
@@ -157,13 +158,15 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
-    val controller = remember { EditorController(density, initial.blocks) }
+    val controller = remember { EditorController(density, initial.blocks, initial.comments) }
     val state by controller.state.collectAsState()
     var fontOpen by remember { mutableStateOf(false) }
     var sizeOpen by remember { mutableStateOf(false) }
     var paraOpen by remember { mutableStateOf(false) }
     var symbolOpen by remember { mutableStateOf(false) }
     var dateOpen by remember { mutableStateOf(false) }
+    var commentNew by remember { mutableStateOf(false) }
+    var commentsOpen by remember { mutableStateOf(false) }
     var navOpen by remember { mutableStateOf(false) }
     var statsOpen by remember { mutableStateOf(false) }
     var linkOpen by remember { mutableStateOf<Triple<String, String, IntArray?>?>(null) }
@@ -509,6 +512,10 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onParagraph = { paraOpen = true },
                 onSymbol = { symbolOpen = true },
                 onDate = { dateOpen = true },
+                onNewComment = {
+                    if (controller.selectedText().isBlank()) scope.launch { snackbar.showSnackbar("Select the words you want to comment on first.") } else commentNew = true
+                },
+                onComments = { commentsOpen = true },
                 onToc = {
                     val t = com.docscan.app.core.word.TableOfContents.text(controller.outline())
                     if (t.isEmpty()) scope.launch { snackbar.showSnackbar("Give some lines a Heading style first, then insert the contents.") }
@@ -687,6 +694,12 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             onDismiss = { linkActions = null },
         )
     }
+    if (commentNew) CommentEditDialog(
+        title = "New comment", initial = "", action = "Add",
+        onDone = { body -> commentNew = false; controller.addComment("Me", body) },
+        onDismiss = { commentNew = false },
+    )
+    if (commentsOpen) CommentsDialog(controller, onDismiss = { commentsOpen = false })
     if (symbolOpen) SymbolDialog(onInsert = { symbolOpen = false; controller.insertText(it) }, onDismiss = { symbolOpen = false })
     if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
     if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
@@ -729,6 +742,8 @@ private fun Ribbon(
     onSymbol: () -> Unit,
     onDate: () -> Unit,
     onToc: () -> Unit,
+    onNewComment: () -> Unit,
+    onComments: () -> Unit,
     onLink: () -> Unit,
     onNav: () -> Unit,
     caseMenu: Boolean,
@@ -757,7 +772,7 @@ private fun Ribbon(
         0 -> listOf("Font" to Icons.Default.TextFields, "Paragraph" to Icons.Default.FormatAlignLeft, "Style" to Icons.Default.Title, "Clear" to Icons.Default.FormatClear)
         1 -> listOf("Illustrations" to Icons.Default.Image, "Letterhead and signature" to Icons.Default.Draw, "Text and page" to Icons.Default.Link)
         2 -> listOf("Page" to Icons.Default.Description, "Paragraph" to Icons.Default.FormatAlignLeft, "Borders and shading" to Icons.Default.CropSquare)
-        3 -> listOf("Find" to Icons.Default.Search, "Proofing" to Icons.Default.Numbers)
+        3 -> listOf("Find" to Icons.Default.Search, "Proofing" to Icons.Default.Numbers, "Comments" to Icons.Default.Menu)
         else -> listOf("Views" to Icons.Default.Description, "Zoom" to Icons.Default.Search, "Reading" to Icons.Default.Menu)
     }
     val pickedGroup = groupPick[tab]?.takeIf { n -> groupsOf(tab).any { it.first == n } } ?: groupsOf(tab).first().first
@@ -987,6 +1002,9 @@ private fun Ribbon(
                         Btn("Find and replace", Icons.Default.Search, close = true) { onFind() }
                         Group("Proofing")
                         Btn("Word count", Icons.Default.Numbers, close = true) { onCount() }
+                        Group("Comments")
+                        Btn("New comment", Icons.Default.Add, close = true) { onNewComment() }
+                        Btn("Comments", Icons.Default.Menu, close = true) { onComments() }
                     }
                     else -> {
                         Group("Views")
@@ -1234,3 +1252,49 @@ private fun tw(text: String, fallback: Int): Int {
 
 @Composable
 private fun Modifier.horizontalScrollFreeColumn(): Modifier = this.then(Modifier.fillMaxWidth())
+
+
+@Composable
+private fun CommentEditDialog(title: String, initial: String, action: String, onDone: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { androidx.compose.material3.OutlinedTextField(text, { text = it.take(2000) }, label = { Text("Comment") }, minLines = 3, modifier = Modifier.fillMaxWidth()) },
+        confirmButton = { TextButton(onClick = { onDone(text) }, enabled = text.isNotBlank()) { Text(action) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Every comment in the document: tap Go to to jump to the text, edit it, or delete it. */
+@Composable
+private fun CommentsDialog(controller: EditorController, onDismiss: () -> Unit) {
+    var list by remember { mutableStateOf(controller.comments()) }
+    var editing by remember { mutableStateOf<com.docscan.app.core.word.DocComment?>(null) }
+    editing?.let { c ->
+        CommentEditDialog("Edit comment", c.text, "Save",
+            onDone = { controller.editComment(c.id, it); list = controller.comments(); editing = null },
+            onDismiss = { editing = null })
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Comments (${list.size})") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (list.isEmpty()) Text("No comments yet. Select some words, then choose New comment.", style = MaterialTheme.typography.bodyMedium)
+                list.forEach { c ->
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(c.author, style = MaterialTheme.typography.labelLarge)
+                        Text(c.text, style = MaterialTheme.typography.bodyMedium)
+                        Row {
+                            TextButton(onClick = { controller.showComment(c.id); onDismiss() }) { Text("Go to") }
+                            TextButton(onClick = { editing = c }) { Text("Edit") }
+                            TextButton(onClick = { controller.deleteComment(c.id); list = controller.comments() }) { Text("Delete") }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
+}

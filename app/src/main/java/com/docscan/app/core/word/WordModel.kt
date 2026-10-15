@@ -21,6 +21,8 @@ data class RunStyle(
     val vertical: VerticalAlign = VerticalAlign.BASELINE,
     /** Web address, e-mail (mailto:) or phone (tel:) this text links to. */
     val link: String? = null,
+    /** Id of the comment this text is attached to (see [DocComment]). */
+    val comment: Int? = null,
 ) {
     /** Properties set on [this] win; anything unset falls back to [base]. */
     fun over(base: RunStyle): RunStyle = RunStyle(
@@ -35,6 +37,7 @@ data class RunStyle(
         font = font ?: base.font,
         vertical = if (vertical != VerticalAlign.BASELINE) vertical else base.vertical,
         link = link ?: base.link,
+        comment = comment ?: base.comment,
     )
 }
 
@@ -238,6 +241,9 @@ data class PageSetup(
     val contentHeightTwips: Int get() = (sheetHeightTwips - marginTopTwips - marginBottomTwips).coerceAtLeast(720)
 }
 
+/** A comment on part of the text: [id] matches [RunStyle.comment] on the text it is attached to. */
+data class DocComment(val id: Int, val author: String, val text: String)
+
 /** A font file carried inside a .docx. [style]: 0 regular, 1 bold, 2 italic, 3 bold italic. */
 class EmbeddedFont(val name: String, val style: Int, val bytes: ByteArray)
 
@@ -247,6 +253,7 @@ data class WordDoc(
     val page: PageSetup = PageSetup(),
     /** Fonts the file embeds; only set when reading, the editor registers them so the text shows in its own font. */
     val fonts: List<EmbeddedFont> = emptyList(),
+    val comments: List<DocComment> = emptyList(),
 )
 
 object Twips {

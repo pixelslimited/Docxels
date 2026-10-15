@@ -283,6 +283,13 @@ class FontNameSpan(val name: String) : MetricAffectingSpan() {
     }
 }
 
+/** A comment's anchor: the text it is about is tinted, and the id links it to the comment's text. */
+class CommentSpan(val id: Int) : CharacterStyle(), UpdateAppearance {
+    override fun updateDrawState(tp: TextPaint) {
+        if (tp.bgColor == 0) tp.bgColor = 0x66FFD54F
+    }
+}
+
 /** Underline that remembers its Word style (double, dotted, wavy…) so it survives editing and saving. */
 class UnderlineStyleSpan(val word: String) : UnderlineSpan()
 
@@ -370,6 +377,7 @@ object RichOps {
         is FontNameSpan -> FontNameSpan(span.name)
         is VertSpan -> VertSpan(span.up)
         is LinkSpan -> LinkSpan(span.url)
+        is CommentSpan -> CommentSpan(span.id)
         else -> span
     }
 
@@ -641,6 +649,7 @@ object SpanBridge {
         st.sizePt?.let { put(CharAttr.Size(it)) }
         st.font?.let { put(CharAttr.Font(it)) }
         st.link?.let { put(CharAttr.Link(it)) }
+        st.comment?.let { sb.setSpan(CommentSpan(it), s, e, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
         when (st.vertical) {
             VerticalAlign.SUPERSCRIPT -> put(CharAttr.Vert(true))
             VerticalAlign.SUBSCRIPT -> put(CharAttr.Vert(false))
@@ -697,6 +706,7 @@ object SpanBridge {
                     is FontNameSpan -> st.copy(font = s.name)
                     is VertSpan -> st.copy(vertical = if (s.up) VerticalAlign.SUPERSCRIPT else VerticalAlign.SUBSCRIPT)
                     is LinkSpan -> st.copy(link = s.url)
+                    is CommentSpan -> st.copy(comment = s.id)
                     else -> st
                 }
             }
@@ -708,7 +718,7 @@ object SpanBridge {
     }
 
     private fun isCharSpan(s: Any) = s is StyleSpan || s is UnderlineSpan || s is StrikethroughSpan ||
-        s is ForegroundColorSpan || s is BackgroundColorSpan || s is PtSizeSpan || s is FontNameSpan || s is VertSpan || s is LinkSpan
+        s is ForegroundColorSpan || s is BackgroundColorSpan || s is PtSizeSpan || s is FontNameSpan || s is VertSpan || s is LinkSpan || s is CommentSpan
 }
 
 // ---- blocks the editor cannot edit yet (tables, images, page breaks) ------------------------------------

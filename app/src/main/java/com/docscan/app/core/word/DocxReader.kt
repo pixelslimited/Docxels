@@ -86,8 +86,6 @@ object DocxReader {
             val en = count(doc, "<w:endnoteReference")
             if (en > 0) notes += "endnotes ($en)"
         }
-        val cm = count(comments, "<w:comment ")
-        if (cm > 0) notes += "comments ($cm)"
         val tracked = count(doc, "<w:ins ") + count(doc, "<w:del ")
         if (tracked > 0) notes += "tracked changes ($tracked; the final text is kept)"
         if (names.any { it.startsWith("word/charts/") }) notes += "charts"
@@ -147,6 +145,9 @@ object DocxReader {
         var defaultStyleId: String? = null
         /** The document's own body font when it is not Calibri (from docDefaults / the Normal style / the theme). */
         var defaultFont: String? = null
+        var comments: Map<Int, DocComment> = emptyMap()
+        /** The comment whose range we are inside while reading (ranges can span paragraphs). */
+        var activeComment: Int? = null
         var themeMajor: String? = null
         var themeMinor: String? = null
         var numKinds: Map<String, Map<Int, ListKind>> = emptyMap() // numId -> level -> kind
@@ -170,6 +171,7 @@ object DocxReader {
             rels = readRels(relsPath, dir)
             links = readLinks(relsPath)
             readTheme()
+            readComments(dir)
             readStyles(dir)
             readNumbering(dir)
             val root = xml(mainPath) ?: throw DocxException("The document text could not be read")
@@ -181,7 +183,13 @@ object DocxReader {
             appendNotes(dir, blocks)
             if (blocks.isEmpty()) blocks += Block.Para(Paragraph())
             val title = xml("docProps/core.xml")?.find("title")?.text?.toString()?.trim().orEmpty()
-            return WordDoc(title.ifEmpty { fallbackTitle }, blocks, page, readEmbeddedFonts(dir))
+            val used = HashSet<Int>()
+            fun scan(bs: List<Block>) {
+                for (b in bs) if (b is Block.Para) b.paragraph.runs.forEach { r -> r.style.comment?.let { used += it } }
+            }
+            scan(blocks)
+            val kept = comments.values.filter { it.id in used || comments.size <= 200 }.sortedBy { it.id }
+            return WordDoc(title.ifEmpty { fallbackTitle }, blocks, page, readEmbeddedFonts(dir), kept)
         }
 
         /** Footnote and endnote text, added under a "Notes" heading with the [n] numbers cited in the text. */
@@ -295,6 +303,27 @@ object DocxReader {
                 }
             }
             return out
+        }
+
+        fun readComments(dir: String) {
+            val path = rels.values.firstOrNull { it.endsWith("comments.xml") } ?: (if (dir.isEmpty()) "comments.xml" else "$dir/comments.xml")
+            val root = xml(path) ?: return
+            val map = LinkedHashMap<Int, DocComment>()
+            for (c in root.childrenNamed("comment")) {
+                val id = c.attr("id")?.toIntOrNull() ?: continue
+                val text = c.findAll("p").joinToString("\n") { p -> p.findAll("t").joinToString("") { it.text.toString() } }.trim()
+                map[id] = DocComment(id, c.attr("author")?.takeIf { it.isNotBlank() } ?: "Someone", text)
+                if (map.size >= 500) break
+            }
+            comments = map
+        }
+
+        fun commentMarker(n: XNode) {
+            val id = n.attr("id")?.toIntOrNull()
+            when (n.local) {
+                "commentRangeStart" -> if (id != null && id in comments) activeComment = id
+                "commentRangeEnd" -> if (id == activeComment) activeComment = null
+            }
         }
 
         fun readTheme() {
@@ -575,6 +604,7 @@ object DocxReader {
             for (child in container.children) {
                 when (child.local) {
                     "p" -> readParagraph(child, out)
+                    "commentRangeStart", "commentRangeEnd" -> commentMarker(child)
                     "tbl" -> readTable(child)?.let { out += Block.Table(it) }
                     "sdt" -> child.child("sdtContent")?.let { readBlocks(it, out) }
                     "customXml", "ins", "smartTag" -> readBlocks(child, out)
@@ -721,6 +751,7 @@ object DocxReader {
                 for (c in node.children) {
                     when (c.local) {
                         "r" -> readRun(c, inherited)
+                        "commentRangeStart", "commentRangeEnd" -> commentMarker(c)
                         "hyperlink" -> {
                             val url = c.attr("id")?.let { links[it] }
                             walk(c, if (url != null) inherited.copy(link = url) else inherited)
@@ -734,7 +765,7 @@ object DocxReader {
             fun readRun(r: XNode, inherited: RunStyle) {
                 val rPr = r.child("rPr")
                 val direct = rPr?.let { readRPr(it) } ?: RunStyle()
-                val style = direct.over(charStyleOf(rPr)).over(styleRun).over(inherited)
+                val style = direct.over(charStyleOf(rPr)).over(styleRun).over(inherited).let { st -> activeComment?.let { st.copy(comment = it) } ?: st }
                 for (c in r.children) {
                     when (c.local) {
                         "t" -> addText(c.text.toString(), style)

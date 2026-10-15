@@ -575,7 +575,8 @@ private class Snap(val blocks: List<Block>, val selStart: Int, val selEnd: Int)
  * Owns the editable text and every formatting action. The screen only draws the toolbar from [state] and calls
  * these methods. Undo/redo is snapshot based: a snapshot of the document is taken once typing pauses.
  */
-class EditorController(private val baseDensity: Float, initial: List<Block>) {
+class EditorController(private val baseDensity: Float, initial: List<Block>, initialComments: List<com.docscan.app.core.word.DocComment> = emptyList()) {
+    private var allComments: List<com.docscan.app.core.word.DocComment> = initialComments
     /** The density the text is currently laid out at; the page views rescale it to fit the sheet to the screen. */
     private var density: Float = baseDensity
     private var mode = ViewMode.MOBILE
@@ -654,7 +655,52 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
 
     private fun snapshot() = Snap(EditorModel.toBlocks(text, originals), selection.first, selection.second)
 
-    fun toDoc(title: String, page: PageSetup): WordDoc = WordDoc(title, EditorModel.toBlocks(text, originals), page)
+    fun toDoc(title: String, page: PageSetup): WordDoc {
+        val blocks = EditorModel.toBlocks(text, originals)
+        val live = liveCommentIds()
+        return WordDoc(title, blocks, page, comments = allComments.filter { it.id in live })
+    }
+
+    private fun liveCommentIds(): Set<Int> =
+        view?.text?.let { t -> t.getSpans(0, t.length, CommentSpan::class.java).filter { t.getSpanStart(it) < t.getSpanEnd(it) }.map { it.id }.toSet() } ?: emptySet()
+
+    /** The comments whose text is still in the document, in the order they appear. */
+    fun comments(): List<com.docscan.app.core.word.DocComment> {
+        val t = view?.text ?: return emptyList()
+        val live = t.getSpans(0, t.length, CommentSpan::class.java).filter { t.getSpanStart(it) < t.getSpanEnd(it) }.sortedBy { t.getSpanStart(it) }.map { it.id }
+        return live.distinct().mapNotNull { id -> allComments.firstOrNull { it.id == id } }
+    }
+
+    /** Attaches a comment to the selected text. Returns false when nothing is selected. */
+    fun addComment(author: String, body: String): Boolean {
+        val v = view ?: return false
+        val (a, b) = selection
+        if (a >= b || body.isBlank()) return false
+        val id = (allComments.maxOfOrNull { it.id } ?: -1) + 1
+        allComments = allComments + com.docscan.app.core.word.DocComment(id, author, body.trim())
+        v.text.setSpan(CommentSpan(id), a, b, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        changed()
+        return true
+    }
+
+    fun editComment(id: Int, body: String) {
+        allComments = allComments.map { if (it.id == id) it.copy(text = body.trim()) else it }
+        changed()
+    }
+
+    fun deleteComment(id: Int) {
+        val t = view?.text ?: return
+        t.getSpans(0, t.length, CommentSpan::class.java).filter { it.id == id }.forEach { t.removeSpan(it) }
+        changed()
+    }
+
+    fun showComment(id: Int) {
+        val v = view ?: return
+        val t = v.text
+        val sp = t.getSpans(0, t.length, CommentSpan::class.java).firstOrNull { it.id == id } ?: return
+        v.requestFocus()
+        v.setSelection(t.getSpanStart(sp).coerceAtLeast(0), t.getSpanEnd(sp).coerceAtMost(t.length))
+    }
 
     // -- history --
 

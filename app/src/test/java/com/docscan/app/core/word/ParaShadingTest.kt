@@ -119,7 +119,7 @@ class CompatNotesTest {
         assertEquals(emptyList<String>(), DocxReader.compatNotes(bytes))
     }
 
-    @Test fun reportsFootnotesCommentsAndTrackedChanges() {
+    @Test fun reportsFootnotesAndTrackedChanges() {
         val bytes = zip(
             "word/document.xml" to "<w:document><w:body><w:p><w:ins w:id=\"1\"><w:r><w:t>x</w:t></w:r></w:ins><w:del w:id=\"2\"/></w:p></w:body></w:document>",
             "word/footnotes.xml" to "<w:footnotes><w:footnote w:type=\"separator\" w:id=\"-1\"/><w:footnote w:id=\"1\"/><w:footnote w:id=\"2\"/></w:footnotes>",
@@ -128,7 +128,7 @@ class CompatNotesTest {
         )
         val notes = DocxReader.compatNotes(bytes)
         assertEquals(true, notes.any { it.startsWith("footnotes (2)") })
-        assertEquals(true, notes.any { it.startsWith("comments (1)") })
+        assertEquals(false, notes.any { it.startsWith("comments") }) // comments are kept now
         assertEquals(true, notes.any { it.startsWith("tracked changes (2") })
         assertEquals(true, notes.contains("charts"))
     }
