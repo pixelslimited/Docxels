@@ -131,6 +131,10 @@ object DocxReader {
         var links: Map<String, String> = emptyMap()
         var styles: Map<String, StyleInfo> = emptyMap()
         var defaultStyleId: String? = null
+        /** The document's own body font when it is not Calibri (from docDefaults / the Normal style / the theme). */
+        var defaultFont: String? = null
+        var themeMajor: String? = null
+        var themeMinor: String? = null
         var numKinds: Map<String, Map<Int, ListKind>> = emptyMap() // numId -> level -> kind
         var page = PageSetup()
         /** Footnotes and endnotes in the order they are cited; their text is added at the end so nothing is lost. */
@@ -151,6 +155,7 @@ object DocxReader {
             val relsPath = (if (dir.isEmpty()) "" else "$dir/") + "_rels/" + mainPath.substringAfterLast('/') + ".rels"
             rels = readRels(relsPath, dir)
             links = readLinks(relsPath)
+            readTheme()
             readStyles(dir)
             readNumbering(dir)
             val root = xml(mainPath) ?: throw DocxException("The document text could not be read")
@@ -252,6 +257,29 @@ object DocxReader {
                 )
             }
             styles = map
+            fun fontOf(rPr: XNode?): String? = rPr?.child("rFonts")?.let { fontName(it) }
+            val fromDefaults = fontOf(root.child("docDefaults")?.child("rPrDefault")?.child("rPr"))
+            val fromNormal = fontOf(defaultStyleId?.let { map[it]?.rPr })
+            defaultFont = (fromNormal ?: fromDefaults)?.takeIf { !it.equals(StyleDefaults.BODY_FONT, ignoreCase = true) }
+        }
+
+        fun readTheme() {
+            val path = rels.values.firstOrNull { it.contains("theme/") && it.endsWith(".xml") } ?: "word/theme/theme1.xml"
+            val root = xml(path) ?: return
+            themeMajor = root.find("majorFont")?.child("latin")?.attr("typeface")?.takeIf { it.isNotBlank() }
+            themeMinor = root.find("minorFont")?.child("latin")?.attr("typeface")?.takeIf { it.isNotBlank() }
+        }
+
+        /** The font a w:rFonts element names; theme fonts (minorHAnsi, majorHAnsi…) are looked up in the theme. */
+        fun fontName(f: XNode): String? {
+            val theme = f.attr("asciiTheme") ?: f.attr("hAnsiTheme")
+            val fromTheme = when {
+                theme == null -> null
+                theme.startsWith("minor") -> themeMinor
+                theme.startsWith("major") -> themeMajor
+                else -> null
+            }
+            return (fromTheme ?: f.attr("ascii") ?: f.attr("hAnsi") ?: f.attr("cs") ?: f.attr("eastAsia"))?.takeIf { it.isNotBlank() }
         }
 
         fun builtin(info: StyleInfo): ParaStyle? {
@@ -268,7 +296,7 @@ object DocxReader {
         }
 
         /** Walks a style and its ancestors up to (excluding) the first built-in or default style. */
-        class Chain(val custom: List<StyleInfo>, val paraStyle: ParaStyle, val name: String)
+        class Chain(val custom: List<StyleInfo>, val paraStyle: ParaStyle, val name: String, val builtinFont: String? = null)
 
         fun chainFor(styleId: String?): Chain {
             val custom = ArrayList<StyleInfo>()
@@ -276,17 +304,19 @@ object DocxReader {
             var cur = styleId?.let { styles[it] }
             val first = cur
             var guard = 0
+            var bFont: String? = null
             while (cur != null && guard++ < 20) {
                 val b = builtin(cur)
                 if (b != null) {
                     para = b
+                    bFont = cur.rPr?.child("rFonts")?.let { fontName(it) }
                     break
                 }
                 if (cur.isDefault || cur.id == defaultStyleId) break
                 custom += cur
                 cur = cur.basedOn?.let { styles[it] }
             }
-            return Chain(custom, para, first?.name.orEmpty())
+            return Chain(custom, para, first?.name.orEmpty(), bFont)
         }
 
         fun charStyleRun(styleId: String?): RunStyle {
@@ -538,7 +568,7 @@ object DocxReader {
             rPr.child("color")?.attr("val")?.let { v -> parseHex(v)?.let { s = s.copy(color = it) } }
             rPr.child("sz")?.attr("val")?.toIntOrNull()?.let { if (it > 0) s = s.copy(sizePt = it / 2f) }
             rPr.child("rFonts")?.let { f ->
-                val name = f.attr("ascii") ?: f.attr("hAnsi") ?: f.attr("cs") ?: f.attr("eastAsia")
+                val name = fontName(f)
                 if (!name.isNullOrBlank()) s = s.copy(font = name)
             }
             rPr.child("highlight")?.attr("val")?.let { v -> namedHighlight(v)?.let { s = s.copy(highlight = it) } }
@@ -579,7 +609,7 @@ object DocxReader {
         inner class ParaReader(val p: XNode, val out: MutableList<Block>, val allowImages: Boolean) {
             val pPr = p.child("pPr")
             val chain = chainFor(pPr?.child("pStyle")?.attr("val"))
-            val styleRun: RunStyle = chain.custom.asReversed().fold(RunStyle()) { acc, st -> st.rPr?.let { readRPr(it).over(acc) } ?: acc }
+            val styleRun: RunStyle = chain.custom.asReversed().fold(RunStyle(font = chain.builtinFont ?: defaultFont)) { acc, st -> st.rPr?.let { readRPr(it).over(acc) } ?: acc }
             val runs = ArrayList<Run>()
             var emitted = false
             val base: Paragraph
