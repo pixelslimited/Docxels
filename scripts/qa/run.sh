@@ -68,7 +68,8 @@ fi
 # Justify the first long paragraph of the converted letter through the ribbon, then look at it.
 step justify
 adb shell input swipe 540 600 540 1800 300; sleep 2
-adb shell input tap 540 950; sleep 2
+adb shell input tap 540 700; sleep 2
+adb shell input keycombination 113 29; sleep 2   # Ctrl+A: justify the whole letter
 adb shell input keyevent 4; sleep 2
 adb shell input tap 980 2170; sleep 2; shot 09a_ribbon
 tap "^Paragraph$" 2
