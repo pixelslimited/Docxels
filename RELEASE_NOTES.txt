@@ -67,3 +67,6 @@
 134|Documents menu: Make a copy (Word), Save as .docx / PDF for any document.
 134|Open with Docxels: PDFs, Word (.docx), text files and pictures from other apps (file manager, WhatsApp, e-mail, Share) are copied into Documents so they stay saved.
 134|ID card: Tools > ID card scans the front and back; export as PDF with ID card layout puts both sides at true size on one A4 page.
+134|Fonts: Word files now open in the fonts they were written in, including the default font, theme fonts and heading fonts that were being ignored (the font name is kept when you save). PDFs converted to Word keep the PDF's own font names instead of only a short list.
+134|The editor's tool bar no longer has a bar behind the Docxels mark when it is closed; the mark just floats in the corner.
+134|Home: tap the paper sheets and some papers are flung away and fade out.

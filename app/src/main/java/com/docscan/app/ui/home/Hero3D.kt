@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -41,7 +42,38 @@ import androidx.compose.ui.unit.dp
 
 
 /** The sheets' own turning, driven by touch: drag to turn them, flick to spin them, tap to flip them over. */
-class SheetsState(private val scope: CoroutineScope) {
+/** One paper thrown off the pile: where it ends up (dp from where it started), how far it turns, and its colour. */
+class Flung(val dx: Float, val dy: Float, val turn: Float, val hue: Float, val ms: Int, val w: Float) {
+    val progress = Animatable(0f)
+}
+
+class SheetsState(private val scope: CoroutineScope, private val reduceMotion: Boolean = false) {
+    val flung = mutableStateListOf<Flung>()
+
+    /** A tap: a handful of papers are flung away from the pile, slow down as they travel, and fade out. */
+    fun fling() {
+        if (reduceMotion) return
+        val r = kotlin.random.Random
+        repeat(5) {
+            // Mostly to the left and upward (the pile sits at the right end of the card), a few the other way.
+            val angle = Math.toRadians((if (r.nextFloat() < 0.8f) r.nextDouble(150.0, 255.0) else r.nextDouble(-40.0, 40.0)))
+            val dist = r.nextFloat() * 120f + 110f
+            val f = Flung(
+                dx = (kotlin.math.cos(angle) * dist).toFloat(),
+                dy = (-kotlin.math.sin(angle) * dist).toFloat() * 0.6f,
+                turn = (r.nextFloat() * 400f + 160f) * (if (r.nextBoolean()) 1 else -1),
+                hue = r.nextFloat(),
+                ms = r.nextInt(750, 1150),
+                w = r.nextFloat() * 0.3f + 0.7f,
+            )
+            flung.add(f)
+            scope.launch {
+                f.progress.animateTo(1f, tween(f.ms, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                flung.remove(f)
+            }
+        }
+    }
+
     val spin = Animatable(0f)
     val tilt = Animatable(0f)
     private var lastDx = 0f
@@ -80,12 +112,16 @@ class SheetsState(private val scope: CoroutineScope) {
 @Composable
 fun rememberSheetsState(): SheetsState {
     val scope = rememberCoroutineScope()
-    return remember { SheetsState(scope) }
+    val context = LocalContext.current
+    return remember {
+        val off = runCatching { Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
+        SheetsState(scope, off)
+    }
 }
 
-/** Makes a region turn the sheets: drag, flick or tap. Buttons inside the region keep working. */
+/** Makes a region turn the sheets: drag or flick to spin them, tap to fling some papers away. Buttons inside the region keep working. */
 fun Modifier.sheetsTouch(state: SheetsState): Modifier = this
-    .pointerInput(state) { detectTapGestures(onTap = { state.flip() }) }
+    .pointerInput(state) { detectTapGestures(onTap = { state.fling() }) }
     .pointerInput(state) {
         detectDragGestures(
             onDragEnd = { state.release() },
@@ -151,6 +187,32 @@ fun FloatingSheets(state: SheetsState, modifier: Modifier = Modifier) {
                 Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(line))
                 Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(line))
                 Box(Modifier.padding(top = 4.dp).fillMaxWidth(0.7f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(line))
+            }
+        }
+        // Papers thrown off by a tap: they leave the pile fast, slow down, turn and fade away.
+        state.flung.forEach { f ->
+            val p = f.progress.value
+            Column(
+                Modifier
+                    .size(width = (34 * f.w).dp, height = (46 * f.w).dp)
+                    .graphicsLayer {
+                        translationX = f.dx * p * density
+                        translationY = f.dy * p * density
+                        rotationZ = f.turn * p
+                        rotationY = f.turn * 0.4f * p
+                        cameraDistance = 14f * density
+                        val grow = 1f - 0.25f * p
+                        scaleX = grow; scaleY = grow
+                        alpha = (1f - p * p).coerceIn(0f, 1f) * 0.9f
+                    }
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.hsv(f.hue * 360f, 0.22f, 1f))
+                    .padding(6.dp),
+            ) {
+                val ink = Color.hsv(f.hue * 360f, 0.75f, 0.85f)
+                Box(Modifier.fillMaxWidth(0.6f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(ink))
+                Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(2.dp).background(ink.copy(alpha = 0.4f)))
+                Box(Modifier.padding(top = 3.dp).fillMaxWidth(0.7f).height(2.dp).background(ink.copy(alpha = 0.4f)))
             }
         }
     }

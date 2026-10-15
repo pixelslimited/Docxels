@@ -791,11 +791,18 @@ private fun Ribbon(
     fun Group(title: String) {
         groupShown = !grid || title == pickedGroup
     }
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
+    // Closed: no bar at all, just the Docxels mark floating at the corner. Open: the tool panel on its own surface.
+    Surface(
+        tonalElevation = if (open) 3.dp else 0.dp,
+        color = if (open) MaterialTheme.colorScheme.surface else Color.Transparent,
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = if (open) 14.dp else 4.dp),
+    ) {
         Column {
             if (!open) {
-                Box(Modifier.fillMaxWidth().height(56.dp).clickable { open = true; grid = true }.padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
-                    com.docscan.app.ui.kit.AnimatedMark(44.dp, description = "Show tools")
+                Box(Modifier.fillMaxWidth().height(56.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+                    Box(Modifier.size(56.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable { open = true; grid = true }, contentAlignment = Alignment.Center) {
+                        com.docscan.app.ui.kit.AnimatedMark(44.dp, description = "Show tools")
+                    }
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
