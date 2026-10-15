@@ -277,7 +277,7 @@ object DocxReader {
             defaultFont = (fromNormal ?: fromDefaults)?.takeIf { !it.equals(StyleDefaults.BODY_FONT, ignoreCase = true) }
         }
 
-        /** Fonts the file carries (word/fonts/*.odttf, scrambled with the font key); unreadable ones are skipped. */
+        /** Fonts the file carries (the .odttf files in word/fonts, scrambled with the font key); unreadable ones are skipped. */
         fun readEmbeddedFonts(dir: String): List<EmbeddedFont> {
             val base = if (dir.isEmpty()) "" else "$dir/"
             val table = xml(base + "fontTable.xml") ?: return emptyList()
