@@ -93,6 +93,10 @@ data class TableBlock(
     val columnWidthsTwips: List<Int>,
     val headerRow: Boolean = false,
     val borders: Boolean = true,
+    /** Distance of the table's left edge from the left margin (drag the table, or choose Left / Centre / Right). */
+    val indentTwips: Int = 0,
+    val borderColor: Int = 0x808080,
+    val borderWidthPt: Float = 0.5f,
 ) {
     val columnCount: Int get() = columnWidthsTwips.size
 }

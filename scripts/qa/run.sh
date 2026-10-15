@@ -6,7 +6,7 @@ mkdir -p "$OUT"
 exec > >(tee -a "$OUT/run-log.txt") 2>&1
 echo "start $(date)"; adb devices; adb shell getprop ro.product.cpu.abi
 UI="python3 $(dirname "$0")/ui.py"
-shot() { dismiss 2>/dev/null; adb exec-out screencap -p > "$OUT/$1.png"; $UI texts > "$OUT/$1.txt" 2>/dev/null || true; }
+shot() { dismiss 2>/dev/null; adb exec-out screencap -p > "$OUT/$1.png"; $UI texts > "$OUT/$1.txt" 2>/dev/null || true; adb shell uiautomator dump /sdcard/d.xml >/dev/null 2>&1 && adb pull /sdcard/d.xml "$OUT/$1.xml" >/dev/null 2>&1 || true; }
 step() { echo "== $*" | tee -a "$OUT/log.txt"; }
 tap() { $UI tap "$1" | tee -a "$OUT/log.txt"; local rc=${PIPESTATUS[0]}; sleep "${2:-2}"; return $rc; }
 
@@ -40,7 +40,7 @@ step "new document"
 for p in "^New doc$" "^New document$"; do tap "$p" 4 && break; done
 dismiss
 shot 03_new_document
-adb shell input tap 540 900; sleep 2
+adb shell input tap 540 520; sleep 2
 LONG="The%squick%sbrown%sfox%sjumps%sover%sthe%slazy%sdog%sand%skeeps%srunning%sacross%sthe%sfield%suntil%sthe%ssun%sgoes%sdown%sbehind%sthe%shills%sand%sthe%swhole%sparagraph%smust%swrap%sinside%sthe%spage."
 adb shell input text "$LONG$LONG$LONG"; sleep 3
 dismiss
@@ -66,3 +66,4 @@ else
   echo "PDF to Word tile not found"
 fi
 adb logcat -d -s AndroidRuntime:E > "$OUT/crashes3.txt" 2>&1 || true
+adb logcat -d -s System.out:I > "$OUT/measure-log.txt" 2>&1 || true

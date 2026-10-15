@@ -781,7 +781,7 @@ class BlockChipSpan(
     private fun naturalWidthTwips(): Int? = when (val b = block) {
         is com.docscan.app.core.word.Block.Image -> b.image.widthTwips
         is com.docscan.app.core.word.Block.Shape -> b.shape.widthTwips
-        is com.docscan.app.core.word.Block.Table -> b.table.columnWidthsTwips.sum()
+        is com.docscan.app.core.word.Block.Table -> b.table.columnWidthsTwips.sum() + b.table.indentTwips
         else -> null
     }
 
@@ -865,7 +865,7 @@ class BlockChipSpan(
         }
     }
 
-    private fun drawTable(c: Canvas, t: com.docscan.app.core.word.TableBlock, x: Float, top: Int, paint: Paint) {
+    private fun drawTable(c: Canvas, t: com.docscan.app.core.word.TableBlock, x0: Float, top: Int, paint: Paint) {
         val k = pxPerTwip(paint) * fit(paint)
         val savedColor = paint.color
         val savedStyle = paint.style
@@ -873,7 +873,8 @@ class BlockChipSpan(
         val savedTypeface = paint.typeface
         val rows = tableRowTwips(t)
         var yTw = 0
-        val line = 0xFF9AA0AE.toInt()
+        val line = 0xFF000000.toInt() or t.borderColor
+        val x = x0 + t.indentTwips * k
         for ((ri, row) in t.rows.withIndex()) {
             var xTw = 0
             var col = 0
@@ -890,7 +891,7 @@ class BlockChipSpan(
                 }
                 if (t.borders) {
                     paint.style = Paint.Style.STROKE
-                    paint.strokeWidth = 1f
+                    paint.strokeWidth = (t.borderWidthPt * 20f * k).coerceAtLeast(1f)
                     paint.color = line
                     c.drawRect(r, paint)
                 }

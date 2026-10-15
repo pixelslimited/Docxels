@@ -148,6 +148,7 @@ class RichEditText(context: Context) : EditText(context) {
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         syncGap()
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        System.out.println("DocxelsQA measure spec=${android.view.View.MeasureSpec.toString(widthMeasureSpec)} measured=$measuredWidth layoutW=${layout?.width} padL=$paddingLeft padR=$paddingRight len=${text.length} density=${paint.density} textSize=${textSize} parentW=${(parent as? android.view.View)?.width}")
         val d = decor ?: return
         if (layout == null) return
         var rounds = 0

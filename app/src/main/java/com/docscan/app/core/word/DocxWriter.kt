@@ -370,10 +370,12 @@ object DocxWriter {
     private fun writeTable(t: TableBlock, sb: StringBuilder, ctx: Ctx) {
         val total = t.columnWidthsTwips.sum()
         sb.append("<w:tbl><w:tblPr><w:tblW w:w=\"$total\" w:type=\"dxa\"/>")
+        if (t.indentTwips != 0) sb.append("<w:tblInd w:w=\"${t.indentTwips}\" w:type=\"dxa\"/>")
         if (t.borders) {
             sb.append("<w:tblBorders>")
+            val sz = (t.borderWidthPt * 8f).toInt().coerceIn(2, 96)
             for (side in listOf("top", "left", "bottom", "right", "insideH", "insideV")) {
-                sb.append("<w:$side w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"808080\"/>")
+                sb.append("<w:$side w:val=\"single\" w:sz=\"$sz\" w:space=\"0\" w:color=\"${hex(t.borderColor)}\"/>")
             }
             sb.append("</w:tblBorders>")
         }

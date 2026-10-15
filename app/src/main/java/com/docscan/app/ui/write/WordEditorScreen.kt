@@ -535,6 +535,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         when (val b = remember(idx) { controller.blockAt(idx) }) {
             is Block.Table -> TableEditorDialog(
                 initial = b.table,
+                contentWidthTwips = page.contentWidthTwips,
+                current = (controller.blockAt(idx) as? Block.Table)?.table ?: b.table,
                 onSave = { controller.replaceBlock(idx, Block.Table(it)); editing = null },
                 onLive = { controller.replaceBlock(idx, Block.Table(it)) },
                 onRemove = { controller.removeBlock(idx); editing = null },

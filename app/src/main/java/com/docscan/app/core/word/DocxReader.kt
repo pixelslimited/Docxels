@@ -853,7 +853,11 @@ object DocxReader {
             val borderNode = tblPr?.child("tblBorders")
             val hasBorders = borderNode?.children?.any { it.attr("val").let { v -> v != null && v != "nil" && v != "none" } } == true ||
                 (borderNode == null && tblPr?.child("tblStyle")?.attr("val")?.contains("Grid", ignoreCase = true) == true)
-            return TableBlock(padded, grid, header, hasBorders)
+            val indent = tblPr?.child("tblInd")?.attr("w")?.toIntOrNull() ?: 0
+            val firstSide = borderNode?.children?.firstOrNull { it.attr("val").let { v -> v != null && v != "nil" && v != "none" } }
+            val bColor = firstSide?.attr("color")?.let { parseHex(it) } ?: 0x808080
+            val bWidth = firstSide?.attr("sz")?.toFloatOrNull()?.div(8f)?.coerceIn(0.25f, 12f) ?: 0.5f
+            return TableBlock(padded, grid, header, hasBorders, indent.coerceAtLeast(0), bColor, bWidth)
         }
     }
 }

@@ -121,10 +121,15 @@ private fun Stepper(label: String, value: Int, min: Int, max: Int, onChange: (In
 
 private val SHADES = listOf(null, 0xD9E2F3, 0xE2EFDA, 0xFFF2CC, 0xFCE4D6, 0xEDEDED, 0xFFFF00)
 
-/** Full-screen table editor: type in cells, add or remove rows and columns, shade cells, header row, borders. */
+/**
+ * Table properties in a panel docked at the bottom: every change shows on the page at once. Drag the table on the page
+ * to move it sideways (or up and down between paragraphs); the cell picker chooses which cell the cell tools act on.
+ */
 @Composable
 fun TableEditorDialog(
     initial: TableBlock,
+    contentWidthTwips: Int,
+    current: TableBlock = initial,
     onSave: (TableBlock) -> Unit,
     onLive: (TableBlock) -> Unit,
     onRemove: () -> Unit,
@@ -132,143 +137,159 @@ fun TableEditorDialog(
 ) {
     var table by remember { mutableStateOf(initial) }
     var tableStarted by remember { mutableStateOf(false) }
+    // A position changed by dragging the table on the page shows here too.
+    androidx.compose.runtime.LaunchedEffect(current.indentTwips) {
+        if (current.indentTwips != table.indentTwips) table = table.copy(indentTwips = current.indentTwips)
+    }
     androidx.compose.runtime.LaunchedEffect(table) {
-        if (tableStarted) { kotlinx.coroutines.delay(150); onLive(table) } else tableStarted = true
+        if (tableStarted) { kotlinx.coroutines.delay(60); onLive(table) } else tableStarted = true
     }
     var sel by remember { mutableStateOf(0 to 0) }
     val merged = remember(initial) { initial.rows.any { r -> r.any { it.colSpan > 1 || it.vMergeStart || it.vMergeContinue } } }
+    val (sr, sc) = sel
+    val cur = table.rows.getOrNull(sr)?.getOrNull(sc)
+    val total = table.columnWidthsTwips.sum()
 
     fun update(r: Int, c: Int, cell: TableCell) {
         table = table.copy(rows = table.rows.mapIndexed { ri, row -> if (ri == r) row.mapIndexed { ci, old -> if (ci == c) cell else old } else row })
     }
+    fun setTotal(newTotal: Int) {
+        val n = table.columnCount
+        val scaled = table.columnWidthsTwips.map { (it.toLong() * newTotal / total.coerceAtLeast(1)).toInt().coerceAtLeast(240) }
+        table = table.copy(columnWidthsTwips = scaled, indentTwips = table.indentTwips.coerceAtMost(maxOf(0, contentWidthTwips - scaled.sum())))
+        if (n == 0) return
+    }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { onLive(initial); onDismiss() }) { Text("Undo all") }
-                    Text("Table", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
-                    TextButton(onClick = onRemove) { Text("Remove") }
-                    TextButton(onClick = { onSave(table) }) { Text("Done") }
+    LivePanel(
+        title = "Table",
+        onDone = { onSave(table) },
+        onRemove = onRemove,
+        onRevert = { table = initial },
+    ) {
+        Text("Rows and columns", style = MaterialTheme.typography.labelLarge)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(enabled = !merged, onClick = {
+                val cols = table.columnCount
+                table = table.copy(rows = table.rows.toMutableList().also { it.add(sr + 1, List(cols) { TableCell() }) })
+                sel = (sr + 1) to sc
+            }) { Text("Add row") }
+            OutlinedButton(enabled = !merged, onClick = {
+                val cols = table.columnCount
+                table = table.copy(rows = table.rows.toMutableList().also { it.add(sr, List(cols) { TableCell() }) })
+            }) { Text("Row above") }
+            OutlinedButton(enabled = !merged && table.rows.size > 1, onClick = {
+                table = table.copy(rows = table.rows.filterIndexed { i, _ -> i != sr })
+                sel = minOf(sr, table.rows.size - 1) to sc
+            }) { Text("Delete row") }
+            OutlinedButton(enabled = !merged && table.columnCount < 12, onClick = {
+                val n = table.columnCount + 1
+                table = table.copy(
+                    rows = table.rows.map { row -> row.toMutableList().also { it.add(sc + 1, TableCell()) } },
+                    columnWidthsTwips = List(n) { total / n },
+                )
+                sel = sr to (sc + 1)
+            }) { Text("Add column") }
+            OutlinedButton(enabled = !merged && table.columnCount > 1, onClick = {
+                val n = table.columnCount - 1
+                table = table.copy(
+                    rows = table.rows.map { row -> row.filterIndexed { i, _ -> i != sc } },
+                    columnWidthsTwips = List(n) { total / n },
+                )
+                sel = sr to minOf(sc, n - 1)
+            }) { Text("Delete column") }
+        }
+        if (merged) Text("This table has merged cells, so rows and columns can't be added or removed here yet.", style = MaterialTheme.typography.bodySmall)
+
+        Text("Cell", style = MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Stepper("Row", sr + 1, 1, table.rows.size) { sel = (it - 1) to minOf(sc, (table.rows.getOrNull(it - 1)?.size ?: 1) - 1) }
+        }
+        Stepper("Column", sc + 1, 1, table.rows.getOrNull(sr)?.size ?: 1) { sel = sr to (it - 1) }
+        if (cur != null && !cur.vMergeContinue) {
+            OutlinedTextField(
+                value = cur.plain(), onValueChange = { update(sr, sc, cur.withText(it)) },
+                label = { Text("Text in row ${sr + 1}, column ${sc + 1}") }, modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        val noVMerge = table.rows.none { r -> r.any { it.vMergeStart || it.vMergeContinue } }
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(enabled = noVMerge && cur != null && sc + 1 < table.rows[sr].size, onClick = {
+                val row = table.rows[sr]
+                val a = row[sc]
+                val b = row[sc + 1]
+                val joined = if (b.plain().isBlank()) a else a.withText((a.plain() + " " + b.plain()).trim())
+                val newRow = row.toMutableList().also { it[sc] = joined.copy(colSpan = a.colSpan + b.colSpan); it.removeAt(sc + 1) }
+                table = table.copy(rows = table.rows.mapIndexed { i, r -> if (i == sr) newRow else r })
+            }) { Text("Merge right") }
+            OutlinedButton(enabled = noVMerge && cur != null && cur.colSpan > 1, onClick = {
+                val row = table.rows[sr]
+                val a = row[sc]
+                val newRow = row.toMutableList().also {
+                    it[sc] = a.copy(colSpan = 1)
+                    for (k in 1 until a.colSpan) it.add(sc + k, TableCell(shading = a.shading))
                 }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val (sr, sc) = sel
-                    OutlinedButton(enabled = !merged, onClick = {
-                        val cols = table.columnCount
-                        table = table.copy(rows = table.rows.toMutableList().also { it.add(sr + 1, List(cols) { TableCell() }) })
-                        sel = (sr + 1) to sc
-                    }) { Text("Add row") }
-                    OutlinedButton(enabled = !merged && table.rows.size > 1, onClick = {
-                        table = table.copy(rows = table.rows.filterIndexed { i, _ -> i != sr })
-                        sel = minOf(sr, table.rows.size - 1) to sc
-                    }) { Text("Delete row") }
-                    OutlinedButton(enabled = !merged && table.columnCount < 12, onClick = {
-                        val total = table.columnWidthsTwips.sum()
-                        val n = table.columnCount + 1
-                        table = table.copy(
-                            rows = table.rows.map { row -> row.toMutableList().also { it.add(sc + 1, TableCell()) } },
-                            columnWidthsTwips = List(n) { total / n },
-                        )
-                        sel = sr to (sc + 1)
-                    }) { Text("Add column") }
-                    OutlinedButton(enabled = !merged && table.columnCount > 1, onClick = {
-                        val total = table.columnWidthsTwips.sum()
-                        val n = table.columnCount - 1
-                        table = table.copy(
-                            rows = table.rows.map { row -> row.filterIndexed { i, _ -> i != sc } },
-                            columnWidthsTwips = List(n) { total / n },
-                        )
-                        sel = sr to minOf(sc, n - 1)
-                    }) { Text("Delete column") }
-                }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val (sr, sc) = sel
-                    val noVMerge = table.rows.none { r -> r.any { it.vMergeStart || it.vMergeContinue } }
-                    val cur = table.rows.getOrNull(sr)?.getOrNull(sc)
-                    OutlinedButton(enabled = !merged, onClick = {
-                        val cols = table.columnCount
-                        table = table.copy(rows = table.rows.toMutableList().also { it.add(sr, List(cols) { TableCell() }) })
-                    }) { Text("Row above") }
-                    OutlinedButton(enabled = noVMerge && cur != null && sc + 1 < table.rows[sr].size, onClick = {
-                        val row = table.rows[sr]
-                        val a = row[sc]
-                        val b = row[sc + 1]
-                        val joined = if (b.plain().isBlank()) a else a.withText((a.plain() + " " + b.plain()).trim())
-                        val newRow = row.toMutableList().also { it[sc] = joined.copy(colSpan = a.colSpan + b.colSpan); it.removeAt(sc + 1) }
-                        table = table.copy(rows = table.rows.mapIndexed { i, r -> if (i == sr) newRow else r })
-                    }) { Text("Merge right") }
-                    OutlinedButton(enabled = noVMerge && cur != null && cur.colSpan > 1, onClick = {
-                        val row = table.rows[sr]
-                        val a = row[sc]
-                        val newRow = row.toMutableList().also {
-                            it[sc] = a.copy(colSpan = 1)
-                            for (k in 1 until a.colSpan) it.add(sc + k, TableCell(shading = a.shading))
-                        }
-                        table = table.copy(rows = table.rows.mapIndexed { i, r -> if (i == sr) newRow else r })
-                    }) { Text("Split cell") }
-                    OutlinedButton(enabled = cur != null && !cur.vMergeContinue, onClick = {
-                        val c0 = table.rows[sr][sc]
-                        val allBold = c0.paragraphs.all { p -> p.runs.isNotEmpty() && p.runs.all { it.style.bold } }
-                        update(sr, sc, c0.copy(paragraphs = c0.paragraphs.map { p ->
-                            p.copy(runs = p.runs.map { it.copy(style = it.style.copy(bold = !allBold)) })
-                        }))
-                    }) { Text("Bold") }
-                    listOf(Align.LEFT to "Left", Align.CENTER to "Centre", Align.RIGHT to "Right").forEach { (al, label) ->
-                        OutlinedButton(enabled = cur != null && !cur.vMergeContinue, onClick = {
-                            val c0 = table.rows[sr][sc]
-                            update(sr, sc, c0.copy(paragraphs = c0.paragraphs.map { it.copy(align = al) }))
-                        }) { Text(label) }
+                table = table.copy(rows = table.rows.mapIndexed { i, r -> if (i == sr) newRow else r })
+            }) { Text("Split cell") }
+            OutlinedButton(enabled = cur != null && !cur.vMergeContinue, onClick = {
+                val c0 = table.rows[sr][sc]
+                val allBold = c0.paragraphs.all { p -> p.runs.isNotEmpty() && p.runs.all { it.style.bold } }
+                update(sr, sc, c0.copy(paragraphs = c0.paragraphs.map { p -> p.copy(runs = p.runs.map { it.copy(style = it.style.copy(bold = !allBold)) }) }))
+            }) { Text("Bold") }
+            listOf(Align.LEFT to "Left", Align.CENTER to "Centre", Align.RIGHT to "Right").forEach { (al, label) ->
+                OutlinedButton(enabled = cur != null && !cur.vMergeContinue, onClick = {
+                    val c0 = table.rows[sr][sc]
+                    update(sr, sc, c0.copy(paragraphs = c0.paragraphs.map { it.copy(align = al) }))
+                }) { Text(label) }
+            }
+        }
+        Text("Shade this cell", style = MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            SHADES.forEach { rgb ->
+                Box(
+                    Modifier.width(32.dp).padding(2.dp)
+                        .background(if (rgb == null) MaterialTheme.colorScheme.surface else Color(0xFF000000.toInt() or rgb))
+                        .padding(14.dp),
+                ) { TextButton(onClick = { update(sr, sc, table.rows[sr][sc].copy(shading = rgb)) }, modifier = Modifier.fillMaxSize()) { Text(if (rgb == null) "∅" else "") } }
+            }
+        }
+
+        Text("Size and position", style = MaterialTheme.typography.labelLarge)
+        val maxTotal = maxOf(contentWidthTwips, total)
+        fun cm(t: Int) = "%.1f cm".format(t / 567f)
+        Text("Table width ${cm(total)}")
+        Slider(total.toFloat(), { setTotal(it.toInt().coerceIn(table.columnCount * 240, maxTotal)) }, valueRange = (table.columnCount * 240f)..maxTotal.toFloat())
+        val colW = table.columnWidthsTwips.getOrElse(sc) { 0 }
+        Text("Width of column ${sc + 1}: ${cm(colW)}")
+        Slider(colW.toFloat(), { v ->
+            val w = v.toInt().coerceIn(240, maxTotal)
+            table = table.copy(columnWidthsTwips = table.columnWidthsTwips.mapIndexed { i, x -> if (i == sc) w else x })
+        }, valueRange = 240f..maxTotal.toFloat())
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val room = (contentWidthTwips - total).coerceAtLeast(0)
+            FilterChip(table.indentTwips == 0, { table = table.copy(indentTwips = 0) }, label = { Text("Left") })
+            FilterChip(table.indentTwips == room / 2 && room > 0, { table = table.copy(indentTwips = room / 2) }, label = { Text("Centre") })
+            FilterChip(table.indentTwips == room && room > 0, { table = table.copy(indentTwips = room) }, label = { Text("Right") })
+        }
+        Text("Or drag the table on the page: sideways to move it, up or down to place it between paragraphs.", style = MaterialTheme.typography.bodySmall)
+
+        Text("Borders and header", style = MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(table.headerRow, { table = table.copy(headerRow = it) })
+            Text("Header row   ")
+            Checkbox(table.borders, { table = table.copy(borders = it) })
+            Text("Borders")
+        }
+        if (table.borders) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SHAPE_COLORS.plus(0x808080).forEach { c ->
+                    Box(Modifier.width(32.dp).padding(2.dp).background(Color(0xFF000000.toInt() or c)).padding(14.dp)) {
+                        TextButton(onClick = { table = table.copy(borderColor = c) }, modifier = Modifier.fillMaxSize()) { Text(if (table.borderColor == c) "✓" else "", color = Color.White) }
                     }
                 }
-                if (merged) Text("This table has merged cells, so rows and columns can't be added or removed here yet.", style = MaterialTheme.typography.bodySmall)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(table.headerRow, { table = table.copy(headerRow = it) })
-                    Text("Header row   ")
-                    Checkbox(table.borders, { table = table.copy(borders = it) })
-                    Text("Borders")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    Text("Shade cell:")
-                    SHADES.forEach { rgb ->
-                        Box(
-                            Modifier.width(32.dp).padding(2.dp)
-                                .background(if (rgb == null) MaterialTheme.colorScheme.surface else Color(0xFF000000.toInt() or rgb))
-                                .padding(14.dp)
-                                .let { m -> m },
-                        ) {
-                            TextButton(onClick = {
-                                val (r, c) = sel
-                                update(r, c, table.rows[r][c].copy(shading = rgb))
-                            }, modifier = Modifier.fillMaxSize()) { Text(if (rgb == null) "∅" else "") }
-                        }
-                    }
-                }
-                Box(Modifier.weight(1f).verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        table.rows.forEachIndexed { r, row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                row.forEachIndexed { c, cell ->
-                                    if (cell.vMergeContinue) {
-                                        Box(Modifier.width(150.dp))
-                                    } else {
-                                        OutlinedTextField(
-                                            value = cell.plain(),
-                                            onValueChange = { update(r, c, cell.withText(it)) },
-                                            modifier = Modifier.width((150 * cell.colSpan).dp)
-                                                .background(cell.shading?.let { Color(0xFF000000.toInt() or it) } ?: Color.Transparent),
-                                            textStyle = MaterialTheme.typography.bodyMedium,
-                                            label = if (sel == r to c) ({ Text("Selected") }) else null,
-                                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }.also { src ->
-                                                androidx.compose.runtime.LaunchedEffect(src) {
-                                                    src.interactions.collect { if (it is androidx.compose.foundation.interaction.FocusInteraction.Focus) sel = r to c }
-                                                }
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+            }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(0.25f to "¼ pt", 0.5f to "½ pt", 1f to "1 pt", 2f to "2 pt", 3f to "3 pt").forEach { (w, l) ->
+                    FilterChip(table.borderWidthPt == w, { table = table.copy(borderWidthPt = w) }, label = { Text(l) })
                 }
             }
         }

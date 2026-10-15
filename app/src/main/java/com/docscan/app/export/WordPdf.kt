@@ -179,7 +179,9 @@ object WordPdf {
             val total = t.columnWidthsTwips.sum().coerceAtLeast(1) / 20f * ZOOM
             val scale = if (total > contentW) contentW / total else 1f
             val widths = t.columnWidthsTwips.map { it / 20f * ZOOM * scale }
-            val border = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 0.75f * ZOOM; color = Color.rgb(0x80, 0x80, 0x80) }
+            val bc = t.borderColor
+            val border = Paint().apply { style = Paint.Style.STROKE; strokeWidth = t.borderWidthPt * ZOOM; color = Color.rgb((bc shr 16) and 0xFF, (bc shr 8) and 0xFF, bc and 0xFF) }
+            val indentPx = if (scale < 1f) 0f else t.indentTwips / 20f * ZOOM
             val fill = Paint()
             y += 2f * ZOOM
 
@@ -208,12 +210,12 @@ object WordPdf {
                     for (p in row) {
                         p.cell.shading?.let {
                             fill.color = Color.rgb((it shr 16) and 0xFF, (it shr 8) and 0xFF, it and 0xFF)
-                            drawRect(p.x, 0f, p.x + p.w, h, fill)
+                            drawRect(indentPx + p.x, 0f, indentPx + p.x + p.w, h, fill)
                         }
-                        if (t.borders) drawRect(RectF(p.x, 0f, p.x + p.w, h), border)
+                        if (t.borders) drawRect(RectF(indentPx + p.x, 0f, indentPx + p.x + p.w, h), border)
                         save()
-                        clipRect(p.x, 0f, p.x + p.w, h)
-                        translate(p.x + pad, pad)
+                        clipRect(indentPx + p.x, 0f, indentPx + p.x + p.w, h)
+                        translate(indentPx + p.x + pad, pad)
                         p.layout.draw(this)
                         restore()
                     }
