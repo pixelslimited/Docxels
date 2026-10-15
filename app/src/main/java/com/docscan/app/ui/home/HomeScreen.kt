@@ -91,8 +91,13 @@ fun HomeScreen(
         Column(
             Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brand.Gradient).padding(18.dp),
         ) {
-            Text("What are we working on?", color = Color.White, style = MaterialTheme.typography.titleLarge)
-            Text("Scan, write and convert in one place.", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
+            Box(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(end = 96.dp).align(Alignment.CenterStart)) {
+                    Text("What are we working on?", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Text("Scan, write and convert in one place.", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
+                }
+                FloatingSheets(Modifier.align(Alignment.CenterEnd))
+            }
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HeroAction(Icons.Default.NoteAdd, "New doc", primary = true, modifier = Modifier.weight(1f), onClick = actions.newDoc)
                 HeroAction(Icons.Default.DocumentScanner, "Scan", modifier = Modifier.weight(1f), onClick = actions.scan)
