@@ -235,9 +235,25 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 }.getOrNull()
             }
             if (img == null) { snackbar.showSnackbar("Could not read that picture."); return@launch }
-            page = if (mode == "first") page.copy(differentFirstPage = true, firstHeaderImages = listOf(img))
-            else page.copy(headerImages = listOf(img), firstHeaderImages = if (page.differentFirstPage) listOf(img) else page.firstHeaderImages)
-            snackbar.showSnackbar(if (mode == "first") "Letterhead added to the first page." else "Letterhead added to every page.")
+            val p0 = page
+            // Switching to separate first / later pages: keep what the first page already shows.
+            val split = if (p0.differentFirstPage) p0 else p0.copy(
+                differentFirstPage = true,
+                firstHeaderText = p0.headerText, firstFooterText = p0.footerText, firstPageNumbers = p0.pageNumbers,
+                firstHeaderImages = p0.headerImages, firstFooterImages = p0.footerImages,
+            )
+            page = when (mode) {
+                "first" -> split.copy(firstHeaderImages = listOf(img), headerImages = if (p0.differentFirstPage) split.headerImages else emptyList())
+                "rest" -> split.copy(headerImages = listOf(img))
+                else -> p0.copy(headerImages = listOf(img), firstHeaderImages = if (p0.differentFirstPage) listOf(img) else p0.firstHeaderImages)
+            }
+            snackbar.showSnackbar(
+                when (mode) {
+                    "first" -> "Letterhead added to the first page only."
+                    "rest" -> "Continuous letterhead added to the pages after the first."
+                    else -> "Letterhead added to every page."
+                },
+            )
         }
     }
     val signaturePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -409,8 +425,12 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onRead = { reading = true },
                 onPreview = { previewDoc = controller.toDoc(title, page) },
                 onLetterhead = { mode ->
-                    if (mode == "remove") {
-                        page = page.copy(headerImages = emptyList(), firstHeaderImages = emptyList())
+                    if (mode.startsWith("remove")) {
+                        page = when (mode) {
+                            "remove_first" -> page.copy(firstHeaderImages = emptyList())
+                            "remove_rest" -> page.copy(headerImages = emptyList())
+                            else -> page.copy(headerImages = emptyList(), firstHeaderImages = emptyList())
+                        }
                     } else {
                         letterheadMode = mode
                         letterheadPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -766,9 +786,12 @@ private fun Ribbon(
                         Box {
                             Btn("Letterhead", Icons.Default.Description) { letterMenu = true }
                             DropdownMenu(expanded = letterMenu, onDismissRequest = { letterMenu = false }) {
-                                DropdownMenuItem(text = { Text("Every page (fits the paper)") }, onClick = { letterMenu = false; open = false; onLetterhead("all") })
                                 DropdownMenuItem(text = { Text("First page only") }, onClick = { letterMenu = false; open = false; onLetterhead("first") })
-                                DropdownMenuItem(text = { Text("Remove letterhead") }, onClick = { letterMenu = false; onLetterhead("remove") })
+                                DropdownMenuItem(text = { Text("Continuous letterhead (pages after the first)") }, onClick = { letterMenu = false; open = false; onLetterhead("rest") })
+                                DropdownMenuItem(text = { Text("Same on every page") }, onClick = { letterMenu = false; open = false; onLetterhead("all") })
+                                DropdownMenuItem(text = { Text("Remove first-page letterhead") }, onClick = { letterMenu = false; onLetterhead("remove_first") })
+                                DropdownMenuItem(text = { Text("Remove continuous letterhead") }, onClick = { letterMenu = false; onLetterhead("remove_rest") })
+                                DropdownMenuItem(text = { Text("Remove all letterhead") }, onClick = { letterMenu = false; onLetterhead("remove") })
                             }
                         }
                         Box {
