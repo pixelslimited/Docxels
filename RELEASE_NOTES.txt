@@ -59,6 +59,8 @@
 134|Searchable PDF: in the scan export sheet, PDF now has a Searchable text switch (slower) so the PDF can be searched and copied from.
 134|Save and Save as everywhere: Word documents (menu: Save, Save a copy, Save as .docx/PDF/text/RTF, Save PDF in Docxels), PDF tool results and the PDF viewer (Save in Docxels, Save as), scan exports and table exports (Save as: you choose the folder and file name), and your saved signatures and letterheads (save to the phone).
 134|PDFs can now live in Documents: they show under the new PDF filter, open in the viewer, and can be renamed, favourited, tagged, shared, saved as or moved to Trash.
+134|Letterheads and signatures can now be named: you are asked for a name when you add one, and the pencil button renames it (in Settings, and in the editor's My signatures / My letterheads lists).
+134|Insert > Contents puts a contents list of your headings into the document.
 134|Annotate PDFs: in Sign a PDF, use Highlight to mark text and Draw to write freehand, with Undo last.
 134|Search inside documents: Settings > Search inside documents (off by default) lets Documents search find words inside scans and Word files. The index is encrypted.
 134|Signatures you draw or import in the editor are also kept in My signatures, and letterheads you add are also kept in My letterheads, so you can reuse them anywhere.
