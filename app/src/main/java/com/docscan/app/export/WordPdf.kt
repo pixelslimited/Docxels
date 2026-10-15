@@ -113,9 +113,9 @@ object WordPdf {
             val c = canvas!!
             val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f; color = Color.GRAY; typeface = Typeface.SANS_SERIF }
             val firstPage = page.differentFirstPage && pageNo == 1
-            val headerText = if (firstPage) page.firstHeaderText else page.headerText
-            val footerText = if (firstPage) page.firstFooterText else page.footerText
-            val numbers = if (firstPage) page.firstPageNumbers else page.pageNumbers
+            val headerText = page.headerFor(pageNo)
+            val footerText = page.footerFor(pageNo)
+            val numbers = page.numbersFor(pageNo)
             for (img in (if (firstPage) page.firstHeaderImages + page.firstFooterImages else page.headerImages + page.footerImages)) {
                 if (!img.behind) drawPageImage(c, img)
             }

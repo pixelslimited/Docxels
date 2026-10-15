@@ -462,6 +462,16 @@ object DocxReader {
                     }
                 }
             }
+            val evenOdd = (rels.values.firstOrNull { it.endsWith("settings.xml") } ?: "word/settings.xml").let { xml(it)?.child("evenAndOddHeaders") != null }
+            if (evenOdd) {
+                setup = setup.copy(differentOddEven = true)
+                sect.childrenNamed("headerReference").firstOrNull { it.attr("type") == "even" }?.attr("id")?.let { id ->
+                    rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(evenHeaderText = partText(it).first) } }
+                }
+                sect.childrenNamed("footerReference").firstOrNull { it.attr("type") == "even" }?.attr("id")?.let { id ->
+                    rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(evenFooterText = partText(it).first) } }
+                }
+            }
             headerRef?.attr("id")?.let { id ->
                 rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(headerText = partText(it).first, headerImages = partImages(path, it, false, setup)) } }
             }

@@ -225,6 +225,10 @@ data class PageSetup(
     val firstHeaderText: String = "",
     val firstFooterText: String = "",
     val firstPageNumbers: Boolean = false,
+    /** Different header and footer on even pages (Word's odd and even pages); the ordinary ones then serve odd pages. */
+    val differentOddEven: Boolean = false,
+    val evenHeaderText: String = "",
+    val evenFooterText: String = "",
     /** Distance from the sheet edge to the header / footer text. */
     val headerDistTwips: Int = 709,
     val footerDistTwips: Int = 709,
@@ -239,6 +243,21 @@ data class PageSetup(
     val sheetHeightTwips: Int get() = if (landscape) minOf(widthTwips, heightTwips) else maxOf(widthTwips, heightTwips)
     val contentWidthTwips: Int get() = (sheetWidthTwips - marginLeftTwips - marginRightTwips).coerceAtLeast(720)
     val contentHeightTwips: Int get() = (sheetHeightTwips - marginTopTwips - marginBottomTwips).coerceAtLeast(720)
+
+    /** The header text for page [pageNo] (1-based): the first page's own, the even page's own, or the ordinary one. */
+    fun headerFor(pageNo: Int): String = when {
+        differentFirstPage && pageNo == 1 -> firstHeaderText
+        differentOddEven && pageNo % 2 == 0 -> evenHeaderText
+        else -> headerText
+    }
+
+    fun footerFor(pageNo: Int): String = when {
+        differentFirstPage && pageNo == 1 -> firstFooterText
+        differentOddEven && pageNo % 2 == 0 -> evenFooterText
+        else -> footerText
+    }
+
+    fun numbersFor(pageNo: Int): Boolean = if (differentFirstPage && pageNo == 1) firstPageNumbers else pageNumbers
 }
 
 /** A comment on part of the text: [id] matches [RunStyle.comment] on the text it is attached to. */

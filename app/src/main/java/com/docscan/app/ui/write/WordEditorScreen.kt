@@ -1163,6 +1163,9 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
     var numbers by remember { mutableStateOf(page.pageNumbers) }
     var diffFirst by remember { mutableStateOf(page.differentFirstPage) }
     var header1 by remember { mutableStateOf(page.firstHeaderText) }
+    var oddEven by remember { mutableStateOf(page.differentOddEven) }
+    var headerEven by remember { mutableStateOf(page.evenHeaderText) }
+    var footerEven by remember { mutableStateOf(page.evenFooterText) }
     var footer1 by remember { mutableStateOf(page.firstFooterText) }
     var numbers1 by remember { mutableStateOf(page.firstPageNumbers) }
     AlertDialog(
@@ -1217,6 +1220,15 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
                     Switch(diffFirst, { diffFirst = it })
                     Text("  Different first page")
                 }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(oddEven, { oddEven = it })
+                    Text("  Different odd and even pages")
+                }
+                if (oddEven) {
+                    Text("The header and footer above are for odd pages (1, 3, 5…).", style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(headerEven, { headerEven = it }, label = { Text("Even page header") }, singleLine = true)
+                    OutlinedTextField(footerEven, { footerEven = it }, label = { Text("Even page footer") }, singleLine = true)
+                }
                 if (diffFirst) {
                     OutlinedTextField(header1, { header1 = it }, label = { Text("First page header") }, singleLine = true)
                     OutlinedTextField(footer1, { footer1 = it }, label = { Text("First page footer") }, singleLine = true)
@@ -1236,6 +1248,7 @@ private fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDis
                         marginTopTwips = tw(mTop, page.marginTopTwips), marginBottomTwips = tw(mBottom, page.marginBottomTwips),
                         headerText = header.trim(), footerText = footer.trim(), pageNumbers = numbers,
                         differentFirstPage = diffFirst, firstHeaderText = header1.trim(), firstFooterText = footer1.trim(), firstPageNumbers = numbers1,
+                        differentOddEven = oddEven, evenHeaderText = headerEven.trim(), evenFooterText = footerEven.trim(),
                     ).let { if (dropPics) it.copy(headerImages = emptyList(), footerImages = emptyList(), firstHeaderImages = emptyList(), firstFooterImages = emptyList()) else it },
                 )
             }) { Text("Apply") }

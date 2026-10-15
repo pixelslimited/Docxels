@@ -32,6 +32,9 @@ class PageDecor(
     val firstHeaderText: String,
     val firstFooterText: String,
     val firstPageNumbers: Boolean,
+    val differentOddEven: Boolean,
+    val evenHeaderText: String,
+    val evenFooterText: String,
     val contentHeightPx: Float,
     val bottomMarginPx: Float,
     val smallTextPx: Float,
@@ -274,8 +277,9 @@ class RichEditText(context: Context) : EditText(context) {
             val sheetTop = if (k == 0) 0f else topPad + ys[k] + d.bottomMarginPx + d.deskGapPx
             val sheetBottom = if (k == n - 1) height.toFloat() else topPad + ys[k + 1] + d.bottomMarginPx
             val first = k == 0 && d.differentFirstPage
-            val header = if (first) d.firstHeaderText else d.headerText
-            val footer = if (first) d.firstFooterText else d.footerText
+            val evenPage = !first && d.differentOddEven && (k + 1) % 2 == 0
+            val header = if (first) d.firstHeaderText else if (evenPage) d.evenHeaderText else d.headerText
+            val footer = if (first) d.firstFooterText else if (evenPage) d.evenFooterText else d.footerText
             val numbered = if (first) d.firstPageNumbers else d.pageNumbers
             if (header.isNotEmpty()) {
                 canvas.drawText(header, paddingLeft.toFloat(), sheetTop + d.topMarginPx / 2f + d.smallTextPx / 3f, small)
@@ -827,6 +831,9 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
                 firstHeaderText = pageSetup.firstHeaderText,
                 firstFooterText = pageSetup.firstFooterText,
                 firstPageNumbers = pageSetup.firstPageNumbers,
+                differentOddEven = pageSetup.differentOddEven,
+                evenHeaderText = pageSetup.evenHeaderText,
+                evenFooterText = pageSetup.evenFooterText,
                 contentHeightPx = pageSetup.contentHeightTwips / 20f * ZOOM * eff,
                 bottomMarginPx = pageSetup.marginBottomTwips / 20f * ZOOM * eff,
                 smallTextPx = 9f * ZOOM * eff,

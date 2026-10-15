@@ -33,13 +33,19 @@ object DocxWriter {
         val first = page.differentFirstPage
         val hasFirstHeader = first && (page.firstHeaderText.isNotBlank() || page.firstHeaderImages.isNotEmpty())
         val hasFirstFooter = first && (page.firstFooterText.isNotBlank() || page.firstPageNumbers || page.firstFooterImages.isNotEmpty())
+        val even = page.differentOddEven
         val rels = StringBuilder()
+        if (even) rels.append("<Relationship Id=\"rIdSettings\" Type=\"$REL/settings\" Target=\"settings.xml\"/>")
         rels.append("<Relationship Id=\"rIdStyles\" Type=\"$REL/styles\" Target=\"styles.xml\"/>")
         rels.append("<Relationship Id=\"rIdNumbering\" Type=\"$REL/numbering\" Target=\"numbering.xml\"/>")
         if (hasHeader) rels.append("<Relationship Id=\"rIdHeader\" Type=\"$REL/header\" Target=\"header1.xml\"/>")
         if (hasFooter) rels.append("<Relationship Id=\"rIdFooter\" Type=\"$REL/footer\" Target=\"footer1.xml\"/>")
         if (hasFirstHeader) rels.append("<Relationship Id=\"rIdHeaderFirst\" Type=\"$REL/header\" Target=\"header2.xml\"/>")
         if (hasFirstFooter) rels.append("<Relationship Id=\"rIdFooterFirst\" Type=\"$REL/footer\" Target=\"footer2.xml\"/>")
+        if (even) {
+            rels.append("<Relationship Id=\"rIdHeaderEven\" Type=\"$REL/header\" Target=\"header3.xml\"/>")
+            rels.append("<Relationship Id=\"rIdFooterEven\" Type=\"$REL/footer\" Target=\"footer3.xml\"/>")
+        }
         ctx.images.forEachIndexed { i, img ->
             rels.append("<Relationship Id=\"rIdImg${i + 1}\" Type=\"$REL/image\" Target=\"media/image${i + 1}.${img.extension}\"/>")
         }
@@ -54,6 +60,7 @@ object DocxWriter {
         if (hasFooter) body.append("<w:footerReference w:type=\"default\" r:id=\"rIdFooter\"/>")
         if (hasFirstHeader) body.append("<w:headerReference w:type=\"first\" r:id=\"rIdHeaderFirst\"/>")
         if (hasFirstFooter) body.append("<w:footerReference w:type=\"first\" r:id=\"rIdFooterFirst\"/>")
+        if (even) body.append("<w:headerReference w:type=\"even\" r:id=\"rIdHeaderEven\"/><w:footerReference w:type=\"even\" r:id=\"rIdFooterEven\"/>")
         body.append("<w:pgSz w:w=\"${page.sheetWidthTwips}\" w:h=\"${page.sheetHeightTwips}\"")
         if (page.landscape) body.append(" w:orient=\"landscape\"")
         body.append("/>")
@@ -68,7 +75,7 @@ object DocxWriter {
         val zip = ZipOutputStream(out)
         fun putText(name: String, text: String) = put(zip, name, text.toByteArray(Charsets.UTF_8))
 
-        putText("[Content_Types].xml", contentTypes(ctx, hasHeader, hasFooter, hasFirstHeader, hasFirstFooter, (page.headerImages + page.footerImages + page.firstHeaderImages + page.firstFooterImages).map { it.extension }))
+        putText("[Content_Types].xml", contentTypes(ctx, hasHeader, hasFooter, hasFirstHeader, hasFirstFooter, (page.headerImages + page.footerImages + page.firstHeaderImages + page.firstFooterImages).map { it.extension }, even))
         putText(
             "_rels/.rels",
             HEAD + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
@@ -112,6 +119,11 @@ object DocxWriter {
         if (hasHeader) part("header1.xml", { ids -> headerXml(page.headerText, page.headerImages, ids, 1001) }, page.headerImages)
         if (hasFooter) part("footer1.xml", { ids -> footerXml(page.footerText, page.pageNumbers, page.footerImages, ids, 1101) }, page.footerImages)
         if (hasFirstHeader) part("header2.xml", { ids -> headerXml(page.firstHeaderText, page.firstHeaderImages, ids, 1201) }, page.firstHeaderImages)
+        if (even) {
+            putText("word/settings.xml", HEAD + "<w:settings $NS><w:evenAndOddHeaders/></w:settings>")
+            part("header3.xml", { ids -> headerXml(page.evenHeaderText, emptyList(), ids, 1401) }, emptyList())
+            part("footer3.xml", { ids -> footerXml(page.evenFooterText, page.pageNumbers, emptyList(), ids, 1501) }, emptyList())
+        }
         if (hasFirstFooter) part("footer2.xml", { ids -> footerXml(page.firstFooterText, page.firstPageNumbers, page.firstFooterImages, ids, 1301) }, page.firstFooterImages)
         ctx.images.forEachIndexed { i, img -> put(zip, "word/media/image${i + 1}.${img.extension}", img.bytes) }
         zip.finish()
@@ -190,7 +202,7 @@ object DocxWriter {
         zip.closeEntry()
     }
 
-    private fun contentTypes(ctx: Ctx, header: Boolean, footer: Boolean, firstHeader: Boolean, firstFooter: Boolean, extra: List<String>): String {
+    private fun contentTypes(ctx: Ctx, header: Boolean, footer: Boolean, firstHeader: Boolean, firstFooter: Boolean, extra: List<String>, evenOdd: Boolean = false): String {
         val sb = StringBuilder(HEAD)
         sb.append("<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">")
         sb.append("<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>")
@@ -202,6 +214,7 @@ object DocxWriter {
         sb.append("<Override PartName=\"/word/document.xml\" ContentType=\"$w.document.main+xml\"/>")
         sb.append("<Override PartName=\"/word/styles.xml\" ContentType=\"$w.styles+xml\"/>")
         sb.append("<Override PartName=\"/word/numbering.xml\" ContentType=\"$w.numbering+xml\"/>")
+        if (evenOdd) sb.append("<Override PartName=\"/word/settings.xml\" ContentType=\"$w.settings+xml\"/><Override PartName=\"/word/header3.xml\" ContentType=\"$w.header+xml\"/><Override PartName=\"/word/footer3.xml\" ContentType=\"$w.footer+xml\"/>")
         if (ctx.usedComments.isNotEmpty()) sb.append("<Override PartName=\"/word/comments.xml\" ContentType=\"$w.comments+xml\"/>")
         if (header) sb.append("<Override PartName=\"/word/header1.xml\" ContentType=\"$w.header+xml\"/>")
         if (footer) sb.append("<Override PartName=\"/word/footer1.xml\" ContentType=\"$w.footer+xml\"/>")
