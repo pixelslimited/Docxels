@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Title
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
@@ -679,8 +681,16 @@ private fun Ribbon(
     var open by remember { mutableStateOf(false) }
     var grid by remember { mutableStateOf(true) }
     val wide = tab != 0
-    // Tool groups: only the open group's tools are shown in the grid.
-    var openGroup by remember { mutableStateOf("") }
+    // Tool groups: a row of group icons; the picked group's tools show below as icon tiles (no dropdowns).
+    var groupPick by remember { mutableStateOf(mapOf<Int, String>()) }
+    fun groupsOf(t: Int): List<Pair<String, androidx.compose.ui.graphics.vector.ImageVector>> = when (t) {
+        0 -> listOf("Font" to Icons.Default.TextFields, "Paragraph" to Icons.Default.FormatAlignLeft, "Style" to Icons.Default.Title, "Clear" to Icons.Default.FormatClear)
+        1 -> listOf("Illustrations" to Icons.Default.Image, "Letterhead and signature" to Icons.Default.Draw, "Text and page" to Icons.Default.Link)
+        2 -> listOf("Page" to Icons.Default.Description, "Paragraph" to Icons.Default.FormatAlignLeft, "Borders and shading" to Icons.Default.CropSquare)
+        3 -> listOf("Find" to Icons.Default.Search, "Proofing" to Icons.Default.Numbers)
+        else -> listOf("Views" to Icons.Default.Description, "Zoom" to Icons.Default.Search, "Reading" to Icons.Default.Menu)
+    }
+    val pickedGroup = groupPick[tab]?.takeIf { n -> groupsOf(tab).any { it.first == n } } ?: groupsOf(tab).first().first
     var groupShown = true
     // One item, drawn as a small icon in the compact bar or as a labelled tile in the grid.
     @Composable
@@ -706,22 +716,10 @@ private fun Ribbon(
             Toggle(icon, label, on, click)
         }
     }
-    // A heading that starts a group of tools in the grid. The group's tools show only while it is open (tap the name).
+    // Marks the start of a group's tools; in the grid only the picked group's tools are drawn.
     @Composable
     fun Group(title: String) {
-        if (!grid) { groupShown = true; return }
-        val key = "$tab:$title"
-        val isOpen = openGroup == key
-        groupShown = isOpen
-        Row(
-            Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                .clickable { openGroup = if (isOpen) "" else key }
-                .padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-            Icon(if (isOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = if (isOpen) "Hide $title" else "Show $title", tint = MaterialTheme.colorScheme.primary)
-        }
+        groupShown = !grid || title == pickedGroup
     }
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
         Column {
@@ -742,15 +740,6 @@ private fun Ribbon(
             val items: @Composable () -> Unit = {
                 when (tab) {
                     0 -> {
-                        Group("Styles")
-                        Box {
-                            Btn("Style", glyph = s.style.label) { styleMenu = true }
-                            DropdownMenu(expanded = styleMenu, onDismissRequest = { styleMenu = false }) {
-                                ParaStyle.entries.forEach { st ->
-                                    DropdownMenuItem(text = { Text(st.label) }, onClick = { styleMenu = false; c.setStyle(st) })
-                                }
-                            }
-                        }
                         Group("Font")
                         Btn("Bold", Icons.Default.FormatBold, on = s.bold) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
                         Btn("Italic", Icons.Default.FormatItalic, on = s.italic) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
@@ -815,8 +804,24 @@ private fun Ribbon(
                         Btn("Justify", Icons.Default.FormatAlignJustify, on = s.align == Align.JUSTIFY, main = false) { c.setAlign(Align.JUSTIFY) }
                         Btn("Outdent", Icons.Default.FormatIndentDecrease, main = false) { c.indent(-1) }
                         Btn("Indent", Icons.Default.FormatIndentIncrease, main = false) { c.indent(1) }
+                        Btn("Space before", Icons.Default.FormatLineSpacing, on = s.spaceBefore, main = false) { c.toggleSpaceBefore() }
+                        Btn("Space after", Icons.Default.FormatLineSpacing, on = s.spaceAfter, main = false) { c.toggleSpaceAfter() }
+                        Btn("Border", Icons.Default.CropSquare, main = false) { c.toggleBorder() }
+                        Group("Style")
+                        if (!grid) Box {
+                            Btn("Style", glyph = s.style.label) { styleMenu = true }
+                            DropdownMenu(expanded = styleMenu, onDismissRequest = { styleMenu = false }) {
+                                ParaStyle.entries.forEach { st ->
+                                    DropdownMenuItem(text = { Text(st.label) }, onClick = { styleMenu = false; c.setStyle(st) })
+                                }
+                            }
+                        }
+                        ParaStyle.entries.forEach { st -> Btn(st.label, glyph = "Aa", on = s.style == st, main = false) { c.setStyle(st) } }
                         Group("Clear")
                         Btn("Clear formatting", Icons.Default.FormatClear, main = false) { c.clearFormatting() }
+                        Btn("Clear colour", Icons.Default.FormatColorText, main = false) { c.remove(CharKind.COLOR) }
+                        Btn("Clear highlight", Icons.Default.FormatColorFill, main = false) { c.remove(CharKind.HIGHLIGHT) }
+                        Btn("No underline", Icons.Default.FormatUnderlined, main = false) { c.remove(CharKind.UNDERLINE) }
                     }
                     1 -> {
                         Group("Illustrations")
@@ -920,6 +925,21 @@ private fun Ribbon(
                 }
             }
             if (open && grid) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    groupsOf(tab).forEach { (name, icon) ->
+                        val on = name == pickedGroup
+                        Column(
+                            Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                                .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                                .clickable { groupPick = groupPick + (tab to name) }
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(icon, contentDescription = name, modifier = Modifier.size(24.dp), tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(name, style = MaterialTheme.typography.labelSmall, maxLines = 1, color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
                 androidx.compose.foundation.layout.FlowRow(
                     Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
