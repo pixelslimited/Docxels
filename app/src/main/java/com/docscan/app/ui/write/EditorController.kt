@@ -303,7 +303,6 @@ class RichEditText(context: Context) : EditText(context) {
         val l = layout ?: return null
         val t = text
         val span = t.getSpans(0, t.length, BlockChipSpan::class.java).firstOrNull { it.index == selectedBlock } ?: return null
-        if (span.sizeTwips() == null) return null
         val hit = floatingHits().firstOrNull { it.span === span }
         if (hit != null) return android.graphics.RectF(hit.left, hit.top, hit.left + hit.w, hit.top + hit.h)
         val (w, h) = span.floatSizePx(paint) ?: return null
@@ -325,7 +324,11 @@ class RichEditText(context: Context) : EditText(context) {
     private var gripX = 0f
     private var gripY = 0f
 
+    private fun selectedSpan(): BlockChipSpan? =
+        text.getSpans(0, text.length, BlockChipSpan::class.java).firstOrNull { it.index == selectedBlock }
+
     private fun gripAt(x: Float, y: Float): Grip {
+        if (selectedSpan()?.sizeTwips() == null) return Grip.NONE
         val r = selectedRect() ?: return Grip.NONE
         val reach = handleR() * 2.2f
         fun near(px: Float, py: Float) = kotlin.math.abs(x - px) <= reach && kotlin.math.abs(y - py) <= reach
@@ -343,6 +346,7 @@ class RichEditText(context: Context) : EditText(context) {
         handlePaint.strokeWidth = 2f * resources.displayMetrics.density
         handlePaint.color = 0xFF4F46E5.toInt()
         canvas.drawRect(r, handlePaint)
+        if (selectedSpan()?.sizeTwips() == null) return
         handlePaint.style = android.graphics.Paint.Style.FILL
         val rad = handleR()
         for ((px, py) in listOf(r.right to r.bottom, r.right to r.centerY(), r.centerX() to r.bottom)) {
@@ -352,6 +356,18 @@ class RichEditText(context: Context) : EditText(context) {
             canvas.drawCircle(px, py, rad * 0.62f, handlePaint)
         }
     }
+
+    /** Width of the text column in twips, for keeping a dragged table inside the page. */
+    var contentWidthTwips: Int = 0
+
+    /** Called with (block index, y of the drop) when a table is dropped well above or below where it was. */
+    var onTableMoved: ((Int, Float) -> Unit)? = null
+
+    private var tblSpan: BlockChipSpan? = null
+    private var tblX = 0f
+    private var tblY = 0f
+    private var tblBase = 0
+    private var tblDragging = false
 
     private var dragHit: Hit? = null
     private var dragStartX = 0f
@@ -364,6 +380,17 @@ class RichEditText(context: Context) : EditText(context) {
         if (!readOnly) {
             when (event.actionMasked) {
                 android.view.MotionEvent.ACTION_DOWN -> {
+                    tblSpan = null
+                    selectedSpan()?.takeIf { it.block is com.docscan.app.core.word.Block.Table }?.let { sp ->
+                        val r = selectedRect()
+                        if (r != null && r.contains(event.x, event.y)) {
+                            tblSpan = sp; tblX = event.x; tblY = event.y
+                            tblBase = (sp.block as com.docscan.app.core.word.Block.Table).table.indentTwips
+                            tblDragging = false
+                            parent?.requestDisallowInterceptTouchEvent(true)
+                            return true
+                        }
+                    }
                     val g = gripAt(event.x, event.y)
                     if (g != Grip.NONE) {
                         val sp = text.getSpans(0, text.length, BlockChipSpan::class.java).firstOrNull { it.index == selectedBlock }
@@ -387,7 +414,18 @@ class RichEditText(context: Context) : EditText(context) {
                         return true
                     }
                 }
-                android.view.MotionEvent.ACTION_MOVE -> if (grip != Grip.NONE) {
+                android.view.MotionEvent.ACTION_MOVE -> if (tblSpan != null) {
+                    val sp = tblSpan!!
+                    val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+                    if (!tblDragging && kotlin.math.abs(event.x - tblX) < slop && kotlin.math.abs(event.y - tblY) < slop) return true
+                    tblDragging = true
+                    val tb = (sp.block as? com.docscan.app.core.word.Block.Table)?.table ?: return true
+                    val k = paint.density * ZOOM / 20f
+                    val room = (contentWidthTwips - tb.columnWidthsTwips.sum()).coerceAtLeast(0)
+                    val ind = (tblBase + ((event.x - tblX) / k).toInt()).coerceIn(0, room)
+                    if (ind != tb.indentTwips) onResized?.invoke(sp.index, com.docscan.app.core.word.Block.Table(tb.copy(indentTwips = ind)), false)
+                    return true
+                } else if (grip != Grip.NONE) {
                     val sp = gripSpan
                     if (sp != null) {
                         val k = paint.density * ZOOM / 20f
@@ -424,7 +462,18 @@ class RichEditText(context: Context) : EditText(context) {
                     }
                     return true
                 }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> if (grip != Grip.NONE) {
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> if (tblSpan != null) {
+                    val sp = tblSpan!!
+                    tblSpan = null
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                    val moved = tblDragging
+                    tblDragging = false
+                    if (moved && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
+                        val r = selectedRect()
+                        if (r != null && (event.y < r.top - r.height() * 0.2f || event.y > r.bottom + 20f)) onTableMoved?.invoke(sp.index, event.y)
+                    } else if (!moved && event.actionMasked == android.view.MotionEvent.ACTION_UP) onChipTap?.invoke(sp.index)
+                    return true
+                } else if (grip != Grip.NONE) {
                     grip = Grip.NONE
                     parent?.requestDisallowInterceptTouchEvent(false)
                     selectedRect()
@@ -506,6 +555,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
         view = v
         v.onFloatMoved = { i, b, fin -> floatMoved(i, b, fin) }
         v.onResized = { i, b, _ -> resizeBlock(i, b) }
+        v.onTableMoved = { i, y -> moveBlockToY(i, y) }
         v.setText(initialText, android.widget.TextView.BufferType.EDITABLE)
         v.setTextSize(TypedValue.COMPLEX_UNIT_PX, StyleDefaults.BODY_SIZE_PT * ZOOM * density)
         v.setTextColor(0xFF1B1B1F.toInt())
@@ -670,6 +720,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
             val sideR = if (mode == ViewMode.PAGE) px(pageSetup.marginRightTwips) else 0
             v.setPadding(side, px(pageSetup.marginTopTwips), sideR, px(pageSetup.marginBottomTwips))
             ChipLimits.maxWidthPx = Float.MAX_VALUE
+            v.contentWidthTwips = pageSetup.contentWidthTwips
             v.decor = PageDecor(
                 headerText = pageSetup.headerText,
                 footerText = pageSetup.footerText,
@@ -898,6 +949,40 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
     fun lastBlockIndex(): Int? = originals.indices.lastOrNull()
 
     /** A picture or shape was resized by its handles. */
+    /** Moves a table (or any block's paragraph) to the paragraph under screen height [y]. */
+    fun moveBlockToY(index: Int, y: Float) {
+        val v = view ?: return
+        val t = v.text as? Editable ?: return
+        val chip = t.getSpans(0, t.length, BlockChipSpan::class.java).firstOrNull { it.index == index } ?: return
+        val l = v.layout ?: return
+        val off = l.getOffsetForHorizontal(l.getLineForVertical((y - v.totalPaddingTop).toInt().coerceAtLeast(0)), 0f)
+        val line = l.getLineForOffset(off)
+        val lineMid = v.totalPaddingTop + (l.getLineTop(line) + l.getLineBottom(line)) / 2f
+        val r = RichOps.paragraphAt(t, t.getSpanStart(chip))
+        val tgt = RichOps.paragraphAt(t, off)
+        if (tgt.start == r.start) return
+        val below = y > lineMid
+        val pos = if (below) tgt.full else tgt.start
+        if (pos == r.start || pos == r.full) return
+        applying = true
+        try {
+            val piece = android.text.SpannableStringBuilder(t.subSequence(r.start, r.end))
+            val needLead = below && !tgt.hasNewline
+            val insert = android.text.SpannableStringBuilder().also {
+                if (needLead) it.append('\n')
+                it.append(piece)
+                if (!needLead) it.append('\n')
+            }
+            t.insert(pos, insert)
+            val shift = if (pos <= r.start) insert.length else 0
+            val from = r.start + shift
+            val to = r.end + shift
+            if (r.hasNewline) t.delete(from, to + 1) else t.delete(maxOf(0, from - 1), to)
+        } finally { applying = false }
+        changed()
+        view?.invalidate()
+    }
+
     fun resizeBlock(index: Int, block: Block) {
         val floating = (block as? Block.Image)?.image?.wrap?.floating ?: (block as? Block.Shape)?.shape?.wrap?.floating ?: false
         if (floating) {
