@@ -91,6 +91,11 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 }
             }
 
+            Section("Letterheads")
+            SavedAssetsPanel(signature = false, say = { say(it) })
+            Section("Signatures")
+            SavedAssetsPanel(signature = true, say = { say(it) })
+
             Section("Privacy and security")
             ToggleRow(
                 title = "App lock",

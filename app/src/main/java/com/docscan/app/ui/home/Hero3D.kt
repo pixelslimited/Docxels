@@ -1,7 +1,12 @@
 package com.docscan.app.ui.home
 
 import android.provider.Settings
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -17,6 +22,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,13 +38,70 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 
+
+/** The sheets' own turning, driven by touch: drag to turn them, flick to spin them, tap to flip them over. */
+class SheetsState(private val scope: CoroutineScope) {
+    val spin = Animatable(0f)
+    val tilt = Animatable(0f)
+    private var lastDx = 0f
+
+    fun drag(dx: Float, dy: Float) {
+        lastDx = dx
+        scope.launch {
+            spin.stop(); tilt.stop()
+            spin.snapTo(spin.value + dx * 0.55f)
+            tilt.snapTo((tilt.value - dy * 0.35f).coerceIn(-45f, 45f))
+        }
+    }
+
+    /** Finger lifted: carry on turning with the flick's speed, then settle back to face front. */
+    fun release() {
+        val v = lastDx * 55f
+        lastDx = 0f
+        scope.launch {
+            launch { tilt.animateTo(0f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow)) }
+            if (kotlin.math.abs(v) > 120f) spin.animateDecay(v, exponentialDecay(frictionMultiplier = 1.1f))
+            val target = Math.round(spin.value / 360f) * 360f
+            spin.animateTo(target, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow))
+            spin.snapTo(0f)
+        }
+    }
+
+    fun flip() {
+        scope.launch {
+            spin.stop()
+            spin.animateTo(spin.value + 360f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow))
+            spin.snapTo(spin.value % 360f)
+        }
+    }
+}
+
+@Composable
+fun rememberSheetsState(): SheetsState {
+    val scope = rememberCoroutineScope()
+    return remember { SheetsState(scope) }
+}
+
+/** Makes a region turn the sheets: drag, flick or tap. Buttons inside the region keep working. */
+fun Modifier.sheetsTouch(state: SheetsState): Modifier = this
+    .pointerInput(state) { detectTapGestures(onTap = { state.flip() }) }
+    .pointerInput(state) {
+        detectDragGestures(
+            onDragEnd = { state.release() },
+            onDragCancel = { state.release() },
+        ) { change, drag ->
+            change.consume()
+            state.drag(drag.x, drag.y)
+        }
+    }
+
 /**
  * Three paper sheets that float and turn in perspective. Pure Compose: each sheet is rotated in 3D with a camera
  * distance, so it needs no extra libraries and costs almost nothing. Stays still when the phone has animations
  * switched off (Settings > Accessibility > Remove animations).
  */
 @Composable
-fun FloatingSheets(modifier: Modifier = Modifier) {
+fun FloatingSheets(state: SheetsState, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val still = remember {
@@ -59,8 +127,8 @@ fun FloatingSheets(modifier: Modifier = Modifier) {
                     .size(width = 48.dp, height = 64.dp)
                     .graphicsLayer {
                         cameraDistance = 14f * density
-                        rotationY = if (still) -20f else turn * (1f + i * 0.3f) - 8f
-                        rotationX = if (still) 0f else lean
+                        rotationY = (if (still) -20f else turn * (1f + i * 0.3f) - 8f) + state.spin.value * (1f + i * 0.12f)
+                        rotationX = (if (still) 0f else lean) + state.tilt.value
                         translationX = (i - 1) * 18.dp.toPx()
                         translationY = if (still) 0f else bob * (1f + i * 0.4f)
                         alpha = 0.6f + 0.2f * i

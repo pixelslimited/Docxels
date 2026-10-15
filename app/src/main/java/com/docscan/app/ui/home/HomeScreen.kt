@@ -87,16 +87,17 @@ fun HomeScreen(
             Text("Search your documents", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp))
         }
 
-        // Hero: the four ways to begin.
+        // Hero: the four ways to begin. Touching the card turns the sheets: drag, flick or tap.
+        val sheets = rememberSheetsState()
         Column(
-            Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brand.Gradient).padding(18.dp),
+            Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brand.Gradient).sheetsTouch(sheets).padding(18.dp),
         ) {
             Box(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(end = 96.dp).align(Alignment.CenterStart)) {
                     Text("What are we working on?", color = Color.White, style = MaterialTheme.typography.titleLarge)
                     Text("Scan, write and convert in one place.", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
                 }
-                FloatingSheets(Modifier.align(Alignment.CenterEnd))
+                FloatingSheets(sheets, Modifier.align(Alignment.CenterEnd))
             }
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HeroAction(Icons.Default.NoteAdd, "New doc", primary = true, modifier = Modifier.weight(1f), onClick = actions.newDoc)

@@ -213,13 +213,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
 
     // Letterhead: one picture, stretched to the paper, repeated behind the text of every page (or just the first).
     var letterheadMode by remember { mutableStateOf("all") }
-    val letterheadPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val mode = letterheadMode
-        val setup = page
+    fun applyLetterhead(lh: PageSources.Letterhead, mode: String) {
         scope.launch {
-            val lh = PageSources.letterhead(context, uri, setup)
-            if (lh == null) { snackbar.showSnackbar("Could not find a letterhead in that file."); return@launch }
             val p0 = page
             // Switching to separate first / later pages: keep what the first page already shows.
             val split = if (p0.differentFirstPage) p0 else p0.copy(
@@ -251,6 +246,17 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             )
         }
     }
+    val letterheadPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val mode = letterheadMode
+        val setup = page
+        scope.launch {
+            val lh = PageSources.letterhead(context, uri, setup)
+            if (lh == null) { snackbar.showSnackbar("Could not find a letterhead in that file."); return@launch }
+            applyLetterhead(lh, mode)
+        }
+    }
+    var savedPicker by remember { mutableStateOf<Boolean?>(null) }
     fun placeSignature(block: ImageBlock) {
         val found = controller.insertSignature(block, page.contentWidthTwips)
         scope.launch {
@@ -408,7 +414,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onRead = { reading = true },
                 onPreview = { previewDoc = controller.toDoc(title, page) },
                 onLetterhead = { mode ->
-                    if (mode.startsWith("remove")) {
+                    if (mode == "saved") savedPicker = false
+                    else if (mode.startsWith("remove")) {
                         page = when (mode) {
                             "remove_first" -> page.copy(firstHeaderImages = emptyList())
                             "remove_rest" -> page.copy(headerImages = emptyList())
@@ -421,6 +428,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 },
                 onSignature = { mode ->
                     if (mode == "draw") signPad = true
+                    else if (mode == "saved") savedPicker = true
                     else signaturePicker.launch(PageSources.MIMES)
                 },
                 onTable = { tableOpen = true },
@@ -452,6 +460,27 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
 
     previewDoc?.let { d -> PagePreview(vm, d) { previewDoc = null } }
+    savedPicker?.let { isSignature ->
+        com.docscan.app.ui.settings.SavedAssetsDialog(
+            signature = isSignature,
+            onPick = { bytes, mode ->
+                savedPicker = null
+                scope.launch {
+                    val bmp = withContext(Dispatchers.Default) { android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+                    if (bmp == null) { snackbar.showSnackbar("Could not open that saved picture."); return@launch }
+                    if (isSignature) {
+                        val tw = 2800
+                        val out = java.io.ByteArrayOutputStream()
+                        bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                        placeSignature(ImageBlock(out.toByteArray(), "png", tw, (tw.toLong() * bmp.height / bmp.width.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT))
+                    } else {
+                        applyLetterhead(PageSources.Letterhead(listOf(PageSources.fullPage(bmp, page)), emptyList()), mode)
+                    }
+                }
+            },
+            onDismiss = { savedPicker = null },
+        )
+    }
     signSource?.let { src ->
         SignatureImportDialog(
             source = src,
@@ -780,6 +809,7 @@ private fun Ribbon(
                         Box {
                             Btn("Letterhead", Icons.Default.Description) { letterMenu = true }
                             DropdownMenu(expanded = letterMenu, onDismissRequest = { letterMenu = false }) {
+                                DropdownMenuItem(text = { Text("My saved letterheads…") }, onClick = { letterMenu = false; open = false; onLetterhead("saved") })
                                 DropdownMenuItem(text = { Text("First page only") }, onClick = { letterMenu = false; open = false; onLetterhead("first") })
                                 DropdownMenuItem(text = { Text("Continuous letterhead (pages after the first)") }, onClick = { letterMenu = false; open = false; onLetterhead("rest") })
                                 DropdownMenuItem(text = { Text("Same on every page") }, onClick = { letterMenu = false; open = false; onLetterhead("all") })
@@ -791,6 +821,7 @@ private fun Ribbon(
                         Box {
                             Btn("Signature", Icons.Default.Draw) { signMenu = true }
                             DropdownMenu(expanded = signMenu, onDismissRequest = { signMenu = false }) {
+                                DropdownMenuItem(text = { Text("My saved signatures…") }, onClick = { signMenu = false; open = false; onSignature("saved") })
                                 DropdownMenuItem(text = { Text("Draw with finger") }, onClick = { signMenu = false; open = false; onSignature("draw") })
                                 DropdownMenuItem(text = { Text("From a picture") }, onClick = { signMenu = false; open = false; onSignature("picture") })
                             }

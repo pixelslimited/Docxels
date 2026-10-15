@@ -27,3 +27,6 @@
 83|Home: removed the duplicate PDF to Word card (it is in the Convert and scan row).
 84|Every new or converted document is A4 (a PDF to Word result no longer takes the odd page size of the PDF).
 85|Signature is resized for a signature and placed automatically on the signing line (a dotted or underscore line, or a Signature / Director line) at or after your cursor.
+86|Home: touch the floating sheets. Drag to turn them, flick to spin them, tap to flip them over.
+87|Settings: new Letterheads and Signatures sections. Add them from a picture, a PDF or a Word file (signature backgrounds are removed) and keep them on your phone.
+88|Editor: Letterhead and Signature menus now have "My saved letterheads" (first page, continuous or every page) and "My saved signatures" (placed on the signing line).
