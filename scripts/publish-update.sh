@@ -60,7 +60,6 @@ for i in 1 2 3 4 5; do
   gh release edit latest --repo "$SITE" --draft=false --latest || true
   sleep 5
 done
-curl -fsSL "$BASE/update.json" >/dev/null
 
 # Keep this build (and the last few) so the next release can make patches from them.
 cp "$APK" "Docxels-$CODE.apk"
@@ -69,3 +68,11 @@ gh release upload history "Docxels-$CODE.apk" --repo "$SITE" --clobber
 for OLDNAME in $(gh release view history --repo "$SITE" --json assets --jq '.assets[].name' | sort -t- -k2 -n | head -n -"$KEEP"); do
   gh release delete-asset history "$OLDNAME" --repo "$SITE" --yes || true
 done
+
+# Last check: the public update file must be reachable (GitHub's download address can take a little while to appear).
+for i in $(seq 1 12); do
+  if curl -fsSL "$BASE/update.json" | grep -q "\"versionCode\":$CODE"; then echo "update.json for build $CODE is live"; exit 0; fi
+  sleep 5
+done
+echo "update.json for build $CODE is not reachable at $BASE" >&2
+exit 1
