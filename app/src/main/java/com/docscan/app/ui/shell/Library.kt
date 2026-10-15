@@ -35,12 +35,13 @@ private const val MAX_IMPORT_BYTES = 50L * 1024 * 1024
  * actions the Home, Documents and Tools screens share (create, scan, import, convert, share) live here.
  */
 class LibraryViewModel(private val container: AppContainer) : ViewModel() {
-    private val everything: StateFlow<List<LibraryItem>> = combine(container.repository.observeHome(), container.words.items, container.libraryMeta.all) { scans, words, meta ->
+    private val everything: StateFlow<List<LibraryItem>> = combine(container.repository.observeHome(), container.words.items, container.libraryMeta.all, container.pdfs.items) { scans, words, meta, pdfs ->
         val a = scans.map {
             LibraryItem(DocKind.SCAN, it.document.id, it.document.name, it.document.updatedAt, "${it.pageCount} page${if (it.pageCount == 1) "" else "s"}", it.cover, meta[LibraryMeta.key(DocKind.SCAN, it.document.id)] ?: ItemMeta())
         }
         val b = words.map { LibraryItem(DocKind.DOCX, it.id, it.title, it.modified, "Word document", null, meta[LibraryMeta.key(DocKind.DOCX, it.id)] ?: ItemMeta()) }
-        (a + b).sortedByDescending { it.modified }
+        val c = pdfs.map { LibraryItem(DocKind.PDF, it.id, it.title, it.modified, "${it.pages} page${if (it.pages == 1) "" else "s"} · PDF", null, meta[LibraryMeta.key(DocKind.PDF, it.id)] ?: ItemMeta()) }
+        (a + b + c).sortedByDescending { it.modified }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Everything that is not in Trash. */
@@ -101,6 +102,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
             when (item.kind) {
                 DocKind.SCAN -> container.repository.renameDocument(item.id, name)
                 DocKind.DOCX -> withContext(Dispatchers.IO) { container.words.rename(item.id, name) }
+                DocKind.PDF -> withContext(Dispatchers.IO) { container.pdfs.rename(item.id, name) }
             }
         }
     }
@@ -116,6 +118,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
             when (item.kind) {
                 DocKind.SCAN -> container.repository.deleteDocument(item.id)
                 DocKind.DOCX -> withContext(Dispatchers.IO) { container.words.delete(item.id) }
+                DocKind.PDF -> withContext(Dispatchers.IO) { container.pdfs.delete(item.id) }
             }
         }
     }
@@ -300,21 +303,52 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    fun sharePdf(context: Context, item: LibraryItem) {
+    fun sharePdf(context: Context, item: LibraryItem) = withFile(context, item, asPdf = true) { ShareHelper.share(context, listOf(it), Mime.PDF) }
+
+    /** Makes the file for [item] (the Word file, or a PDF of it / of a scan) and hands it over, e.g. to share or "Save as…". */
+    fun withFile(context: Context, item: LibraryItem, asPdf: Boolean, then: (File) -> Unit) {
         viewModelScope.launch {
-            _busy.value = "Preparing PDF…"
+            _busy.value = if (asPdf) "Preparing PDF…" else "Preparing file…"
             runCatching {
-                val file = withContext(Dispatchers.Default) {
-                    val doc = container.words.load(item.id) ?: error("missing")
-                    File(File(context.cacheDir, "exports").apply { mkdirs() }, safeName(item.title) + ".pdf").also { f ->
-                        f.outputStream().use { com.docscan.app.export.WordPdf.write(doc, it) }
+                val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+                withContext(Dispatchers.Default) {
+                    when (item.kind) {
+                        DocKind.DOCX ->
+                            if (asPdf) {
+                                val doc = container.words.load(item.id) ?: error("missing")
+                                File(dir, safeName(item.title) + ".pdf").also { f -> f.outputStream().use { com.docscan.app.export.WordPdf.write(doc, it) } }
+                            } else {
+                                val bytes = container.words.docxBytes(item.id) ?: error("missing")
+                                File(dir, safeName(item.title) + ".docx").also { it.writeBytes(bytes) }
+                            }
+                        DocKind.PDF -> {
+                            val plain = container.pdfs.open(item.id) ?: error("missing")
+                            File(dir, safeName(item.title) + ".pdf").also { plain.copyTo(it, overwrite = true); plain.delete() }
+                        }
+                        DocKind.SCAN -> {
+                            val pages = container.repository.pages(item.id)
+                            container.exporter.exportDocument(pages, item.title, com.docscan.app.export.ExportOptions()).files.first()
+                        }
                     }
                 }
-                ShareHelper.share(context, listOf(file), Mime.PDF)
-            }.onFailure { _message.value = "Could not create the PDF." }
+            }.onSuccess(then).onFailure { _message.value = "Could not create the file." }
             _busy.value = null
         }
     }
+
+    /** Keeps a second copy of a Word document in the library. */
+    fun duplicate(item: LibraryItem) {
+        if (item.kind != DocKind.DOCX) return
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching { container.words.load(item.id)?.let { container.words.add(it.copy(title = item.title + " copy")) } }.getOrNull()
+            }
+            _message.value = if (ok != null) "Copy saved as \"${item.title} copy\"." else "Could not make a copy."
+        }
+    }
+
+    /** Stores a PDF made by a tool or export in the library. Returns the library id. */
+    fun savePdfToLibrary(file: File, title: String, pages: Int): String = container.pdfs.add(file, title, pages)
 
     private fun safeName(title: String) = title.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Document" }
 }

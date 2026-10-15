@@ -56,6 +56,7 @@ import com.docscan.app.data.PageEntity
 import com.docscan.app.export.DocFormat
 import com.docscan.app.export.ExportOptions
 import com.docscan.app.export.ShareHelper
+import kotlinx.coroutines.launch
 import com.docscan.app.imaging.DocMode
 import com.docscan.app.ui.BusyOverlay
 import com.docscan.app.ui.ConfirmDialog
@@ -80,12 +81,15 @@ fun DocumentScreen(
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<PageEntity?>(null) }
     var showExport by remember { mutableStateOf(false) }
+    val saveScope = androidx.compose.runtime.rememberCoroutineScope()
+    val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { msg -> saveScope.launch { snackbar.showSnackbar(msg) } }
 
     LaunchedEffect(Unit) {
         vm.uiEvents.collect { event ->
             when (event) {
                 is UiEvent.Message -> snackbar.showSnackbar(event.text)
                 is UiEvent.Share -> ShareHelper.share(context, event.files, event.mime)
+                is UiEvent.SaveAs -> saveAs(event.files)
             }
         }
     }
@@ -196,9 +200,9 @@ fun DocumentScreen(
     if (showExport) {
         ExportSheet(
             onDismiss = { showExport = false },
-            onExport = { options, save ->
+            onExport = { options, save, saveAs ->
                 showExport = false
-                vm.export(options, save)
+                vm.export(options, save, saveAs)
             },
         )
     }
@@ -233,7 +237,7 @@ private fun PageCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean) -> Unit) {
+private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean, Boolean) -> Unit) {
     val ui = com.docscan.app.LocalContainer.current.ui
     var options by remember {
         mutableStateOf(ExportOptions(format = runCatching { DocFormat.valueOf(ui.exportFormat) }.getOrDefault(DocFormat.PDF), a4 = ui.exportA4))
@@ -266,9 +270,10 @@ private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean
                 else -> Text("One image file per page.", style = MaterialTheme.typography.bodySmall)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = { onExport(options, false) }, modifier = Modifier.weight(1f)) { Text("Share") }
-                OutlinedButton(onClick = { onExport(options, true) }, modifier = Modifier.weight(1f)) { Text("Save to phone") }
+                Button(onClick = { onExport(options, false, false) }, modifier = Modifier.weight(1f)) { Text("Share") }
+                OutlinedButton(onClick = { onExport(options, true, false) }, modifier = Modifier.weight(1f)) { Text("Save to phone") }
             }
+            OutlinedButton(onClick = { onExport(options, false, true) }, modifier = Modifier.fillMaxWidth()) { Text("Save as… (choose folder and name)") }
         }
     }
 }

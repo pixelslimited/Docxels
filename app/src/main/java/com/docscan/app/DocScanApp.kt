@@ -37,7 +37,7 @@ class DocScanApp : Application() {
             cacheDir.listFiles()?.filter { it.isFile && it.name.startsWith("capture") }?.forEach { SecureFiles.wipe(it) }
             container.exporter.clearCache()
             // Unlocked/working copies of PDFs and old downloaded updates must not outlive the session.
-            listOf("pdfwork", "updates").forEach { n -> File(cacheDir, n).listFiles()?.forEach { SecureFiles.wipe(it) } }
+            listOf("pdfwork", "updates", "pdfview").forEach { n -> File(cacheDir, n).listFiles()?.forEach { SecureFiles.wipe(it) } }
         }
     }
 
@@ -60,6 +60,7 @@ class AppContainer(context: Context) {
     val security = SecurityPrefs(context)
     val ui = com.docscan.app.security.UiPrefs(context)
     val words = com.docscan.app.data.WordStore(context)
+    val pdfs = com.docscan.app.data.PdfStore(context)
     val libraryMeta = com.docscan.app.data.LibraryMeta(context)
     val scanToWord = com.docscan.app.ocr.ScanToWord(renderer, ocr)
     val pdfToWord = com.docscan.app.pdf.PdfToWord(context, scanToWord)

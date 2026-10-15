@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -99,7 +101,7 @@ enum class PdfMode(val route: String, val title: String, val hint: String, val m
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit) {
+fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit, autoPick: Boolean = true, storedId: String? = null) {
     val sources by vm.sources.collectAsState()
     val results by vm.results.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -118,7 +120,7 @@ fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit) {
 
     var asked by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        if (!asked && sources.isEmpty()) { asked = true; pick() }
+        if (autoPick && !asked && sources.isEmpty()) { asked = true; pick() }
     }
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); vm.messageShown() }
@@ -135,6 +137,11 @@ fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit) {
                     if (mode == PdfMode.VIEW && sources.isNotEmpty()) {
                         val ctx = androidx.compose.ui.platform.LocalContext.current
                         IconButton(onClick = { com.docscan.app.export.PrintHelper.printPdf(ctx, sources[0].file, sources[0].name) }) { Icon(Icons.Default.Print, "Print") }
+                        if (storedId == null) {
+                            IconButton(onClick = { vm.saveToLibrary(sources[0].file, sources[0].name) }) { Icon(Icons.Default.Save, "Save in Docxels") }
+                        }
+                        val viewSaveAs = com.docscan.app.export.SaveAs.rememberSaveAs { vm.say(it) }
+                        IconButton(onClick = { viewSaveAs(listOf(sources[0].file)) }) { Icon(Icons.Default.SaveAlt, "Save as") }
                         IconButton(onClick = { vm.share(listOf(sources[0].file)) }) { Icon(Icons.Default.Share, "Share") }
                     }
                     IconButton(onClick = pick) { Icon(Icons.Default.FolderOpen, "Choose PDF") }
@@ -232,6 +239,7 @@ private fun EmptyPick(mode: PdfMode, pick: () -> Unit) {
 private fun ResultCard(files: List<File>, vm: PdfViewModel, preview: Boolean) {
     var selected by remember(files) { mutableStateOf(0) }
     val current = files.getOrElse(selected) { files.first() }
+    val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { vm.say(it) }
     Column(Modifier.fillMaxSize()) {
         Text(
             if (files.size == 1) "Preview: check it before you save or share" else "Preview: ${files.size} files made. Tap one to look at it.",
@@ -262,6 +270,8 @@ private fun ResultCard(files: List<File>, vm: PdfViewModel, preview: Boolean) {
                 GradientButton(if (files.size > 1) "Share all" else "Share", onClick = { vm.share(files) }, modifier = Modifier.weight(1f))
                 SoftButton(if (files.size > 1) "Save all" else "Save to phone", DocxelsTheme.tints.blue, onClick = { vm.saveToPhone(files) }, modifier = Modifier.weight(1f))
             }
+            SoftButton("Save in Docxels", DocxelsTheme.tints.violet, onClick = { files.forEach { vm.saveToLibrary(it, it.nameWithoutExtension) } }, modifier = Modifier.fillMaxWidth())
+            SoftButton("Save as… (choose folder and name)", DocxelsTheme.tints.blue, onClick = { saveAs(files) }, modifier = Modifier.fillMaxWidth())
             TextButton(onClick = vm::clearResults, modifier = Modifier.fillMaxWidth()) { Text("Back to editing") }
         }
     }

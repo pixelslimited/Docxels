@@ -60,6 +60,7 @@ import com.docscan.app.data.PageEntity
 import com.docscan.app.data.cornerList
 import com.docscan.app.data.settings
 import com.docscan.app.export.ShareHelper
+import kotlinx.coroutines.launch
 import com.docscan.app.imaging.DocMode
 import com.docscan.app.imaging.EnhanceSettings
 import com.docscan.app.ui.BusyOverlay
@@ -79,12 +80,15 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
     val busyLabel by vm.busyLabel.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     var tab by remember { mutableIntStateOf(0) }
+    val saveScope = androidx.compose.runtime.rememberCoroutineScope()
+    val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { msg -> saveScope.launch { snackbar.showSnackbar(msg) } }
 
     LaunchedEffect(Unit) {
         vm.uiEvents.collect { event ->
             when (event) {
                 is UiEvent.Message -> snackbar.showSnackbar(event.text)
                 is UiEvent.Share -> ShareHelper.share(context, event.files, event.mime)
+                is UiEvent.SaveAs -> saveAs(event.files)
             }
         }
     }
@@ -313,6 +317,7 @@ private fun TableTab(vm: EditViewModel, preview: Bitmap?, table: TableState?) {
                         Text("Save to phone")
                     }
                 }
+                OutlinedButton(onClick = { vm.exportTable(export, save = false, saveAs = true) }, modifier = Modifier.fillMaxWidth()) { Text("Save as… (choose folder and name)") }
             }
         }
     }

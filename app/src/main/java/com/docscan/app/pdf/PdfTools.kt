@@ -225,7 +225,7 @@ class PdfTools(context: Context) {
                                 cs.setFont(PDType1Font.ZAPF_DINGBATS, size)
                                 cs.setNonStrokingColor(0f, 0f, 0f)
                                 cs.newLineAtOffset(x, box.lowerLeftY + h - m.top * h - size * 0.8f)
-                                cs.showText("4")
+                                cs.showText("\u2714")
                                 cs.endText()
                             }
                         }

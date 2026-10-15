@@ -249,6 +249,33 @@ class PdfViewModel(private val container: AppContainer, appContext: Context) : V
         }
     }
 
+    /** Opens a PDF kept in the library. */
+    fun openStored(id: String) {
+        if (_sources.value.isNotEmpty()) return
+        viewModelScope.launch {
+            _busy.value = "Opening…"
+            val plain = withContext(Dispatchers.IO) { container.pdfs.open(id) }
+            if (plain == null) {
+                _message.value = "That PDF could not be opened."
+            } else {
+                val title = container.pdfs.items.value.firstOrNull { it.id == id }?.title ?: "Document"
+                val copy = File(work, UUID.randomUUID().toString() + ".pdf")
+                withContext(Dispatchers.IO) { plain.copyTo(copy, overwrite = true); plain.delete() }
+                accept(copy, title, null)
+            }
+            _busy.value = null
+        }
+    }
+
+    /** Keeps a PDF in the Documents list (encrypted in the app). */
+    fun saveToLibrary(file: File, name: String) {
+        viewModelScope.launch {
+            val pages = withContext(Dispatchers.IO) { runCatching { tools.pageCount(file) }.getOrDefault(0) }
+            withContext(Dispatchers.IO) { container.pdfs.add(file, name, pages) }
+            _message.value = "Saved in Documents as “$name”."
+        }
+    }
+
     fun share(files: List<File>) = ShareHelper.share(context, files, Mime.PDF)
 
     fun saveToPhone(files: List<File>) {

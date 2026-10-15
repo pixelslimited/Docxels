@@ -66,12 +66,13 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private enum class Filter { ALL, WORD, SCANS, FAVOURITES, TRASH }
+private enum class Filter { ALL, WORD, SCANS, PDFS, FAVOURITES, TRASH }
 private enum class Sort(val label: String) { DATE("Date modified"), NAME("Name") }
 
 @Composable
 fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions: Actions, vm: LibraryViewModel, onOpen: (LibraryItem) -> Unit) {
     val context = LocalContext.current
+    val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { vm.say(it) }
     val t = DocxelsTheme.tints
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(Filter.ALL) }
@@ -94,6 +95,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                 when (filter) {
                     Filter.ALL, Filter.TRASH -> true
                     Filter.WORD -> it.kind == DocKind.DOCX
+                    Filter.PDFS -> it.kind == DocKind.PDF
                     Filter.SCANS -> it.kind == DocKind.SCAN
                     Filter.FAVOURITES -> it.meta.favourite
                 }
@@ -155,6 +157,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                 FilterPill("All", filter == Filter.ALL, { filter = Filter.ALL })
                 FilterPill("Word", filter == Filter.WORD, { filter = Filter.WORD })
                 FilterPill("Scans", filter == Filter.SCANS, { filter = Filter.SCANS })
+                FilterPill("PDF", filter == Filter.PDFS, { filter = Filter.PDFS })
                 FilterPill("Favourites", filter == Filter.FAVOURITES, { filter = Filter.FAVOURITES })
                 folders.forEach { f -> FilterPill("\uD83D\uDCC1 $f", folder == f, { folder = if (folder == f) null else f }) }
                 FilterPill("Trash${if (trash.isEmpty()) "" else " (${trash.size})"}", filter == Filter.TRASH, { filter = Filter.TRASH })
@@ -197,7 +200,10 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                     onRename = { renaming = item },
                     onDelete = { deleting = item },
                     onShare = if (item.kind == DocKind.DOCX) ({ vm.shareDocx(context, item) }) else null,
-                    onSharePdf = if (item.kind == DocKind.DOCX) ({ vm.sharePdf(context, item) }) else null,
+                    onSharePdf = if (item.kind != DocKind.SCAN) ({ vm.sharePdf(context, item) }) else null,
+                    onSaveAs = ({ vm.withFile(context, item, asPdf = item.kind != DocKind.DOCX) { saveAs(listOf(it)) } }),
+                    onSaveAsPdf = if (item.kind != DocKind.PDF) ({ vm.withFile(context, item, asPdf = true) { saveAs(listOf(it)) } }) else null,
+                    onDuplicate = if (item.kind == DocKind.DOCX) ({ vm.duplicate(item) }) else null,
                     onToWord = if (item.kind == DocKind.SCAN) ({ vm.scanToWord(item.id) { id -> onOpenWordFromLibrary(actions, id) } }) else null,
                     onFavourite = { vm.setFavourite(item, !item.meta.favourite) },
                     onMove = { moving = item },
@@ -281,6 +287,9 @@ class RowMenu(
     val onShare: (() -> Unit)? = null,
     val onSharePdf: (() -> Unit)? = null,
     val onToWord: (() -> Unit)? = null,
+    val onSaveAs: (() -> Unit)? = null,
+    val onSaveAsPdf: (() -> Unit)? = null,
+    val onDuplicate: (() -> Unit)? = null,
 )
 
 @Composable
@@ -326,6 +335,9 @@ private fun ItemMenuItems(item: LibraryItem, menu: RowMenu, close: () -> Unit) {
     DropdownMenuItem(text = { Text("Rename") }, onClick = { close(); menu.onRename() })
     menu.onMove?.let { f -> DropdownMenuItem(text = { Text("Move to folder…") }, onClick = { close(); f() }) }
     menu.onTags?.let { f -> DropdownMenuItem(text = { Text("Tags…") }, onClick = { close(); f() }) }
+    menu.onDuplicate?.let { f -> DropdownMenuItem(text = { Text("Make a copy") }, onClick = { close(); f() }) }
+    menu.onSaveAs?.let { f -> DropdownMenuItem(text = { Text(if (item.kind == DocKind.DOCX) "Save as .docx…" else "Save as…") }, onClick = { close(); f() }) }
+    menu.onSaveAsPdf?.let { f -> DropdownMenuItem(text = { Text("Save as PDF…") }, onClick = { close(); f() }) }
     menu.onShare?.let { f -> DropdownMenuItem(text = { Text("Share as .docx") }, onClick = { close(); f() }) }
     menu.onSharePdf?.let { f -> DropdownMenuItem(text = { Text("Share as PDF") }, onClick = { close(); f() }) }
     DropdownMenuItem(text = { Text("Move to Trash") }, onClick = { close(); menu.onDelete() })

@@ -57,3 +57,7 @@
 134|Library: favourites, folders, tags, grid view; search also finds tags. Deleting now moves a document to Trash for 30 days (restore, delete for good, or empty Trash).
 134|Scan to Excel: Tools > Scan to Excel finds ruled tables on every page of a scan and shares one Excel file with a sheet per page.
 134|Searchable PDF: in the scan export sheet, PDF now has a Searchable text switch (slower) so the PDF can be searched and copied from.
+134|Save and Save as everywhere: Word documents (menu: Save, Save a copy, Save as .docx/PDF/text/RTF, Save PDF in Docxels), PDF tool results and the PDF viewer (Save in Docxels, Save as), scan exports and table exports (Save as: you choose the folder and file name), and your saved signatures and letterheads (save to the phone).
+134|PDFs can now live in Documents: they show under the new PDF filter, open in the viewer, and can be renamed, favourited, tagged, shared, saved as or moved to Trash.
+134|Signatures you draw or import in the editor are also kept in My signatures, and letterheads you add are also kept in My letterheads, so you can reuse them anywhere.
+134|Documents menu: Make a copy (Word), Save as .docx / PDF for any document.

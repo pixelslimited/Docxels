@@ -104,6 +104,7 @@ fun MainShell(
     onOpenScan: (String) -> Unit,
     onOpenWord: (String) -> Unit,
     onPdfTool: (String) -> Unit,
+    onOpenPdf: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(container) } })
@@ -165,7 +166,7 @@ fun MainShell(
                 Tab.HOME -> HomeScreen(
                     items = items,
                     actions = actions,
-                    onOpen = { if (it.kind == DocKind.SCAN) onOpenScan(it.id) else onOpenWord(it.id) },
+                    onOpen = { when (it.kind) { DocKind.SCAN -> onOpenScan(it.id); DocKind.PDF -> onOpenPdf(it.id); else -> onOpenWord(it.id) } },
                     onSearch = { tab = Tab.DOCS },
                     onAllTools = { tab = Tab.TOOLS },
                     onAllDocs = { tab = Tab.DOCS },
@@ -175,7 +176,7 @@ fun MainShell(
                     trash = trash,
                     actions = actions,
                     vm = vm,
-                    onOpen = { if (it.kind == DocKind.SCAN) onOpenScan(it.id) else onOpenWord(it.id) },
+                    onOpen = { when (it.kind) { DocKind.SCAN -> onOpenScan(it.id); DocKind.PDF -> onOpenPdf(it.id); else -> onOpenWord(it.id) } },
                 )
                 Tab.TOOLS -> ToolsScreen(actions)
                 Tab.SETTINGS -> SettingsScreen(container = container)

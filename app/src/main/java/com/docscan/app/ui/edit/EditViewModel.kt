@@ -280,7 +280,7 @@ class EditViewModel(
         return container.ocr.cellText(crop)
     }
 
-    fun exportTable(kind: TableExport, save: Boolean) {
+    fun exportTable(kind: TableExport, save: Boolean, saveAs: Boolean = false) {
         val t = _table.value ?: return
         if ((kind == TableExport.EXCEL || kind == TableExport.WORD) && t.rows.isEmpty()) {
             viewModelScope.launch { events.send(UiEvent.Message("Tap \"Read text\" first so the table has content.")) }
@@ -297,7 +297,7 @@ class EditViewModel(
                     TableExport.PDF -> listOf(exporter.tablePdf(cropToTable(t), name)) to Mime.PDF
                     TableExport.IMAGE -> listOf(exporter.tableImage(cropToTable(t), name, png = false)) to Mime.JPEG
                 }
-            }.onSuccess { (files, mime) -> deliver(files, mime, save) }
+            }.onSuccess { (files, mime) -> if (saveAs) events.send(UiEvent.SaveAs(files)) else deliver(files, mime, save) }
                 .onFailure { events.send(UiEvent.Message("Export failed: ${it.message ?: "unknown error"}")) }
             _busyLabel.value = null
         }

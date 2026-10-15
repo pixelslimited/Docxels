@@ -38,6 +38,17 @@ class WordViewModel(private val container: AppContainer, val id: String) : ViewM
         }
     }
 
+    /** Keeps a second copy of the document in the library and returns its id. */
+    suspend fun saveCopy(doc: WordDoc): String = withContext(Dispatchers.IO) { container.words.add(doc.copy(title = doc.title + " copy")) }
+
+    /** Makes a PDF of the document and keeps it in the library's PDF list. */
+    suspend fun savePdfToLibrary(doc: WordDoc, context: android.content.Context): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val f = pdfFile(doc, context)
+            container.pdfs.add(f, doc.title, runCatching { com.docscan.app.pdf.PdfTools(context).pageCount(f) }.getOrDefault(0))
+        }.isSuccess
+    }
+
     suspend fun docxFile(doc: WordDoc, context: android.content.Context): java.io.File = withContext(Dispatchers.IO) {
         val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
         val name = doc.title.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Document" }

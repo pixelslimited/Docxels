@@ -109,14 +109,16 @@ class DocumentViewModel(private val container: AppContainer, private val docId: 
         }
     }
 
-    fun export(options: ExportOptions, save: Boolean) {
+    fun export(options: ExportOptions, save: Boolean, saveAs: Boolean = false) {
         viewModelScope.launch {
             val current = repo.pages(docId)
             val name = document.value?.name ?: "Scan"
             _busyLabel.value = "Preparing ${options.format.label}…"
             runCatching { container.exporter.exportDocument(current, name, options) }
                 .onSuccess { result ->
-                    if (save) {
+                    if (saveAs) {
+                        events.send(UiEvent.SaveAs(result.files))
+                    } else if (save) {
                         val saved = container.exporter.saveToDevice(result.files, result.mime)
                         val where = if (result.mime.startsWith("image/")) "Pictures/DocScan" else "Downloads/DocScan"
                         events.send(

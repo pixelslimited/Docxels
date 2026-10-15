@@ -27,6 +27,7 @@ private const val DOC = "doc/{docId}"
 private const val EDIT = "edit/{docId}/{pageId}"
 private const val WRITE = "write/{id}"
 private const val PDF = "pdf/{mode}"
+private const val PDFDOC = "pdfdoc/{id}"
 
 @Composable
 fun AppNav(container: AppContainer) {
@@ -40,6 +41,7 @@ fun AppNav(container: AppContainer) {
                 onOpenScan = { docId -> nav.navigate("doc/$docId") },
                 onOpenWord = { id -> nav.navigate("write/$id") },
                 onPdfTool = { mode -> nav.navigate("pdf/$mode") },
+                onOpenPdf = { id -> nav.navigate("pdfdoc/$id") },
             )
         }
         composable(PDF) { entry ->
@@ -50,6 +52,16 @@ fun AppNav(container: AppContainer) {
                 factory = viewModelFactory { initializer { PdfViewModel(container, context.applicationContext) } },
             )
             PdfScreen(vm = vm, mode = mode, onBack = { nav.popBackStack() })
+        }
+        composable(PDFDOC) { entry ->
+            val id = entry.arguments?.getString("id") ?: return@composable
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val vm: PdfViewModel = viewModel(
+                key = "pdfdoc-$id",
+                factory = viewModelFactory { initializer { PdfViewModel(container, context.applicationContext) } },
+            )
+            androidx.compose.runtime.LaunchedEffect(id) { vm.openStored(id) }
+            PdfScreen(vm = vm, mode = PdfMode.VIEW, onBack = { nav.popBackStack() }, autoPick = false, storedId = id)
         }
         composable(WRITE) { entry ->
             val id = entry.arguments?.getString("id") ?: return@composable

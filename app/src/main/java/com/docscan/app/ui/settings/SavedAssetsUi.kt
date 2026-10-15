@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +70,7 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val store = remember(signature) { SavedAssets(context, if (signature) "signatures" else "letterheads") }
     var items by remember(signature) { mutableStateOf(store.list()) }
+    val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { say(it) }
     var source by remember { mutableStateOf<Bitmap?>(null) }
     val word = if (signature) "signature" else "letterhead"
 
@@ -107,6 +109,15 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Thumb(store, item, signature, Modifier.width(110.dp))
                 Text(item.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                IconButton(onClick = {
+                    val bytes = store.bytes(item)
+                    if (bytes == null) say("Could not read it.") else {
+                        val ext = if (bytes.size > 3 && bytes[0] == 0x89.toByte()) "png" else "jpg"
+                        val f = java.io.File(java.io.File(context.cacheDir, "exports").apply { mkdirs() }, "${item.name.ifBlank { word }}.$ext")
+                        f.writeBytes(bytes)
+                        saveAs(listOf(f))
+                    }
+                }) { Icon(Icons.Default.SaveAlt, contentDescription = "Save ${item.name} to the phone") }
                 IconButton(onClick = { store.delete(item); items = store.list() }) { Icon(Icons.Default.Delete, contentDescription = "Delete ${item.name}") }
             }
         }

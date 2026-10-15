@@ -258,13 +258,37 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             val lh = PageSources.letterhead(context, uri, setup)
             if (lh == null) { snackbar.showSnackbar("Could not find a letterhead in that file."); return@launch }
             applyLetterhead(lh, mode)
+            // Keep it in Settings > Letterheads too, so it can be used again in any document.
+            runCatching {
+                val bmp = PageSources.letterheadBitmap(context, uri, 2000)
+                if (bmp != null) {
+                    val bytes = withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        val out = java.io.ByteArrayOutputStream()
+                        bmp.compress(if (bmp.hasAlpha()) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                        out.toByteArray()
+                    }
+                    bmp.recycle()
+                    val store = com.docscan.app.store.SavedAssets(context, "letterheads")
+                    store.add("Letterhead ${store.list().size + 1}", bytes)
+                    snackbar.showSnackbar("Also kept in My letterheads.")
+                }
+            }
         }
     }
     var savedPicker by remember { mutableStateOf<Boolean?>(null) }
-    fun placeSignature(block: ImageBlock) {
+    /** A new signature (drawn or from a picture) is also kept in Settings > Signatures so it can be used again anywhere. */
+    fun keepSignature(bytes: ByteArray) {
+        runCatching {
+            val store = com.docscan.app.store.SavedAssets(context, "signatures")
+            store.add("Signature ${store.list().size + 1}", bytes)
+        }
+    }
+    fun placeSignature(block: ImageBlock, keep: Boolean = false) {
         val found = controller.insertSignature(block, page.contentWidthTwips)
+        if (keep) keepSignature(block.bytes)
         scope.launch {
-            snackbar.showSnackbar(if (found) "Signature placed on the signing line." else "No signing line found. Drag the signature where you want it.")
+            val base = if (found) "Signature placed on the signing line." else "No signing line found. Drag the signature where you want it."
+            snackbar.showSnackbar(if (keep) "$base Also kept in My signatures." else base)
         }
     }
     var signSource by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -278,6 +302,13 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var signPad by remember { mutableStateOf(false) }
 
     fun saveNow() = vm.save(controller.toDoc(title, page))
+    val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { msg -> scope.launch { snackbar.showSnackbar(msg) } }
+    fun saveAsFile(make: suspend (WordDoc) -> java.io.File) {
+        val d = controller.toDoc(title, page)
+        scope.launch {
+            runCatching { make(d) }.onSuccess { saveAs(listOf(it)) }.onFailure { snackbar.showSnackbar("Could not create the file.") }
+        }
+    }
 
     controller.onChanged = { tick++ }
     LaunchedEffect(tick, title, page) {
@@ -329,6 +360,21 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                                     }
                                 },
                             )
+                            DropdownMenuItem(text = { Text("Save") }, onClick = { menu = false; saveNow(); scope.launch { snackbar.showSnackbar("Saved.") } })
+                            DropdownMenuItem(text = { Text("Save a copy in Docxels") }, onClick = {
+                                menu = false
+                                val d = controller.toDoc(title, page)
+                                scope.launch { runCatching { vm.saveCopy(d) }.onSuccess { snackbar.showSnackbar("Copy saved as \"${d.title} copy\".") }.onFailure { snackbar.showSnackbar("Could not save a copy.") } }
+                            })
+                            DropdownMenuItem(text = { Text("Save PDF in Docxels") }, onClick = {
+                                menu = false
+                                val d = controller.toDoc(title, page)
+                                scope.launch { snackbar.showSnackbar(if (vm.savePdfToLibrary(d, context)) "PDF saved in Documents." else "Could not save the PDF.") }
+                            })
+                            DropdownMenuItem(text = { Text("Save as .docx…") }, onClick = { menu = false; saveAsFile { vm.docxFile(it, context) } })
+                            DropdownMenuItem(text = { Text("Save as PDF…") }, onClick = { menu = false; saveAsFile { vm.pdfFile(it, context) } })
+                            DropdownMenuItem(text = { Text("Save as text…") }, onClick = { menu = false; saveAsFile { vm.txtFile(it, context) } })
+                            DropdownMenuItem(text = { Text("Save as RTF…") }, onClick = { menu = false; saveAsFile { vm.rtfFile(it, context) } })
                             DropdownMenuItem(
                                 text = { Text("Print") },
                                 onClick = {
@@ -504,7 +550,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             onInsert = { bytes, w, h ->
                 signSource = null
                 val tw = 2800
-                placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT))
+                placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT), keep = true)
             },
             onDismiss = { signSource = null },
         )
@@ -514,7 +560,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             onDone = { bytes, w, h ->
                 signPad = false
                 val tw = 2800
-                placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT))
+                placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT), keep = true)
             },
             onDismiss = { signPad = false },
         )

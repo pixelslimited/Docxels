@@ -76,7 +76,7 @@ fun PageEntity.withSettings(s: EnhanceSettings): PageEntity = copy(
 
 data class PageCount(val documentId: String, val pageCount: Int)
 
-enum class DocKind { SCAN, DOCX }
+enum class DocKind { SCAN, DOCX, PDF }
 
 /** One row of the unified library: a scan or a Word document. */
 data class LibraryItem(

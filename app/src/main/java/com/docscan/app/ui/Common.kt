@@ -41,6 +41,8 @@ import java.io.File
 sealed interface UiEvent {
     data class Message(val text: String) : UiEvent
     data class Share(val files: List<File>, val mime: String) : UiEvent
+    /** Ask where on the phone to save these files (file picker). */
+    data class SaveAs(val files: List<File>) : UiEvent
 }
 
 /** The rectangle an image of [bitmapW]x[bitmapH] occupies when fitted and centred in a [boxW]x[boxH] box. */

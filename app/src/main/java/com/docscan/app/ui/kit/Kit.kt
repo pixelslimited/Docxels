@@ -50,6 +50,7 @@ fun DocBadge(kind: DocKind, modifier: Modifier = Modifier) {
     val (tint, label) = when (kind) {
         DocKind.SCAN -> t.green to "SCAN"
         DocKind.DOCX -> t.blue to "DOCX"
+        DocKind.PDF -> t.orange to "PDF"
     }
     Box(
         modifier.size(width = 46.dp, height = 52.dp).clip(RoundedCornerShape(14.dp)).background(tint.container),
