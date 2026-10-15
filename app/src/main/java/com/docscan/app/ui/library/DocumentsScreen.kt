@@ -97,7 +97,7 @@ fun DocumentsScreen(items: List<LibraryItem>, actions: Actions, vm: LibraryViewM
             Text("Documents", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.fillMaxWidth().padding(top = 20.dp))
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(112.dp).clip(RoundedCornerShape(30.dp)).background(Brand.Gradient), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(112.dp).clip(RoundedCornerShape(30.dp)).background(DocxelsTheme.brand.gradient), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.DocumentScanner, contentDescription = null, tint = Color.White, modifier = Modifier.size(52.dp))
                     }
                     Text("No documents yet", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 28.dp))

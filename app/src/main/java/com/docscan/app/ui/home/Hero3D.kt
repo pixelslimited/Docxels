@@ -3,6 +3,7 @@ package com.docscan.app.ui.home
 import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
@@ -120,8 +121,17 @@ fun FloatingSheets(state: SheetsState, modifier: Modifier = Modifier) {
         initialValue = 7f, targetValue = -7f,
         animationSpec = infiniteRepeatable(tween(4400, easing = EaseInOutSine), RepeatMode.Reverse), label = "lean",
     )
+    // The colours drift round the whole rainbow and meet themselves again, so the change never jumps.
+    val hue by t.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Restart), label = "hue",
+    )
     Box(modifier.size(width = 104.dp, height = 88.dp), contentAlignment = Alignment.Center) {
         for (i in 0 until 3) {
+            val h = if (still) 0.68f else (hue + i * 0.12f) % 1f
+            val paper = Color.hsv(h * 360f, 0.22f, 1f)
+            val ink = Color.hsv(h * 360f, 0.75f, 0.85f)
+            val line = Color.hsv(h * 360f, 0.35f, 0.95f)
             Column(
                 Modifier
                     .size(width = 48.dp, height = 64.dp)
@@ -134,13 +144,13 @@ fun FloatingSheets(state: SheetsState, modifier: Modifier = Modifier) {
                         alpha = 0.6f + 0.2f * i
                     }
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White)
+                    .background(paper)
                     .padding(8.dp),
             ) {
-                Box(Modifier.fillMaxWidth(0.6f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF4F46E5)))
-                Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFB9B4F4)))
-                Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFB9B4F4)))
-                Box(Modifier.padding(top = 4.dp).fillMaxWidth(0.7f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFB9B4F4)))
+                Box(Modifier.fillMaxWidth(0.6f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(ink))
+                Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(line))
+                Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(line))
+                Box(Modifier.padding(top = 4.dp).fillMaxWidth(0.7f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(line))
             }
         }
     }

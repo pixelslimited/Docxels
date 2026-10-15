@@ -63,7 +63,7 @@ fun GradientButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    brush: Brush = Brand.Gradient,
+    brush: Brush = DocxelsTheme.brand.gradient,
     enabled: Boolean = true,
     icon: ImageVector? = null,
 ) {

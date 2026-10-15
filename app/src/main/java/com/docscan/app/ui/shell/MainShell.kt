@@ -262,7 +262,7 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit
                 .background(MaterialTheme.colorScheme.background)
                 .padding(5.dp)
                 .clip(CircleShape)
-                .background(Brand.Gradient)
+                .background(DocxelsTheme.brand.gradient)
                 .clickable(onClickLabel = "Scan a document", role = Role.Button, onClick = onScan),
             contentAlignment = Alignment.Center,
         ) { Icon(Icons.Default.DocumentScanner, contentDescription = "Scan", tint = Color.White, modifier = Modifier.size(30.dp)) }

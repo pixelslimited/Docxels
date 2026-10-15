@@ -67,7 +67,7 @@ fun HomeScreen(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp).padding(bottom = 24.dp),
     ) {
         Row(Modifier.padding(top = 14.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Brand.Gradient), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(DocxelsTheme.brand.gradient), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.Description, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
             }
             Text("Docxels", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 12.dp))
@@ -90,7 +90,7 @@ fun HomeScreen(
         // Hero: the four ways to begin. Touching the card turns the sheets: drag, flick or tap.
         val sheets = rememberSheetsState()
         Column(
-            Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brand.Gradient).sheetsTouch(sheets).padding(18.dp),
+            Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(DocxelsTheme.brand.gradient).sheetsTouch(sheets).padding(18.dp),
         ) {
             Box(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(end = 96.dp).align(Alignment.CenterStart)) {

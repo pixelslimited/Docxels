@@ -169,6 +169,8 @@ enum class PaperSize(val label: String, val widthTwips: Int, val heightTwips: In
     A4("A4", 11906, 16838),
     A3("A3", 16838, 23811),
     A5("A5", 8392, 11906),
+    B3("B3", 20012, 28346),
+    B4("B4", 14173, 20012),
     B5("B5", 9979, 14173),
     LETTER("Letter", 12240, 15840),
     LEGAL("Legal", 12240, 20160),

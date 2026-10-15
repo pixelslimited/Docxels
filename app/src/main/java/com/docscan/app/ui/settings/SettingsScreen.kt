@@ -2,6 +2,13 @@ package com.docscan.app.ui.settings
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,6 +95,21 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                         mode == m,
                         { container.ui.setTheme(m) },
                     )
+                }
+            }
+
+            Text("Theme colour", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            val accent by container.ui.accent.collectAsState()
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                com.docscan.app.security.Accent.entries.forEach { ac ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { container.ui.setAccent(ac) }) {
+                        Box(
+                            Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color(ac.a), androidx.compose.ui.graphics.Color(ac.b))))
+                                .then(if (accent == ac) Modifier.border(3.dp, MaterialTheme.colorScheme.onBackground, androidx.compose.foundation.shape.CircleShape) else Modifier),
+                        )
+                        Text(ac.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
+                    }
                 }
             }
 

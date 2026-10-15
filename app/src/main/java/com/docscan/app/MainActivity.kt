@@ -33,6 +33,7 @@ class MainActivity : FragmentActivity() {
             val locked by container.security.locked.collectAsState()
             val protect by container.security.protect.collectAsState()
             val mode by container.ui.theme.collectAsState()
+            val accent by container.ui.accent.collectAsState()
             val dark = when (mode) {
                 com.docscan.app.security.ThemeMode.LIGHT -> false
                 com.docscan.app.security.ThemeMode.DARK -> true
@@ -46,7 +47,7 @@ class MainActivity : FragmentActivity() {
                 )
             }
             CompositionLocalProvider(LocalContainer provides container) {
-                DocScanTheme(darkTheme = dark) {
+                DocScanTheme(darkTheme = dark, accent = accent) {
                     Box {
                         AppNav(container)
                         if (locked) LockScreen(onUnlockRequest = ::requestUnlock)

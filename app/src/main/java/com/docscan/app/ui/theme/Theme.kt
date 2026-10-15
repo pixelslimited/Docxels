@@ -69,10 +69,46 @@ private val DarkTints = Tints(
 
 val LocalTints = staticCompositionLocalOf { LightTints }
 
+/** The chosen accent as the colours the app draws with. */
+class BrandColors(val a: Color, val b: Color) {
+    val gradient: Brush = Brush.linearGradient(listOf(a, b))
+}
+
+val LocalBrand = staticCompositionLocalOf { BrandColors(Brand.Indigo, Brand.Violet) }
+
 object DocxelsTheme {
     val tints: Tints
         @Composable @ReadOnlyComposable get() = LocalTints.current
+    val brand: BrandColors
+        @Composable @ReadOnlyComposable get() = LocalBrand.current
 }
+
+private fun mix(x: Color, y: Color, t: Float) = androidx.compose.ui.graphics.lerp(x, y, t)
+
+private fun lightSchemeFor(a: Color, b: Color) = LightColors.copy(
+    primary = a,
+    primaryContainer = mix(a, Color.White, 0.86f),
+    onPrimaryContainer = mix(a, Color.Black, 0.55f),
+    secondary = b,
+    secondaryContainer = mix(b, Color.White, 0.86f),
+    onSecondaryContainer = mix(b, Color.Black, 0.55f),
+    background = mix(Color(0xFFF7F7FA), a, 0.05f),
+    surface = mix(Color(0xFFF7F7FA), a, 0.05f),
+    surfaceVariant = mix(Color(0xFFEDEDF3), a, 0.07f),
+    surfaceContainer = mix(Color(0xFFF1F1F6), a, 0.06f),
+    surfaceContainerHigh = mix(Color(0xFFEBEBF2), a, 0.07f),
+    surfaceContainerHighest = mix(Color(0xFFE4E4ED), a, 0.08f),
+)
+
+private fun darkSchemeFor(a: Color, b: Color) = DarkColors.copy(
+    primary = mix(a, Color.White, 0.62f),
+    onPrimary = mix(a, Color.Black, 0.6f),
+    primaryContainer = mix(a, Color.Black, 0.3f),
+    onPrimaryContainer = mix(a, Color.White, 0.86f),
+    secondary = mix(b, Color.White, 0.6f),
+    secondaryContainer = mix(b, Color.Black, 0.35f),
+    onSecondaryContainer = mix(b, Color.White, 0.86f),
+)
 
 private val LightColors = lightColorScheme(
     primary = Brand.Indigo,
@@ -169,10 +205,21 @@ private val AppShapes = Shapes(
 )
 
 @Composable
-fun DocScanTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    androidx.compose.runtime.CompositionLocalProvider(LocalTints provides if (darkTheme) DarkTints else LightTints) {
+fun DocScanTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    accent: com.docscan.app.security.Accent = com.docscan.app.security.Accent.DOCXELS,
+    content: @Composable () -> Unit,
+) {
+    val a = Color(accent.a)
+    val b = Color(accent.b)
+    val brand = androidx.compose.runtime.remember(accent) { BrandColors(a, b) }
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalTints provides if (darkTheme) DarkTints else LightTints,
+        LocalBrand provides brand,
+    ) {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkColors else LightColors,
+            colorScheme = if (accent == com.docscan.app.security.Accent.DOCXELS) (if (darkTheme) DarkColors else LightColors)
+            else if (darkTheme) darkSchemeFor(a, b) else lightSchemeFor(a, b),
             typography = AppTypography,
             shapes = AppShapes,
             content = content,

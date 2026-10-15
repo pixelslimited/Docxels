@@ -35,7 +35,7 @@ adb logcat -d > "$OUT/logcat-full.txt" 2>&1 || true
 
 # Typing test: does a long paragraph wrap inside the page?
 step "new document"
-for p in "^New document$" "^Write$" "^New$" "Blank"; do tap "$p" 4 && break; done
+for p in "^New doc$" "^New document$"; do tap "$p" 4 && break; done
 dismiss
 shot 03_new_document
 adb shell input tap 540 900; sleep 2

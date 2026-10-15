@@ -52,6 +52,15 @@ cp "$APK" Docxels.apk 2>/dev/null || true
 gh release delete latest --repo "$SITE" --yes --cleanup-tag || true
 ASSETS=(Docxels.apk update.json "${PATCH_FILES[@]}")
 gh release create latest "${ASSETS[@]}" --repo "$SITE" --title "Docxels $CODE" --notes "Build $CODE. Install from the app: Settings > App updates." --latest
+# GitHub sometimes leaves a new release as a hidden draft when it is made right after the old one was deleted; the
+# app could not then find update.json. Make sure the release is public, and fail loudly if it is not.
+for i in 1 2 3 4 5; do
+  DRAFT=$(gh release view latest --repo "$SITE" --json isDraft --jq .isDraft)
+  [ "$DRAFT" = "false" ] && break
+  gh release edit latest --repo "$SITE" --draft=false --latest || true
+  sleep 5
+done
+curl -fsSL "$BASE/update.json" >/dev/null
 
 # Keep this build (and the last few) so the next release can make patches from them.
 cp "$APK" "Docxels-$CODE.apk"

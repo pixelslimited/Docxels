@@ -26,6 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.Link
@@ -689,6 +691,7 @@ private fun Ribbon(
         onClick: () -> Unit,
     ) {
         if (!grid && !main) return
+        if (grid && !groupShown) return
         val click = { onClick(); if (close) open = false }
         if (grid) {
             RibbonTile(label, icon, glyph, on, click)
@@ -700,25 +703,30 @@ private fun Ribbon(
             Toggle(icon, label, on, click)
         }
     }
-    // A heading that starts a new group of tools in the grid (hidden in the compact bar).
+    // A heading that starts a group of tools in the grid. The group's tools show only while it is open (tap the name).
+    var openGroup by remember { mutableStateOf("") }
+    var groupShown = true
     @Composable
     fun Group(title: String) {
-        if (grid) Text(
-            title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
-        )
+        if (!grid) { groupShown = true; return }
+        val key = "$tab:$title"
+        val isOpen = openGroup == key
+        groupShown = isOpen
+        Row(
+            Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .clickable { openGroup = if (isOpen) "" else key }
+                .padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            Icon(if (isOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = if (isOpen) "Hide $title" else "Show $title", tint = MaterialTheme.colorScheme.primary)
+        }
     }
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
         Column {
             if (!open) {
                 Box(Modifier.fillMaxWidth().height(56.dp).clickable { open = true; grid = true }.padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
-                    androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.ic_docxels_mark),
-                        contentDescription = "Show tools",
-                        modifier = Modifier.size(44.dp),
-                    )
+                    com.docscan.app.ui.kit.AnimatedMark(44.dp, description = "Show tools")
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -903,10 +911,10 @@ private fun Ribbon(
                         Group("Zoom")
                         if (viewMode != ViewMode.MOBILE) Btn("Zoom ${(zoom * 100).toInt()}%", Icons.Default.Search) { onZoom() }
                         Group("Reading")
-                        com.docscan.app.ui.kit.FilterPill("Read mode", false, onRead, Modifier.padding(horizontal = 4.dp))
-                        com.docscan.app.ui.kit.FilterPill("Print layout", viewMode == ViewMode.PAGE, { onViewMode(ViewMode.PAGE) }, Modifier.padding(horizontal = 4.dp))
-                        com.docscan.app.ui.kit.FilterPill("Text width", viewMode == ViewMode.TEXT, { onViewMode(ViewMode.TEXT) }, Modifier.padding(horizontal = 4.dp))
-                        com.docscan.app.ui.kit.FilterPill("Mobile", viewMode == ViewMode.MOBILE, { onViewMode(ViewMode.MOBILE) }, Modifier.padding(horizontal = 4.dp))
+                        if (groupShown || !grid) com.docscan.app.ui.kit.FilterPill("Read mode", false, onRead, Modifier.padding(horizontal = 4.dp))
+                        if (groupShown || !grid) com.docscan.app.ui.kit.FilterPill("Print layout", viewMode == ViewMode.PAGE, { onViewMode(ViewMode.PAGE) }, Modifier.padding(horizontal = 4.dp))
+                        if (groupShown || !grid) com.docscan.app.ui.kit.FilterPill("Text width", viewMode == ViewMode.TEXT, { onViewMode(ViewMode.TEXT) }, Modifier.padding(horizontal = 4.dp))
+                        if (groupShown || !grid) com.docscan.app.ui.kit.FilterPill("Mobile", viewMode == ViewMode.MOBILE, { onViewMode(ViewMode.MOBILE) }, Modifier.padding(horizontal = 4.dp))
                     }
                 }
             }
