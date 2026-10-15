@@ -731,6 +731,55 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
         changed()
     }
 
+    /**
+     * Inserts a signature sized for a signature and sets it on the signing line: the first dotted / underscore line
+     * (or a "Signature", "Director"… line) at or after the cursor that has no signature yet. Returns true if it found
+     * a line; otherwise the signature goes in at the cursor, still sized, to be dragged into place.
+     */
+    fun insertSignature(sig: com.docscan.app.core.word.ImageBlock, contentWidthTwips: Int): Boolean {
+        val v = view ?: return false
+        val t = v.text
+        val l = v.layout
+        val aspect = sig.heightTwips.toFloat() / sig.widthTwips.coerceAtLeast(1)
+        var w = minOf(2880, (contentWidthTwips * 0.4f).toInt()).coerceAtLeast(900)
+        var h = (w * aspect).toInt()
+        if (h > 1100) { h = 1100; w = (h / aspect).toInt().coerceAtLeast(600) }
+        val sized = sig.copy(widthTwips = w, heightTwips = h.coerceAtLeast(200), wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT)
+
+        val ranges = RichOps.paragraphRanges(t)
+        val cur = ranges.indexOfLast { it.start <= selection.first }.coerceAtLeast(0)
+        val strong = Regex("[.\\u2026_]{6,}")
+        val weak = Regex("(?i)(signature|signed|sign here|authori[sz]ed|director|secretary|witness|on behalf of)")
+        fun hasSignature(i: Int): Boolean {
+            if (i <= 0) return false
+            val prev = ranges[i - 1]
+            return t.getSpans(prev.start, prev.end.coerceAtMost(t.length), BlockChipSpan::class.java).any {
+                val b = originals.getOrNull(it.index)
+                b is Block.Image && b.image.wrap.floating
+            }
+        }
+        fun find(rx: Regex): Int? {
+            val order = (cur until ranges.size) + (0 until cur)
+            return order.firstOrNull { i -> i > 0 && rx.containsMatchIn(t.subSequence(ranges[i].start, ranges[i].end)) && !hasSignature(i) }
+        }
+        val target = find(strong) ?: find(weak)
+        if (target == null || l == null) {
+            insertBlock(Block.Image(sized))
+            return false
+        }
+        val r = ranges[target]
+        val k = v.paint.density * ZOOM / 20f
+        val line = l.getLineForOffset(r.start.coerceAtMost(t.length))
+        val lineTwips = ((l.getLineBottom(line) - l.getLineTop(line)) / k).toInt()
+        val dots = strong.find(t.subSequence(r.start, r.end))
+        val startOffset = r.start + (dots?.range?.first ?: 0)
+        val xTwips = (l.getPrimaryHorizontal(startOffset.coerceAtMost(t.length)) / k).toInt() + 60
+        val placed = sized.copy(offsetXTwips = xTwips.coerceAtLeast(0), offsetYTwips = (lineTwips * 0.75f).toInt() - sized.heightTwips)
+        v.setSelection(ranges[target - 1].start.coerceIn(0, t.length))
+        insertBlock(Block.Image(placed))
+        return true
+    }
+
     fun blockAt(index: Int): Block? = originals.getOrNull(index)
 
     /** Index of the block inserted last (for opening it right after inserting). */

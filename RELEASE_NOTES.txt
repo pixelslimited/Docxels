@@ -26,3 +26,4 @@
 82|Letterhead and signature can now come from a picture, a PDF page or a Word file. Signature import has a preview with a Remove background switch.
 83|Home: removed the duplicate PDF to Word card (it is in the Convert and scan row).
 84|Every new or converted document is A4 (a PDF to Word result no longer takes the odd page size of the PDF).
+85|Signature is resized for a signature and placed automatically on the signing line (a dotted or underscore line, or a Signature / Director line) at or after your cursor.

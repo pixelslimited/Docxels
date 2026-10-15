@@ -251,6 +251,12 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             )
         }
     }
+    fun placeSignature(block: ImageBlock) {
+        val found = controller.insertSignature(block, page.contentWidthTwips)
+        scope.launch {
+            snackbar.showSnackbar(if (found) "Signature placed on the signing line." else "No signing line found. Drag the signature where you want it.")
+        }
+    }
     var signSource by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     val signaturePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -452,7 +458,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             onInsert = { bytes, w, h ->
                 signSource = null
                 val tw = 2800
-                controller.insertBlock(Block.Image(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT)))
+                placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT))
             },
             onDismiss = { signSource = null },
         )
@@ -462,7 +468,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             onDone = { bytes, w, h ->
                 signPad = false
                 val tw = 2800
-                controller.insertBlock(Block.Image(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT)))
+                placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT))
             },
             onDismiss = { signPad = false },
         )
