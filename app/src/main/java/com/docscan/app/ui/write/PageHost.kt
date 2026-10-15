@@ -51,6 +51,25 @@ class PageHost(context: Context) : ScrollView(context) {
         sheet.layoutParams = lp
     }
 
+    /**
+     * The sheet's width is set on every measure, not only when this view's size changes: a document opened after the
+     * screen is already laid out would otherwise be measured with no width limit and never wrap.
+     */
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val w = MeasureSpec.getSize(widthMeasureSpec)
+        if (w > 0) {
+            val target = (w * zoom).toInt()
+            val lp = sheet.layoutParams as FrameLayout.LayoutParams
+            if (lp.width != target) { lp.width = target; sheet.layoutParams = lp }
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        super.onLayout(changed, l, t, r, b)
+        System.out.println("DocxelsQA host w=$width sheetW=${sheet.width} sheetLp=${sheet.layoutParams.width} editW=${edit.width} zoom=$zoom")
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         if (w > 0) { applyZoom(); onWidth?.invoke(w) }
