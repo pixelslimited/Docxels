@@ -32,6 +32,7 @@ class PageHost(context: Context) : ScrollView(context) {
 
     fun setDesk(color: Int, gutterPx: Int, verticalGutterPx: Int) {
         setBackgroundColor(color)
+        if (edit.deskColor != color) { edit.deskColor = color; edit.invalidate() }
         sheet.setPadding(gutterPx, verticalGutterPx, gutterPx, verticalGutterPx)
     }
 

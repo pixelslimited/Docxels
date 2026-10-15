@@ -40,7 +40,25 @@ class PageDecor(
     val footerPics: List<DecorPic> = emptyList(),
     val sheetHeightTwips: Int = 0,
     val pxPerTwip: Float = 0f,
-)
+    val topMarginPx: Float = 0f,
+    /** Height of the coloured strip drawn between one sheet and the next. */
+    val deskGapPx: Float = 0f,
+) {
+    /** Extra vertical room the first line of every page after the first carries: bottom margin + strip + top margin. */
+    val pageGapPx: Float get() = bottomMarginPx + deskGapPx + topMarginPx
+}
+
+/** Adds the blank room between two sheets to the first line of each page, so pages are really apart on screen. */
+class PageGapSpan : android.text.style.LineHeightSpan {
+    var starts: Set<Int> = emptySet()
+    var gapPx = 0
+    override fun chooseHeight(text: CharSequence, start: Int, end: Int, spanstartv: Int, lineHeight: Int, fm: android.graphics.Paint.FontMetricsInt) {
+        if (gapPx > 0 && start in starts) {
+            fm.ascent -= gapPx
+            fm.top -= gapPx
+        }
+    }
+}
 
 class DecorPic(val image: com.docscan.app.core.word.PageImage, val bitmap: android.graphics.Bitmap)
 
@@ -72,37 +90,76 @@ class RichEditText(context: Context) : EditText(context) {
     }
     private val small = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF8A8F9C.toInt() }
 
-    /** Y (in layout coordinates) where each page's text starts, mirroring how the PDF export breaks pages by line. */
-    fun pageStarts(): List<Float> {
-        val d = decor ?: return listOf(0f)
-        val l = layout ?: return listOf(0f)
-        val starts = arrayListOf(0f)
-        var pageStart = 0f
-        val t = text
-        for (i in 0 until l.lineCount) {
-            val top = l.getLineTop(i).toFloat()
-            val bottom = l.getLineBottom(i).toFloat()
-            if (i > 0 && top > pageStart && bottom - pageStart > d.contentHeightPx + 0.5f) {
-                starts += top
-                pageStart = top
-            }
-            val ls = l.getLineStart(i)
-            if (ls < t.length && t[ls] == CHIP_CHAR && i < l.lineCount - 1 &&
-                t.getSpans(ls, minOf(t.length, ls + 1), BlockChipSpan::class.java).any { isPageBreak(it.index) }
-            ) {
-                starts += bottom
-                pageStart = bottom
-            }
+    private val gapSpan = PageGapSpan()
+    private var spacingFlip = false
+
+    /** Colour of the desk behind the sheets; the strip between pages is drawn in it. */
+    var deskColor: Int = 0xFFE4E6EC.toInt()
+    private val bandPaint = android.graphics.Paint().apply { style = android.graphics.Paint.Style.FILL }
+
+    private fun syncGap() {
+        val d = decor
+        val want = d?.pageGapPx?.toInt() ?: 0
+        if (gapSpan.gapPx != want) { gapSpan.gapPx = want; gapSpan.starts = emptySet() }
+        if (d == null) return
+        val e = text as? Editable ?: return
+        if (e.getSpanStart(gapSpan) != 0 || e.getSpanEnd(gapSpan) != e.length) {
+            e.setSpan(gapSpan, 0, e.length, android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE)
         }
-        return starts
     }
 
+    /**
+     * Works out where each page starts. Returns the layout Y of the first line of every page (the line that carries
+     * the gap, except for page 1) and the text offsets of those lines. The same rule the PDF export uses: a page
+     * ends when the next line would not fit in the text height, or after a hard page break.
+     */
+    private fun scanPages(): Pair<List<Float>, Set<Int>> {
+        val d = decor ?: return listOf(0f) to emptySet()
+        val l = layout ?: return listOf(0f) to emptySet()
+        val t = text
+        val has = gapSpan.gapPx.toFloat()
+        val full = d.pageGapPx
+        val ys = arrayListOf(0f)
+        val set = LinkedHashSet<Int>()
+        var pageStart = 0f
+        var breakNext = false
+        for (i in 0 until l.lineCount) {
+            val ls = l.getLineStart(i)
+            val top = l.getLineTop(i).toFloat()
+            val bottom = l.getLineBottom(i).toFloat()
+            val g = if (ls in gapSpan.starts) has else 0f
+            if (i > 0 && (breakNext || (top > pageStart && (bottom - g) - pageStart > d.contentHeightPx + 0.5f))) {
+                ys += top
+                set += ls
+                pageStart = top + full
+            }
+            breakNext = ls < t.length && t[ls] == CHIP_CHAR && i < l.lineCount - 1 &&
+                t.getSpans(ls, minOf(t.length, ls + 1), BlockChipSpan::class.java).any { isPageBreak(it.index) }
+        }
+        return ys to set
+    }
+
+    /** Y (in layout coordinates) where each page starts; see [scanPages]. */
+    fun pageStarts(): List<Float> = scanPages().first
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        syncGap()
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val d = decor ?: return
         if (layout == null) return
+        var rounds = 0
+        while (rounds++ < 4) {
+            val set = scanPages().second
+            if (set == gapSpan.starts) break
+            gapSpan.starts = set
+            spacingFlip = !spacingFlip
+            setLineSpacing(if (spacingFlip) 0.01f else 0f, 1f) // forces the layout to be rebuilt with the new gaps
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        }
         // Whole sheets only: the page always ends where a printed page would end.
-        val need = (totalPaddingTop + pageStarts().last() + d.contentHeightPx + d.bottomMarginPx).toInt()
+        val ys = scanPages().first
+        val lastTextTop = ys.last() + if (ys.size > 1) d.pageGapPx else 0f
+        val need = (totalPaddingTop + lastTextTop + d.contentHeightPx + d.bottomMarginPx).toInt()
         if (need > measuredHeight) setMeasuredDimension(measuredWidth, need)
     }
 
@@ -137,27 +194,31 @@ class RichEditText(context: Context) : EditText(context) {
         val d = decor ?: return
         drawPics(canvas, d.headerPics, false, d, false)
         drawPics(canvas, d.footerPics, false, d, true)
-        val starts = pageStarts()
+        val ys = pageStarts()
         small.textSize = d.smallTextPx
-        guide.strokeWidth = maxOf(1f, d.smallTextPx / 8f)
         val topPad = totalPaddingTop.toFloat()
-        val headerNow = if (d.differentFirstPage) d.firstHeaderText else d.headerText
-        if (headerNow.isNotEmpty()) {
-            canvas.drawText(headerNow, paddingLeft.toFloat(), topPad / 2f + d.smallTextPx / 3f, small)
-        }
-        for (k in 1 until starts.size) {
-            val y = topPad + starts[k] - 2f
-            canvas.drawLine(0f, y, width.toFloat(), y, guide)
-            val label = "Page ${k + 1}"
-            canvas.drawText(label, width - paddingRight - small.measureText(label), y - d.smallTextPx / 3f, small)
-        }
-        val footY = height - d.bottomMarginPx / 2f + d.smallTextPx / 3f
-        val onlyFirst = d.differentFirstPage && starts.size == 1
-        val footerNow = if (onlyFirst) d.firstFooterText else d.footerText
-        if (footerNow.isNotEmpty()) canvas.drawText(footerNow, paddingLeft.toFloat(), footY, small)
-        if (if (onlyFirst) d.firstPageNumbers else d.pageNumbers) {
-            val label = starts.size.toString()
-            canvas.drawText(label, width - paddingRight - small.measureText(label), footY, small)
+        val n = ys.size
+        bandPaint.color = deskColor
+        for (k in 0 until n) {
+            if (k > 0) {
+                val y = topPad + ys[k] + d.bottomMarginPx
+                canvas.drawRect(0f, y, width.toFloat(), y + d.deskGapPx, bandPaint)
+            }
+            val sheetTop = if (k == 0) 0f else topPad + ys[k] + d.bottomMarginPx + d.deskGapPx
+            val sheetBottom = if (k == n - 1) height.toFloat() else topPad + ys[k + 1] + d.bottomMarginPx
+            val first = k == 0 && d.differentFirstPage
+            val header = if (first) d.firstHeaderText else d.headerText
+            val footer = if (first) d.firstFooterText else d.footerText
+            val numbered = if (first) d.firstPageNumbers else d.pageNumbers
+            if (header.isNotEmpty()) {
+                canvas.drawText(header, paddingLeft.toFloat(), sheetTop + d.topMarginPx / 2f + d.smallTextPx / 3f, small)
+            }
+            val footY = sheetBottom - d.bottomMarginPx / 2f + d.smallTextPx / 3f
+            if (footer.isNotEmpty()) canvas.drawText(footer, paddingLeft.toFloat(), footY, small)
+            if (numbered) {
+                val label = (k + 1).toString()
+                canvas.drawText(label, width - paddingRight - small.measureText(label), footY, small)
+            }
         }
     }
 
@@ -499,6 +560,8 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
                 footerPics = if (mode == ViewMode.PAGE) pics(pageSetup.footerImages) else emptyList(),
                 sheetHeightTwips = pageSetup.sheetHeightTwips,
                 pxPerTwip = ZOOM * eff / 20f,
+                topMarginPx = pageSetup.marginTopTwips / 20f * ZOOM * eff,
+                deskGapPx = 14f * d0,
             )
         }
         v.requestLayout()
