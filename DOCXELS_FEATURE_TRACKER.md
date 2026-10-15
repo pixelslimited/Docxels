@@ -225,7 +225,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 ## Fonts and polish (added)
 | Item | Status | Notes |
 |---|---|---|
-| Open .docx in the document's own fonts (defaults, Normal style, theme fonts, heading styles) | IMPLEMENTED — NOT VERIFIED | Unit-tested in FontsTest. A font Docxels does not ship is shown in the closest built-in look (serif / sans / mono) but its name is kept on save. Fonts embedded inside the .docx are not read yet. |
+| Open .docx in the document's own fonts (defaults, Normal style, theme fonts, heading styles) | IMPLEMENTED — NOT VERIFIED | Unit-tested in FontsTest. A font Docxels does not ship is shown in the closest built-in look (serif / sans / mono) but its name is kept on save. Fonts embedded inside the .docx are read and used (unit-tested for the unscrambling only; not tried on a real file). |
 | PDF to Word keeps the PDF's font names | IMPLEMENTED — NOT VERIFIED | FontNamesTest. Embedded PDF fonts are subsets and are not reused. |
 | Editor tool bar: no bar when closed | IMPLEMENTED — NOT VERIFIED | |
 | Home: tap flings papers away | IMPLEMENTED — NOT VERIFIED | Off when the phone has animations switched off. |

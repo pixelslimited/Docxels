@@ -70,3 +70,4 @@
 134|Fonts: Word files now open in the fonts they were written in, including the default font, theme fonts and heading fonts that were being ignored (the font name is kept when you save). PDFs converted to Word keep the PDF's own font names instead of only a short list.
 134|The editor's tool bar no longer has a bar behind the Docxels mark when it is closed; the mark just floats in the corner.
 134|Home: tap the paper sheets and some papers are flung away and fade out.
+134|Fonts built into a Word file (embedded fonts) are now used when you open it, so such text shows in its real font.
