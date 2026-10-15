@@ -38,6 +38,9 @@ class PageDecor(
     /** Letterhead pictures for page 1 (or the first-page header) and the last page's footer, already decoded. */
     val headerPics: List<DecorPic> = emptyList(),
     val footerPics: List<DecorPic> = emptyList(),
+    /** Header pictures for pages after the first (differs from [headerPics] when the first page has its own header). */
+    val headerPicsRest: List<DecorPic> = emptyList(),
+    val footerPicsFirst: List<DecorPic> = emptyList(),
     val sheetHeightTwips: Int = 0,
     val pxPerTwip: Float = 0f,
     val topMarginPx: Float = 0f,
@@ -165,13 +168,28 @@ class RichEditText(context: Context) : EditText(context) {
 
     private val picPaint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG)
 
-    private fun drawPics(canvas: android.graphics.Canvas, pics: List<DecorPic>, behind: Boolean, d: PageDecor, fromBottom: Boolean) {
+    private fun drawPics(canvas: android.graphics.Canvas, pics: List<DecorPic>, behind: Boolean, d: PageDecor, sheetTop: Float, sheetBottom: Float, fromBottom: Boolean) {
         for (p in pics) {
             if (p.image.behind != behind) continue
             val x = p.image.xTwips * d.pxPerTwip
-            val y = if (fromBottom) height - (d.sheetHeightTwips - p.image.yTwips) * d.pxPerTwip else p.image.yTwips * d.pxPerTwip
+            val y = if (fromBottom) sheetBottom - (d.sheetHeightTwips - p.image.yTwips) * d.pxPerTwip else sheetTop + p.image.yTwips * d.pxPerTwip
             val dst = android.graphics.RectF(x, y, x + p.image.widthTwips * d.pxPerTwip, y + p.image.heightTwips * d.pxPerTwip)
             canvas.drawBitmap(p.bitmap, null, dst, picPaint)
+        }
+    }
+
+    /** Letterhead pictures on every sheet, each placed against its own sheet's top or bottom edge. */
+    private fun drawAllPics(canvas: android.graphics.Canvas, behind: Boolean) {
+        val d = decor ?: return
+        if (d.headerPics.isEmpty() && d.footerPics.isEmpty() && d.headerPicsRest.isEmpty() && d.footerPicsFirst.isEmpty()) return
+        val ys = pageStarts()
+        val n = ys.size
+        val topPad = totalPaddingTop.toFloat()
+        for (k in 0 until n) {
+            val sheetTop = if (k == 0) 0f else topPad + ys[k] + d.bottomMarginPx + d.deskGapPx
+            val sheetBottom = if (k == n - 1) height.toFloat() else topPad + ys[k + 1] + d.bottomMarginPx
+            drawPics(canvas, if (k == 0) d.headerPics else d.headerPicsRest, behind, d, sheetTop, sheetBottom, false)
+            drawPics(canvas, if (k == 0) d.footerPicsFirst else d.footerPics, behind, d, sheetTop, sheetBottom, true)
         }
     }
 
@@ -184,16 +202,11 @@ class RichEditText(context: Context) : EditText(context) {
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         drawFloating(canvas, true)
-        val dd = decor
-        if (dd != null && (dd.headerPics.isNotEmpty() || dd.footerPics.isNotEmpty())) {
-            drawPics(canvas, dd.headerPics, true, dd, false)
-            drawPics(canvas, dd.footerPics, true, dd, true)
-        }
+        drawAllPics(canvas, true)
         super.onDraw(canvas)
         drawFloating(canvas, false)
         val d = decor ?: return
-        drawPics(canvas, d.headerPics, false, d, false)
-        drawPics(canvas, d.footerPics, false, d, true)
+        drawAllPics(canvas, false)
         val ys = pageStarts()
         small.textSize = d.smallTextPx
         val topPad = totalPaddingTop.toFloat()
@@ -558,6 +571,8 @@ class EditorController(private val baseDensity: Float, initial: List<Block>) {
                 smallTextPx = 9f * ZOOM * eff,
                 headerPics = if (mode == ViewMode.PAGE) pics(if (pageSetup.differentFirstPage) pageSetup.firstHeaderImages else pageSetup.headerImages) else emptyList(),
                 footerPics = if (mode == ViewMode.PAGE) pics(pageSetup.footerImages) else emptyList(),
+                headerPicsRest = if (mode == ViewMode.PAGE) pics(pageSetup.headerImages) else emptyList(),
+                footerPicsFirst = if (mode == ViewMode.PAGE) pics(if (pageSetup.differentFirstPage) pageSetup.firstFooterImages else pageSetup.footerImages) else emptyList(),
                 sheetHeightTwips = pageSetup.sheetHeightTwips,
                 pxPerTwip = ZOOM * eff / 20f,
                 topMarginPx = pageSetup.marginTopTwips / 20f * ZOOM * eff,
