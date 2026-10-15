@@ -48,3 +48,4 @@
 118|Pinch the page to zoom from 100% to 300%.
 118|Converted documents: line spacing no longer grows line by line, so letters stay on the same number of pages as the PDF.
 118|Justify now works in the editor: wrapped lines of a justified paragraph reach the right margin; the last line stays left-aligned.
+118|PDF export now justifies paragraphs the same way the workspace does.

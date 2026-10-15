@@ -29,7 +29,7 @@ import java.io.OutputStream
  * Layout runs in "zoomed" units (points x [ZOOM]) and the canvas is scaled back, which is what lets the editor's
  * density-based spans measure correctly here.
  *
- * Known limits: justified text is drawn left-aligned, merged table cells are drawn unmerged.
+ * Known limits: merged table cells are drawn unmerged.
  */
 object WordPdf {
     fun write(doc: WordDoc, out: OutputStream) {
@@ -141,16 +141,30 @@ object WordPdf {
             c.restore()
         }
 
-        fun layoutOf(paragraphs: List<Paragraph>, width: Float): StaticLayout {
+        fun layoutOf(paragraphs: List<Paragraph>, width: Float, justify: Boolean = false): StaticLayout {
             val text = SpanBridge.toEditable(paragraphs, 1f)
-            return StaticLayout.Builder.obtain(text, 0, text.length, body, width.toInt().coerceAtLeast(1))
+            val b = StaticLayout.Builder.obtain(text, 0, text.length, body, width.toInt().coerceAtLeast(1))
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .setIncludePad(false)
-                .build()
+            // Justified paragraphs are laid out together so the library stretches every line but the last of each.
+            if (justify) b.setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD)
+            return b.build()
         }
 
+        /** Consecutive paragraphs that are all justified, or all not, so each run can be laid out its own way. */
         fun paragraphs(list: List<Paragraph>) {
-            val layout = layoutOf(list, contentW)
+            var i = 0
+            while (i < list.size) {
+                val j = list[i].align == Align.JUSTIFY
+                var k = i + 1
+                while (k < list.size && (list[k].align == Align.JUSTIFY) == j) k++
+                paragraphRun(list.subList(i, k), j)
+                i = k
+            }
+        }
+
+        fun paragraphRun(list: List<Paragraph>, justify: Boolean) {
+            val layout = layoutOf(list, contentW, justify)
             var line = 0
             while (line < layout.lineCount) {
                 val top = layout.getLineTop(line)
@@ -196,7 +210,7 @@ object WordPdf {
                     val span = cell.colSpan.coerceAtLeast(1)
                     val w = (col until minOf(col + span, widths.size)).sumOf { widths[it].toDouble() }.toFloat()
                     val paras = if (cell.vMergeContinue) listOf(Paragraph()) else cell.paragraphs
-                    val l = layoutOf(paras, (w - 2 * pad).coerceAtLeast(1f))
+                    val l = layoutOf(paras, (w - 2 * pad).coerceAtLeast(1f), paras.isNotEmpty() && paras.all { it.align == Align.JUSTIFY })
                     h = maxOf(h, l.height + 2 * pad)
                     placed += Placed(x, w, cell, l)
                     x += w
