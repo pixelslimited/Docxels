@@ -45,6 +45,8 @@ data class ExportOptions(
     val format: DocFormat = DocFormat.PDF,
     /** PDF only: fit pages onto A4 sheets instead of using the scan's own proportions. */
     val a4: Boolean = true,
+    /** PDF only: also put the recognised text under the picture so the PDF can be searched and copied from (runs OCR; slower). */
+    val searchable: Boolean = false,
 )
 
 class ExportResult(val files: List<File>, val mime: String)
@@ -61,7 +63,7 @@ class ExportManager(
         require(pages.isNotEmpty()) { "There are no pages to export" }
         val base = safeName(name)
         return when (options.format) {
-            DocFormat.PDF -> ExportResult(listOf(pdf(pages, base, options.a4)), Mime.PDF)
+            DocFormat.PDF -> ExportResult(listOf(pdf(pages, base, options.a4, options.searchable)), Mime.PDF)
             // Word is always recognised, editable text (OCR); page pictures are what PDF and image export are for.
             DocFormat.WORD -> ExportResult(listOf(wordText(pages, base)), Mime.DOCX)
             DocFormat.TXT -> ExportResult(listOf(textFile(pages, base)), Mime.TXT)
@@ -70,14 +72,15 @@ class ExportManager(
         }
     }
 
-    private suspend fun pdf(pages: List<PageEntity>, base: String, a4: Boolean): File =
+    private suspend fun pdf(pages: List<PageEntity>, base: String, a4: Boolean, searchable: Boolean = false): File =
         withContext(Dispatchers.IO) {
             val file = File(dir, "$base.pdf")
             val document = PdfDocument()
             try {
                 pages.forEachIndexed { index, page ->
                     val bitmap = renderer.render(page, EXPORT_SIDE)
-                    drawPdfPage(document, bitmap, index + 1, a4)
+                    val text = if (searchable) runCatching { ocr.recognize(bitmap) }.getOrNull() else null
+                    drawPdfPage(document, bitmap, index + 1, a4, text)
                     bitmap.recycle()
                 }
                 FileOutputStream(file).use { document.writeTo(it) }
@@ -87,7 +90,7 @@ class ExportManager(
             file
         }
 
-    private fun drawPdfPage(document: PdfDocument, bitmap: Bitmap, number: Int, a4: Boolean) {
+    private fun drawPdfPage(document: PdfDocument, bitmap: Bitmap, number: Int, a4: Boolean, text: com.google.mlkit.vision.text.Text? = null) {
         val landscape = bitmap.width > bitmap.height
         val (pageW, pageH) = when {
             a4 && landscape -> 842 to 595
@@ -103,7 +106,27 @@ class ExportManager(
         val left = (pageW - w) / 2f
         val top = (pageH - h) / 2f
         canvas.drawBitmap(bitmap, null, RectF(left, top, left + w, top + h), Paint(Paint.FILTER_BITMAP_FLAG))
+        if (text != null) drawHiddenText(canvas, text, left, top, scale)
         document.finishPage(page)
+    }
+
+    /**
+     * Writes the recognised words over the picture in an almost fully transparent colour: nobody sees them, but PDF readers
+     * can search and copy them. Each line is stretched to cover the printed line it came from.
+     */
+    private fun drawHiddenText(canvas: android.graphics.Canvas, text: com.google.mlkit.vision.text.Text, left: Float, top: Float, scale: Float) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(1, 0, 0, 0) }
+        for (block in text.textBlocks) for (line in block.lines) {
+            val box = line.boundingBox ?: continue
+            val str = line.text
+            if (str.isBlank()) continue
+            val boxH = box.height() * scale
+            paint.textSize = (boxH * 0.8f).coerceAtLeast(1f)
+            paint.textScaleX = 1f
+            val natural = paint.measureText(str)
+            if (natural > 0f) paint.textScaleX = ((box.width() * scale) / natural).coerceIn(0.2f, 5f)
+            canvas.drawText(str, left + box.left * scale, top + box.bottom * scale - boxH * 0.2f, paint)
+        }
     }
 
     private suspend fun wordText(pages: List<PageEntity>, base: String): File =
@@ -153,6 +176,10 @@ class ExportManager(
 
     suspend fun tableXlsx(rows: List<List<String>>, name: String): File = withContext(Dispatchers.IO) {
         File(dir, "${safeName(name)}.xlsx").also { f -> FileOutputStream(f).use { XlsxBuilder.build(rows, "Table 1", it) } }
+    }
+
+    suspend fun workbookXlsx(sheets: List<Pair<String, List<List<String>>>>, name: String): File = withContext(Dispatchers.IO) {
+        File(dir, "${safeName(name)}.xlsx").also { f -> FileOutputStream(f).use { XlsxBuilder.buildSheets(sheets, it) } }
     }
 
     suspend fun tableDocx(rows: List<List<String>>, name: String): File = withContext(Dispatchers.IO) {

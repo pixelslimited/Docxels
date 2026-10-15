@@ -86,6 +86,7 @@ class Actions(
     val importPhotos: () -> Unit,
     val importWord: () -> Unit,
     val scanToWord: () -> Unit,
+    val scanToExcel: () -> Unit,
     val wordToPdf: () -> Unit,
     val soon: (String) -> Unit,
     val openWord: (String) -> Unit,
@@ -93,7 +94,7 @@ class Actions(
     val pdfToWord: () -> Unit,
 )
 
-private enum class Pick { SCAN_TO_WORD, WORD_TO_PDF }
+private enum class Pick { SCAN_TO_WORD, WORD_TO_PDF, SCAN_TO_EXCEL }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,6 +145,7 @@ fun MainShell(
             importPhotos = { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             importWord = { word.launch(arrayOf(Mime.DOCX, "application/octet-stream")) },
             scanToWord = { pick = Pick.SCAN_TO_WORD },
+            scanToExcel = { pick = Pick.SCAN_TO_EXCEL },
             wordToPdf = { pick = Pick.WORD_TO_PDF },
             soon = { name -> vm.say("$name is coming in a later update.") },
             openWord = onOpenWord,
@@ -215,14 +217,14 @@ fun MainShell(
     }
 
     pick?.let { mode ->
-        val wantKind = if (mode == Pick.SCAN_TO_WORD) DocKind.SCAN else DocKind.DOCX
+        val wantKind = if (mode == Pick.SCAN_TO_WORD || mode == Pick.SCAN_TO_EXCEL) DocKind.SCAN else DocKind.DOCX
         val choices = items.filter { it.kind == wantKind }
         AlertDialog(
             onDismissRequest = { pick = null },
-            title = { Text(if (mode == Pick.SCAN_TO_WORD) "Scan to Word" else "Word to PDF") },
+            title = { Text(when (mode) { Pick.SCAN_TO_WORD -> "Scan to Word"; Pick.SCAN_TO_EXCEL -> "Scan to Excel"; else -> "Word to PDF" }) },
             text = {
                 if (choices.isEmpty()) {
-                    Text(if (mode == Pick.SCAN_TO_WORD) "Scan a document first, then convert it here." else "Write or import a Word document first.")
+                    Text(if (mode != Pick.WORD_TO_PDF) "Scan a document first, then convert it here." else "Write or import a Word document first.")
                 } else {
                     Column {
                         Text("Choose a document", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -233,7 +235,7 @@ fun MainShell(
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 modifier = Modifier.clickable {
                                     pick = null
-                                    if (mode == Pick.SCAN_TO_WORD) vm.scanToWord(item.id, onOpenWord) else vm.sharePdf(context, item)
+                                    when (mode) { Pick.SCAN_TO_WORD -> vm.scanToWord(item.id, onOpenWord); Pick.SCAN_TO_EXCEL -> vm.scanToExcel(context, item.id); else -> vm.sharePdf(context, item) }
                                 },
                             )
                         }

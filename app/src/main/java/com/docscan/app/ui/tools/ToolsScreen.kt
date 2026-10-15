@@ -80,7 +80,7 @@ fun ToolsScreen(actions: Actions) {
         ToolDef(Icons.Default.PictureAsPdf, "Word to PDF", t.green, false, actions.wordToPdf),
         ToolDef(Icons.Default.Image, "Photos to PDF", t.green, false, actions.importPhotos),
         
-        ToolDef(Icons.Default.TableChart, "Scan to Excel", t.green, true, planned("Scan to Excel")),
+        ToolDef(Icons.Default.TableChart, "Scan to Excel", t.green, false, actions.scanToExcel),
     )
     val write = listOf(
         ToolDef(Icons.Default.Edit, "New document", t.orange, false, actions.newDoc),

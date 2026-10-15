@@ -15,6 +15,7 @@ import com.docscan.app.data.LibraryItem
 import com.docscan.app.export.Mime
 import com.docscan.app.export.ShareHelper
 import com.docscan.app.imaging.EdgeDetector
+import com.docscan.app.imaging.toRgbMat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -236,6 +237,55 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
                 _message.value = "Could not convert to a Word document."
             }
         }
+    }
+
+    /** Finds the ruled tables on every page of a scan, reads their text, and shares one Excel file with a sheet per table page. */
+    fun scanToExcel(context: Context, scanId: String) {
+        viewModelScope.launch {
+            val pages = container.repository.pages(scanId)
+            val name = items.value.firstOrNull { it.id == scanId && it.kind == DocKind.SCAN }?.title ?: "Scan"
+            if (pages.isEmpty()) { _message.value = "That scan has no pages."; return@launch }
+            val sheets = ArrayList<Pair<String, List<List<String>>>>()
+            runCatching {
+                pages.forEachIndexed { i, p ->
+                    _busy.value = "Reading tables on page ${i + 1} of ${pages.size}…"
+                    val bitmap = container.renderer.render(p, 2000)
+                    val cells = withContext(Dispatchers.Default) {
+                        val mat = bitmap.toRgbMat()
+                        try { com.docscan.app.imaging.TableDetector.detectCells(mat) } finally { mat.release() }
+                    }
+                    if (cells.isNotEmpty()) {
+                        val rows = com.docscan.app.core.TableGrid.group(cells).map { row -> row.map { readCell(bitmap, it) } }
+                        sheets += "Page ${i + 1}" to com.docscan.app.core.TableGrid.pad(rows)
+                    }
+                    bitmap.recycle()
+                }
+            }.onSuccess {
+                if (sheets.isEmpty()) {
+                    _busy.value = null
+                    _message.value = "No tables with ruled lines were found. Try a flatter, brighter scan."
+                } else {
+                    val file = container.exporter.workbookXlsx(sheets, "$name tables")
+                    _busy.value = null
+                    ShareHelper.share(context, listOf(file), Mime.XLSX)
+                }
+            }.onFailure {
+                _busy.value = null
+                _message.value = "Could not read the tables."
+            }
+        }
+    }
+
+    private suspend fun readCell(bitmap: android.graphics.Bitmap, cell: com.docscan.app.core.CellRect): String {
+        val inset = 3
+        val x = (cell.x + inset).coerceIn(0, bitmap.width - 1)
+        val y = (cell.y + inset).coerceIn(0, bitmap.height - 1)
+        val w = (cell.w - 2 * inset).coerceAtMost(bitmap.width - x)
+        val h = (cell.h - 2 * inset).coerceAtMost(bitmap.height - y)
+        if (w < 4 || h < 4) return ""
+        var crop = android.graphics.Bitmap.createBitmap(bitmap, x, y, w, h)
+        if (h < 48) crop = android.graphics.Bitmap.createScaledBitmap(crop, w * 2, h * 2, true)
+        return container.ocr.cellText(crop)
     }
 
     fun shareDocx(context: Context, item: LibraryItem) {

@@ -55,3 +55,5 @@
 134|Print: Print from the editor's menu or the PDF viewer.
 134|Settings: choose the export format and A4 fit that the scan export sheet starts with.
 134|Library: favourites, folders, tags, grid view; search also finds tags. Deleting now moves a document to Trash for 30 days (restore, delete for good, or empty Trash).
+134|Scan to Excel: Tools > Scan to Excel finds ruled tables on every page of a scan and shares one Excel file with a sheet per page.
+134|Searchable PDF: in the scan export sheet, PDF now has a Searchable text switch (slower) so the PDF can be searched and copied from.

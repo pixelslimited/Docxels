@@ -40,34 +40,49 @@ object XlsxBuilder {
     fun sanitizeSheetName(name: String): String =
         name.replace(Regex("""[\[\]:*?/\\]"""), " ").trim().ifEmpty { "Sheet1" }.take(31)
 
-    fun build(rows: List<List<String>>, sheetName: String, out: OutputStream) {
+    fun build(rows: List<List<String>>, sheetName: String, out: OutputStream) = buildSheets(listOf(sheetName to rows), out)
+
+    /** Writes a workbook with one sheet per entry (names are made unique and valid). */
+    fun buildSheets(sheets: List<Pair<String, List<List<String>>>>, out: OutputStream) {
+        require(sheets.isNotEmpty()) { "A workbook needs at least one sheet" }
+        val used = HashSet<String>()
+        val names = sheets.map { (n, _) ->
+            var base = sanitizeSheetName(n)
+            var candidate = base
+            var k = 2
+            while (!used.add(candidate.lowercase())) { candidate = base.take(28) + " " + k++ }
+            candidate
+        }
         ZipOutputStream(out).use { zip ->
             fun entry(name: String, content: String) {
                 zip.putNextEntry(ZipEntry(name))
                 zip.write(content.toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
             }
+            val overrides = sheets.indices.joinToString("") { """<Override PartName="/xl/worksheets/sheet${it + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>""" }
             entry(
                 "[Content_Types].xml",
                 """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>""",
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>$overrides</Types>""",
             )
             entry(
                 "_rels/.rels",
                 """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>""",
             )
+            val sheetTags = names.indices.joinToString("") { """<sheet name="${Xml.escape(names[it])}" sheetId="${it + 1}" r:id="rId${it + 1}"/>""" }
             entry(
                 "xl/workbook.xml",
                 """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${Xml.escape(sanitizeSheetName(sheetName))}" sheetId="1" r:id="rId1"/></sheets></workbook>""",
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>$sheetTags</sheets></workbook>""",
             )
+            val rels = sheets.indices.joinToString("") { """<Relationship Id="rId${it + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${it + 1}.xml"/>""" }
             entry(
                 "xl/_rels/workbook.xml.rels",
                 """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>""",
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">$rels</Relationships>""",
             )
-            entry("xl/worksheets/sheet1.xml", sheetXml(rows))
+            sheets.forEachIndexed { i, (_, rows) -> entry("xl/worksheets/sheet${i + 1}.xml", sheetXml(rows)) }
         }
     }
 
