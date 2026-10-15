@@ -39,3 +39,7 @@
 100|Picture and signature wrap options now start with 'In front of text' (the last option first).
 109|Adding a letterhead from a PDF or Word file now picks out only the artwork (logo, address block, background) and leaves the letter's text out; signatures are found inside the document and saved with the background removed.
 109|PDF to Word keeps page-sized letterheads and page artwork, drawn lines and boxes, paragraph gaps and line spacing, and shows 'Page N of M' progress text while it works.
+117|Tools icon floats with no background and changes colour; tool groups are now an icon row (Home: Font, Paragraph, Style, Clear) with the picked group's tools shown as icon tiles.
+117|Pictures, signatures and shapes: width and height sliders with a Keep proportions switch, and drag handles on the page (corner keeps proportions, edge handles change one side). Letterheads always stretch to fill the page.
+117|Tables: a live properties panel (rows, columns, cell text and shading, merge, widths, position, borders), and drag a table sideways to place it or up and down to move it between paragraphs.
+117|PDF to Word keeps the letterhead on every letter's first page, not only page 1.
