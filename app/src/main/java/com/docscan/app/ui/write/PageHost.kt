@@ -12,7 +12,18 @@ import android.widget.ScrollView
  */
 class PageHost(context: Context) : ScrollView(context) {
     val edit = RichEditText(context)
-    private val sheet = FrameLayout(context)
+    /**
+     * A horizontal scroller measures its child with no width limit and ignores the child's requested width, so the
+     * sheet forces its own exact width here; the text view inside then wraps at the sheet's edge.
+     */
+    private class Sheet(context: Context) : FrameLayout(context) {
+        var forcedWidth = 0
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val w = if (forcedWidth > 0) MeasureSpec.makeMeasureSpec(forcedWidth, MeasureSpec.EXACTLY) else widthMeasureSpec
+            super.onMeasure(w, heightMeasureSpec)
+        }
+    }
+    private val sheet = Sheet(context)
     private val across = android.widget.HorizontalScrollView(context)
     private var zoom = 1f
 
@@ -48,7 +59,9 @@ class PageHost(context: Context) : ScrollView(context) {
         // Always an exact width: inside the sideways scroller a MATCH_PARENT child is measured unbounded, and the text
         // would then run on one line instead of wrapping.
         lp.width = if (width <= 0) ViewGroup.LayoutParams.MATCH_PARENT else (width * zoom).toInt()
+        sheet.forcedWidth = if (width <= 0) 0 else (width * zoom).toInt()
         sheet.layoutParams = lp
+        sheet.requestLayout()
     }
 
     /**
@@ -61,6 +74,7 @@ class PageHost(context: Context) : ScrollView(context) {
             val target = (w * zoom).toInt()
             val lp = sheet.layoutParams as FrameLayout.LayoutParams
             if (lp.width != target) { lp.width = target; sheet.layoutParams = lp }
+            sheet.forcedWidth = target
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
