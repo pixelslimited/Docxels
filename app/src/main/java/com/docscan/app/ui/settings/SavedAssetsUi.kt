@@ -81,7 +81,7 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val bmp = PageSources.bitmap(context, uri, if (signature) 1600 else 2000)
+            val bmp = if (signature) PageSources.signatureBitmap(context, uri, 1600) else PageSources.letterheadBitmap(context, uri, 2000)
             if (bmp == null) { say("Could not read a picture from that file."); return@launch }
             if (signature) source = bmp
             else {
@@ -98,8 +98,8 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            if (signature) "Keep your signatures here and place them in any document. Add one from a picture, a PDF or a Word file; the background is removed for you."
-            else "Keep your letterheads here and add them to any document. Add one from a picture, a PDF or a Word file; it is fitted to the page automatically.",
+            if (signature) "Keep your signatures here and place them in any document. Add one from a picture, a PDF or a Word file: the signature is found in the document and its background is removed."
+            else "Keep your letterheads here and add them to any document. Add one from a picture, a PDF or a Word file: the letterhead is picked out of the document, the letter text is left out, and it is fitted to the page.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

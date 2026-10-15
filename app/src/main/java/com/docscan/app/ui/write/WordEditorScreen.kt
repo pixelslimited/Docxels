@@ -269,7 +269,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     val signaturePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val bmp = PageSources.bitmap(context, uri, 1600)
+            val bmp = PageSources.signatureBitmap(context, uri, 1600)
             if (bmp == null) snackbar.showSnackbar("Could not read a picture from that file.") else signSource = bmp
         }
     }

@@ -102,6 +102,69 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
         }
     }
 
+    /**
+     * The letterhead of a PDF's first page without the letter's text: the pictures on that page laid on a white sheet (body
+     * pictures such as a stamp or signature low on the page are left out). A page with no pictures is drawn with its body text
+     * erased, keeping only text in the top and bottom bands (a header or footer line).
+     */
+    suspend fun letterheadOf(file: File, maxSide: Int): android.graphics.Bitmap? {
+        val doc = withContext(Dispatchers.IO) { runCatching { PDDocument.load(file, "") }.getOrNull() } ?: return null
+        return doc.use {
+            val parts = withContext(Dispatchers.Default) { runCatching { findParts(doc, 0) }.getOrNull() } ?: return@use null
+            val art = parts.pics.filter { it.fw * it.fh >= 0.002f && !(it.fy + it.fh / 2f > 0.5f && it.fw * it.fh < 0.15f) }
+            val aspect = parts.boxH / parts.boxW
+            val w = maxSide.coerceIn(400, 2400)
+            val h = (w * aspect).toInt().coerceIn(400, 4000)
+            if (art.isNotEmpty()) {
+                val out = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                val c = android.graphics.Canvas(out)
+                c.drawColor(android.graphics.Color.WHITE)
+                val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+                for (p in art) {
+                    val bmp = withContext(Dispatchers.Default) { runCatching { p.image.image }.getOrNull() } ?: continue
+                    c.drawBitmap(bmp, null, android.graphics.RectF(p.fx * w, p.fy * h, (p.fx + p.fw) * w, (p.fy + p.fh) * h), paint)
+                }
+                out
+            } else {
+                val page = withContext(Dispatchers.Default) {
+                    PdfPreview(file).use { it.render(0, w) }
+                }
+                val scale = page.width / pageDims(doc.getPage(0)).first
+                val segs = withContext(Dispatchers.Default) { runCatching { extract(doc, 0, scale) }.getOrDefault(emptyList()) }
+                val c = android.graphics.Canvas(page)
+                val white = android.graphics.Paint().apply { color = android.graphics.Color.WHITE }
+                for (sg in segs) {
+                    val keep = sg.cy < page.height * 0.18f || sg.cy > page.height * 0.92f
+                    if (!keep) c.drawRect(sg.left - 4f, sg.top - 4f, sg.right + 4f, sg.bottom + 4f, white)
+                }
+                page
+            }
+        }
+    }
+
+    /**
+     * A signature picture from a PDF: the smallest picture sitting low on a page (searching from the last page back) that
+     * is not artwork repeated across the pages.
+     */
+    suspend fun signatureOf(file: File): android.graphics.Bitmap? {
+        val doc = withContext(Dispatchers.IO) { runCatching { PDDocument.load(file, "") }.getOrNull() } ?: return null
+        return doc.use {
+            val total = doc.numberOfPages
+            val parts = withContext(Dispatchers.Default) { (0 until total).map { runCatching { findParts(doc, it) }.getOrNull() } }
+            val counts = HashMap<String, Int>()
+            for (pt in parts) for (sig in (pt?.pics ?: emptyList()).map { it.sig }.toSet()) counts[sig] = (counts[sig] ?: 0) + 1
+            val limit = maxOf(2, (total * 0.4f).toInt())
+            for (i in total - 1 downTo 0) {
+                val pt = parts[i] ?: continue
+                val pick = pt.pics
+                    .filter { it.fw * it.fh in 0.0005f..0.15f && it.fy + it.fh / 2f > 0.3f && (counts[it.sig] ?: 0) < limit }
+                    .maxByOrNull { it.fy } ?: continue
+                return@use withContext(Dispatchers.Default) { runCatching { pick.image.image }.getOrNull() }
+            }
+            null
+        }
+    }
+
     private fun pageDims(page: com.tom_roush.pdfbox.pdmodel.PDPage): Pair<Float, Float> {
         val box = page.cropBox ?: page.mediaBox
         val rot = ((page.rotation % 360) + 360) % 360

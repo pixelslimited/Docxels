@@ -56,6 +56,68 @@ object PageSources {
         }.getOrNull()
     }
 
+    private fun pdfFile(context: Context, uri: Uri): java.io.File {
+        val tmp = java.io.File.createTempFile("pick", ".pdf", context.cacheDir)
+        context.contentResolver.openInputStream(uri)?.use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }
+        return tmp
+    }
+
+    private fun toolkit(context: Context) = (context.applicationContext as com.docscan.app.DocScanApp).container.pdfToWord
+
+    /** Header, footer and watermark pictures of a Word file laid on one white sheet, as the letterhead would print. */
+    private fun docxArtwork(doc: com.docscan.app.core.word.WordDoc, maxSide: Int): Bitmap? {
+        val page = doc.page
+        val imgs = (page.headerImages + page.firstHeaderImages + page.footerImages + page.firstFooterImages)
+        if (imgs.isEmpty()) return null
+        val w = maxSide.coerceIn(400, 2400)
+        val h = (w.toLong() * page.sheetHeightTwips / page.sheetWidthTwips.coerceAtLeast(1)).toInt().coerceIn(400, 4000)
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(out)
+        c.drawColor(android.graphics.Color.WHITE)
+        val kx = w.toFloat() / page.sheetWidthTwips
+        val ky = h.toFloat() / page.sheetHeightTwips
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+        for (im in imgs) {
+            val b = android.graphics.BitmapFactory.decodeByteArray(im.bytes, 0, im.bytes.size) ?: continue
+            c.drawBitmap(b, null, android.graphics.RectF(im.xTwips * kx, im.yTwips * ky, (im.xTwips + im.widthTwips) * kx, (im.yTwips + im.heightTwips) * ky), paint)
+            b.recycle()
+        }
+        return out
+    }
+
+    /** A letterhead picture from a picture, a PDF or a Word file: the artwork only, with the document's text left out. */
+    suspend fun letterheadBitmap(context: Context, uri: Uri, maxSide: Int): Bitmap? = withContext(Dispatchers.IO) {
+        runCatching {
+            when (typeOf(context, uri)) {
+                "pdf" -> {
+                    val f = pdfFile(context, uri)
+                    try { toolkit(context).letterheadOf(f, maxSide) } finally { f.delete() }
+                }
+                "docx" -> readDocx(context, uri)?.let { docxArtwork(it, maxSide) } ?: bitmap(context, uri, maxSide)
+                else -> bitmap(context, uri, maxSide)
+            }
+        }.getOrNull()
+    }
+
+    /** A signature picture found inside a PDF or Word file (or the picture itself); null falls back to the page picture. */
+    suspend fun signatureBitmap(context: Context, uri: Uri, maxSide: Int): Bitmap? = withContext(Dispatchers.IO) {
+        runCatching {
+            when (typeOf(context, uri)) {
+                "pdf" -> {
+                    val f = pdfFile(context, uri)
+                    try { toolkit(context).signatureOf(f) } finally { f.delete() }
+                }
+                "docx" -> {
+                    val doc = readDocx(context, uri)
+                    val small = doc?.blocks?.filterIsInstance<Block.Image>()?.map { it.image }
+                        ?.filter { it.widthTwips <= (doc.page.contentWidthTwips * 0.5f) }?.lastOrNull()
+                    small?.let { android.graphics.BitmapFactory.decodeByteArray(it.bytes, 0, it.bytes.size) }
+                }
+                else -> null
+            }
+        }.getOrNull() ?: bitmap(context, uri, maxSide)
+    }
+
     class Letterhead(val header: List<PageImage>, val footer: List<PageImage>)
 
     /** A full-page picture sized to the paper: it fills the sheet when its shape is close to the paper's, else fits the width. */
@@ -87,7 +149,7 @@ object PageSources {
                 val footer = scaled(src.footerImages.ifEmpty { src.firstFooterImages })
                 if (header.isEmpty() && footer.isEmpty()) null else Letterhead(header, footer)
             } else {
-                val bmp = bitmap(context, uri, 2000) ?: return@runCatching null
+                val bmp = letterheadBitmap(context, uri, 2000) ?: return@runCatching null
                 val img = fullPage(bmp, setup)
                 bmp.recycle()
                 Letterhead(listOf(img), emptyList())

@@ -37,3 +37,5 @@
 100|Theme colour choice in Settings (Word blue, Grey, Black, Green, Teal, Orange, Rose and the Docxels violet); the floating sheets and the tools icon now change colour smoothly; tool groups open only when you tap their name; B3 and B4 paper sizes; update check fixed (the release was left hidden).
 100|PDF to Word also keeps text colours, and pictures repeated on every page (letterhead and footer artwork) become the document's letterhead with the margins cleared for it.
 100|Picture and signature wrap options now start with 'In front of text' (the last option first).
+109|Adding a letterhead from a PDF or Word file now picks out only the artwork (logo, address block, background) and leaves the letter's text out; signatures are found inside the document and saved with the background removed.
+109|PDF to Word keeps page-sized letterheads and page artwork, drawn lines and boxes, paragraph gaps and line spacing, and shows 'Page N of M' progress text while it works.
