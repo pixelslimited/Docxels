@@ -258,6 +258,7 @@ private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean
                 DocFormat.PDF -> {
                     SwitchRow("Fit pages to A4", options.a4) { options = options.copy(a4 = it) }
                     SwitchRow("Searchable text (slower)", options.searchable) { options = options.copy(searchable = it) }
+                    SwitchRow("ID card layout: front and back on one page", options.idCard) { options = options.copy(idCard = it) }
                 }
                 DocFormat.WORD -> Text(
                     "Text is read from each page (OCR) so you can edit it in Word.",

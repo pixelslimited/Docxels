@@ -124,6 +124,14 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             var a4 by remember { mutableStateOf(container.ui.exportA4) }
             ToggleRow(title = "Fit PDF pages to A4", body = "Off keeps each scan's own proportions.", checked = a4, onChange = { a4 = it; container.ui.exportA4 = it })
 
+            var inside by remember { mutableStateOf(container.ui.searchInside) }
+            ToggleRow(
+                title = "Search inside documents",
+                body = "Reads the words in your scans (on this phone) and Word documents so the Documents search can find them. Uses some battery the first time.",
+                checked = inside,
+                onChange = { inside = it; container.ui.searchInside = it; if (!it) container.searchIndex.clear() },
+            )
+
             Section("Letterheads")
             SavedAssetsPanel(signature = false, say = { say(it) })
             Section("Signatures")

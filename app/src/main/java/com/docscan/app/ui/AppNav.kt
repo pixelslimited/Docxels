@@ -1,6 +1,9 @@
 package com.docscan.app.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -30,8 +33,18 @@ private const val PDF = "pdf/{mode}"
 private const val PDFDOC = "pdfdoc/{id}"
 
 @Composable
-fun AppNav(container: AppContainer) {
+fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<android.net.Uri?>, onIncomingHandled: () -> Unit) {
     val nav = rememberNavController()
+    val incomingUri by incoming.collectAsState()
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    LaunchedEffect(incomingUri) {
+        val uri = incomingUri ?: return@LaunchedEffect
+        onIncomingHandled()
+        val route = Incoming.import(appContext, container, uri) { msg ->
+            android.os.Handler(android.os.Looper.getMainLooper()).post { android.widget.Toast.makeText(appContext, msg, android.widget.Toast.LENGTH_LONG).show() }
+        }
+        if (route != null) nav.navigate(route)
+    }
 
     NavHost(navController = nav, startDestination = HOME) {
         composable(HOME) {

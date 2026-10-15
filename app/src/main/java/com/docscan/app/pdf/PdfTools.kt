@@ -27,8 +27,12 @@ class PdfMark(
     val size: Float,
     val text: String = "",
     val image: ByteArray? = null,
+    /** HIGHLIGHT: height as a fraction of the page height. */
+    val height: Float = 0f,
+    /** INK: the pen path as (x, y) fractions of the page. */
+    val points: List<Pair<Float, Float>> = emptyList(),
 ) {
-    enum class Kind { TEXT, CHECK, IMAGE }
+    enum class Kind { TEXT, CHECK, IMAGE, HIGHLIGHT, INK }
 }
 
 /** Thrown when a PDF needs a password that was not given or was wrong. */
@@ -219,6 +223,32 @@ class PdfTools(context: Context) {
                                 cs.newLineAtOffset(x, box.lowerLeftY + h - m.top * h - size * 0.8f)
                                 cs.showText(line)
                                 cs.endText()
+                            }
+                            PdfMark.Kind.HIGHLIGHT -> {
+                                val gs = com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState().apply { nonStrokingAlphaConstant = 0.35f }
+                                cs.saveGraphicsState()
+                                cs.setGraphicsStateParameters(gs)
+                                cs.setNonStrokingColor(1f, 0.9f, 0f)
+                                val hh = m.height * h
+                                cs.addRect(x, box.lowerLeftY + h - m.top * h - hh, size, hh)
+                                cs.fill()
+                                cs.restoreGraphicsState()
+                            }
+                            PdfMark.Kind.INK -> {
+                                if (m.points.size >= 2) {
+                                    cs.saveGraphicsState()
+                                    cs.setStrokingColor(0.1f, 0.15f, 0.6f)
+                                    cs.setLineWidth(1.6f)
+                                    cs.setLineCapStyle(1)
+                                    cs.setLineJoinStyle(1)
+                                    m.points.forEachIndexed { k, (px, py) ->
+                                        val ax = box.lowerLeftX + px * w
+                                        val ay = box.lowerLeftY + h - py * h
+                                        if (k == 0) cs.moveTo(ax, ay) else cs.lineTo(ax, ay)
+                                    }
+                                    cs.stroke()
+                                    cs.restoreGraphicsState()
+                                }
                             }
                             PdfMark.Kind.CHECK -> {
                                 cs.beginText()

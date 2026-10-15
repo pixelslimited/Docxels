@@ -52,6 +52,44 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
     val trash: StateFlow<List<LibraryItem>> = everything.map { l -> l.filter { it.meta.trashedAt != 0L }.sortedByDescending { it.meta.trashedAt } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val searchText: StateFlow<Map<String, com.docscan.app.data.SearchIndex.Entry>> = container.searchIndex.entries
+
+    private var indexing = false
+
+    /** Reads the words of scans (OCR) and Word documents that are new or changed, one at a time, in the background. */
+    fun indexContent() {
+        if (indexing || !container.ui.searchInside) return
+        indexing = true
+        viewModelScope.launch {
+            try {
+                kotlinx.coroutines.delay(3_000)
+                for (item in items.value) {
+                    if (!container.ui.searchInside) break
+                    val key = LibraryMeta.key(item.kind, item.id)
+                    val have = container.searchIndex.entries.value[key]
+                    if (have != null && have.stamp >= item.modified) continue
+                    val text = runCatching {
+                        when (item.kind) {
+                            DocKind.DOCX -> withContext(Dispatchers.IO) { container.words.load(item.id)?.let { com.docscan.app.core.word.PlainExport.toText(it) } }
+                            DocKind.SCAN -> {
+                                val sb = StringBuilder()
+                                for (p in container.repository.pages(item.id)) {
+                                    val bmp = container.renderer.render(p, 1600)
+                                    sb.append(container.ocr.recognize(bmp).text).append(' ')
+                                    bmp.recycle()
+                                    if (sb.length > com.docscan.app.data.SearchIndex.MAX_CHARS) break
+                                }
+                                sb.toString()
+                            }
+                            DocKind.PDF -> null
+                        }
+                    }.getOrNull()
+                    if (text != null) container.searchIndex.put(key, item.modified, text)
+                }
+            } finally { indexing = false }
+        }
+    }
+
     fun setFavourite(item: LibraryItem, on: Boolean) = container.libraryMeta.update(item.kind, item.id) { it.copy(favourite = on) }
     fun moveToFolder(item: LibraryItem, folder: String) = container.libraryMeta.update(item.kind, item.id) { it.copy(folder = LibraryMeta.cleanName(folder)) }
     fun setTags(item: LibraryItem, text: String) = container.libraryMeta.update(item.kind, item.id) { m ->

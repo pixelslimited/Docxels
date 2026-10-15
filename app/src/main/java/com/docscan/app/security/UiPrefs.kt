@@ -47,6 +47,11 @@ class UiPrefs(context: Context) {
         get() = prefs.getString("editor_view", "PAGE") ?: "PAGE"
         set(v) = prefs.edit().putString("editor_view", v).apply()
 
+    /** Read the words in scans and documents so the library search can find them (off until the person turns it on). */
+    var searchInside: Boolean
+        get() = prefs.getBoolean("search_inside", false)
+        set(v) = prefs.edit().putBoolean("search_inside", v).apply()
+
     /** Format and page fit that the scan export sheet starts with (see Settings > Exporting). */
     var exportFormat: String
         get() = prefs.getString("export_format", "PDF") ?: "PDF"

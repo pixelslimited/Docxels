@@ -23,10 +23,31 @@ val LocalContainer = staticCompositionLocalOf<AppContainer> { error("AppContaine
 class MainActivity : FragmentActivity() {
     private lateinit var container: AppContainer
 
+    /** A file another app asked Docxels to open or received through Share; consumed by the navigation. */
+    private val incoming = kotlinx.coroutines.flow.MutableStateFlow<android.net.Uri?>(null)
+
+    private fun handleIntent(i: android.content.Intent?) {
+        val uri: android.net.Uri? = when (i?.action) {
+            android.content.Intent.ACTION_VIEW -> i.data
+            android.content.Intent.ACTION_SEND ->
+                if (android.os.Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                else @Suppress("DEPRECATION") i.getParcelableExtra(android.content.Intent.EXTRA_STREAM)
+            else -> null
+        }
+        if (uri != null) incoming.value = uri
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         container = (application as DocScanApp).container
+        handleIntent(intent)
         // Ignore touches while another window is drawn over the app (tap-jacking protection).
         window.decorView.filterTouchesWhenObscured = true
         setContent {
@@ -49,7 +70,7 @@ class MainActivity : FragmentActivity() {
             CompositionLocalProvider(LocalContainer provides container) {
                 DocScanTheme(darkTheme = dark, accent = accent) {
                     Box {
-                        AppNav(container)
+                        AppNav(container, incoming) { incoming.value = null }
                         if (locked) LockScreen(onUnlockRequest = ::requestUnlock)
                     }
                 }

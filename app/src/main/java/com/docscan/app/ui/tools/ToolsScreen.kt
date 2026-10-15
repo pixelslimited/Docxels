@@ -61,7 +61,7 @@ fun ToolsScreen(actions: Actions) {
 
     val scan = listOf(
         ToolDef(Icons.Default.DocumentScanner, "Document scan", t.violet, false, actions.scan),
-        ToolDef(Icons.Default.Badge, "ID card", t.violet, true, planned("ID card scan")),
+        ToolDef(Icons.Default.Badge, "ID card", t.violet, false, actions.idCard),
         ToolDef(Icons.Default.PhotoLibrary, "Import images", t.violet, false, actions.importPhotos),
         ToolDef(Icons.Default.ViewModule, "Batch scan", t.violet, false, actions.scan),
     )

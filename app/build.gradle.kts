@@ -34,13 +34,24 @@ android {
         }
     }
 
+    // Google Play upload key, supplied only by CI secrets (never committed). Used by `-PplaySigning=true` builds of the app bundle.
+    val uploadStore = System.getenv("DOCXELS_UPLOAD_KEYSTORE")
+    if (uploadStore != null && file(uploadStore).exists()) {
+        signingConfigs.create("upload") {
+            storeFile = file(uploadStore)
+            storePassword = System.getenv("DOCXELS_UPLOAD_STORE_PASSWORD")
+            keyAlias = System.getenv("DOCXELS_UPLOAD_KEY_ALIAS")
+            keyPassword = System.getenv("DOCXELS_UPLOAD_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         debug { signingConfig = signingConfigs.getByName("sideload") }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("sideload")
+            signingConfig = if (project.findProperty("playSigning") == "true" && signingConfigs.findByName("upload") != null) signingConfigs.getByName("upload") else signingConfigs.getByName("sideload")
         }
     }
 

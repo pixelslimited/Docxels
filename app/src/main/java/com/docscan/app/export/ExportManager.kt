@@ -47,6 +47,8 @@ data class ExportOptions(
     val a4: Boolean = true,
     /** PDF only: also put the recognised text under the picture so the PDF can be searched and copied from (runs OCR; slower). */
     val searchable: Boolean = false,
+    /** PDF only: put the first two pages (front and back of a card) at real card size on one A4 sheet. */
+    val idCard: Boolean = false,
 )
 
 class ExportResult(val files: List<File>, val mime: String)
@@ -63,7 +65,7 @@ class ExportManager(
         require(pages.isNotEmpty()) { "There are no pages to export" }
         val base = safeName(name)
         return when (options.format) {
-            DocFormat.PDF -> ExportResult(listOf(pdf(pages, base, options.a4, options.searchable)), Mime.PDF)
+            DocFormat.PDF -> ExportResult(listOf(if (options.idCard) idCardPdf(pages, base) else pdf(pages, base, options.a4, options.searchable)), Mime.PDF)
             // Word is always recognised, editable text (OCR); page pictures are what PDF and image export are for.
             DocFormat.WORD -> ExportResult(listOf(wordText(pages, base)), Mime.DOCX)
             DocFormat.TXT -> ExportResult(listOf(textFile(pages, base)), Mime.TXT)
@@ -89,6 +91,32 @@ class ExportManager(
             }
             file
         }
+
+    /** Front and back of an ID card (85.6 x 54 mm) at true size on one A4 page, ready to print and photocopy. */
+    private suspend fun idCardPdf(pages: List<PageEntity>, base: String): File = withContext(Dispatchers.IO) {
+        val file = File(dir, "$base-ID.pdf")
+        val document = PdfDocument()
+        try {
+            val page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
+            val canvas = page.canvas
+            canvas.drawColor(Color.WHITE)
+            val cardW = 85.6f / 25.4f * 72f
+            val cardH = 54f / 25.4f * 72f
+            val left = (595f - cardW) / 2f
+            val border = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.LTGRAY; strokeWidth = 0.5f }
+            pages.take(2).forEachIndexed { i, p ->
+                val top = 150f + i * (cardH + 36f)
+                val bmp = renderer.render(p, 1600)
+                val rect = RectF(left, top, left + cardW, top + cardH)
+                canvas.drawBitmap(bmp, null, rect, Paint(Paint.FILTER_BITMAP_FLAG))
+                canvas.drawRect(rect, border)
+                bmp.recycle()
+            }
+            document.finishPage(page)
+            FileOutputStream(file).use { document.writeTo(it) }
+        } finally { document.close() }
+        file
+    }
 
     private fun drawPdfPage(document: PdfDocument, bitmap: Bitmap, number: Int, a4: Boolean, text: com.google.mlkit.vision.text.Text? = null) {
         val landscape = bitmap.width > bitmap.height

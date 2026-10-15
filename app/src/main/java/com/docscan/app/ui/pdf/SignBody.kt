@@ -61,13 +61,15 @@ private class Placed(
     size: Float,
     val text: String = "",
     val image: ByteArray? = null,
+    val height: Float = 0f,
+    val points: List<Pair<Float, Float>> = emptyList(),
 ) {
     var left by mutableStateOf(left)
     var top by mutableStateOf(top)
     var size by mutableStateOf(size)
 }
 
-private enum class Tool(val label: String) { SIGNATURE("Signature"), TEXT("Text"), DATE("Today's date"), CHECK("Tick") }
+private enum class Tool(val label: String) { SIGNATURE("Signature"), TEXT("Text"), DATE("Today's date"), CHECK("Tick"), HIGHLIGHT("Highlight"), DRAW("Draw") }
 
 /** Sign and fill a PDF: pick what to add, tap the page to put it there, drag to adjust, then save a copy. */
 @Composable
@@ -94,11 +96,32 @@ fun SignBody(vm: PdfViewModel, s: PdfSource) {
             Tool.TEXT -> typed.takeIf { it.isNotBlank() }?.let { Placed(nextId, page, PdfMark.Kind.TEXT, fx, fy - 0.01f, 0.025f, text = it) }
             Tool.DATE -> Placed(nextId, page, PdfMark.Kind.TEXT, fx, fy - 0.01f, 0.025f, text = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH).format(java.util.Date()))
             Tool.CHECK -> Placed(nextId, page, PdfMark.Kind.CHECK, fx - 0.01f, fy - 0.01f, 0.03f)
+            Tool.HIGHLIGHT, Tool.DRAW -> null
         } ?: return
         nextId++
         marks.add(m)
         selected = m.id
         if (t == Tool.SIGNATURE || t == Tool.TEXT) tool = null
+    }
+
+    // A highlight or pen stroke being drawn right now.
+    var dragPage by remember { mutableStateOf(-1) }
+    val dragPoints = remember { mutableStateListOf<Pair<Float, Float>>() }
+
+    fun finishDrag() {
+        val t = tool
+        if (dragPage >= 0 && dragPoints.size >= 2 && (t == Tool.HIGHLIGHT || t == Tool.DRAW)) {
+            val m = if (t == Tool.HIGHLIGHT) {
+                val a = dragPoints.first(); val b = dragPoints.last()
+                Placed(nextId, dragPage, PdfMark.Kind.HIGHLIGHT, minOf(a.first, b.first), minOf(a.second, b.second), kotlin.math.abs(a.first - b.first).coerceAtLeast(0.01f), height = kotlin.math.abs(a.second - b.second).coerceAtLeast(0.008f))
+            } else {
+                Placed(nextId, dragPage, PdfMark.Kind.INK, 0f, 0f, 0f, points = dragPoints.toList())
+            }
+            nextId++
+            marks.add(m)
+        }
+        dragPage = -1
+        dragPoints.clear()
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -119,7 +142,9 @@ fun SignBody(vm: PdfViewModel, s: PdfSource) {
         }
         Text(
             when {
-                tool == null && marks.isEmpty() -> "Choose Signature, Text, Date or Tick, then tap the page where it goes."
+                tool == null && marks.isEmpty() -> "Choose Signature, Text, Date, Tick, Highlight or Draw, then tap or drag on the page."
+                tool == Tool.HIGHLIGHT -> "Drag over the text to highlight it."
+                tool == Tool.DRAW -> "Draw with your finger."
                 tool != null -> "Tap the page to place it."
                 else -> "Drag to move. Tap one to change its size or remove it."
             },
@@ -134,12 +159,45 @@ fun SignBody(vm: PdfViewModel, s: PdfSource) {
                     val ratio by produceState(0.707f, preview, i) { value = runCatching { preview.pageSize(i).let { it.first.toFloat() / it.second } }.getOrDefault(0.707f) }
                     BoxWithConstraints(
                         Modifier.fillMaxWidth().aspectRatio(ratio).background(Color.White)
-                            .pointerInput(i, tool) { detectTapGestures { o -> place(i, o.x / size.width, o.y / size.height) } },
+                            .pointerInput(i, tool) {
+                                if (tool == Tool.HIGHLIGHT || tool == Tool.DRAW) {
+                                    detectDragGestures(
+                                        onDragStart = { o -> dragPage = i; dragPoints.clear(); dragPoints.add(o.x / size.width to o.y / size.height) },
+                                        onDragEnd = { finishDrag() },
+                                        onDragCancel = { finishDrag() },
+                                    ) { change, _ ->
+                                        change.consume()
+                                        val p = change.position.x / size.width to change.position.y / size.height
+                                        if (tool == Tool.HIGHLIGHT) { if (dragPoints.size > 1) dragPoints.removeAt(dragPoints.lastIndex); dragPoints.add(p) } else dragPoints.add(p)
+                                    }
+                                } else detectTapGestures { o -> place(i, o.x / size.width, o.y / size.height) }
+                            },
                     ) {
                         val pw = with(LocalDensity.current) { maxWidth.toPx() }
                         val ph = with(LocalDensity.current) { maxHeight.toPx() }
                         bmp?.let { Image(it.asImageBitmap(), "Page ${i + 1}", contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxSize()) }
-                        marks.filter { it.page == i }.forEach { m ->
+                        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                            fun draw(m: Placed) {
+                                if (m.kind == PdfMark.Kind.HIGHLIGHT) drawRect(Color(0x59FFE600), androidx.compose.ui.geometry.Offset(m.left * pw, m.top * ph), androidx.compose.ui.geometry.Size(m.size * pw, m.height * ph))
+                                if (m.kind == PdfMark.Kind.INK && m.points.size >= 2) {
+                                    val path = androidx.compose.ui.graphics.Path()
+                                    m.points.forEachIndexed { k, (px, py) -> if (k == 0) path.moveTo(px * pw, py * ph) else path.lineTo(px * pw, py * ph) }
+                                    drawPath(path, Color(0xFF1A2699), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f * density, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                                }
+                            }
+                            marks.filter { it.page == i }.forEach { draw(it) }
+                            if (dragPage == i && dragPoints.size >= 2) {
+                                if (tool == Tool.HIGHLIGHT) {
+                                    val a = dragPoints.first(); val b = dragPoints.last()
+                                    drawRect(Color(0x59FFE600), androidx.compose.ui.geometry.Offset(minOf(a.first, b.first) * pw, minOf(a.second, b.second) * ph), androidx.compose.ui.geometry.Size(kotlin.math.abs(a.first - b.first) * pw, kotlin.math.abs(a.second - b.second) * ph))
+                                } else {
+                                    val path = androidx.compose.ui.graphics.Path()
+                                    dragPoints.forEachIndexed { k, (px, py) -> if (k == 0) path.moveTo(px * pw, py * ph) else path.lineTo(px * pw, py * ph) }
+                                    drawPath(path, Color(0xFF1A2699), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f * density, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+                                }
+                            }
+                        }
+                        marks.filter { it.page == i && it.kind != PdfMark.Kind.HIGHLIGHT && it.kind != PdfMark.Kind.INK }.forEach { m ->
                             MarkView(m, pw, ph, m.id == selected, onSelect = { selected = m.id; tool = null }) { dx, dy ->
                                 m.left = (m.left + dx / pw).coerceIn(-0.1f, 1f)
                                 m.top = (m.top + dy / ph).coerceIn(-0.05f, 1f)
@@ -152,6 +210,9 @@ fun SignBody(vm: PdfViewModel, s: PdfSource) {
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val sel = marks.firstOrNull { it.id == selected }
+            if (marks.isNotEmpty() && sel == null) {
+                TextButton(onClick = { marks.removeAt(marks.lastIndex) }) { Text("Undo last") }
+            }
             if (sel != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { sel.size = (sel.size * 0.85f).coerceAtLeast(0.01f) }) { Text("Smaller") }
@@ -161,7 +222,7 @@ fun SignBody(vm: PdfViewModel, s: PdfSource) {
             }
             GradientButton(
                 if (marks.isEmpty()) "Save a copy" else "Save a copy (${marks.size} added)",
-                onClick = { vm.stamp(marks.map { PdfMark(it.page, it.kind, it.left, it.top, it.size, it.text, it.image) }) },
+                onClick = { vm.stamp(marks.map { PdfMark(it.page, it.kind, it.left, it.top, it.size, it.text, it.image, it.height, it.points) }) },
                 enabled = marks.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -205,5 +266,6 @@ private fun MarkView(m: Placed, pagePxW: Float, pagePxH: Float, selected: Boolea
         }
         PdfMark.Kind.TEXT -> Text(m.text, frame, color = Color.Black, fontSize = with(density) { sizePx.toSp() }, maxLines = 1, softWrap = false)
         PdfMark.Kind.CHECK -> Text("✔", frame, color = Color.Black, fontSize = with(density) { sizePx.toSp() })
+        else -> Unit
     }
 }

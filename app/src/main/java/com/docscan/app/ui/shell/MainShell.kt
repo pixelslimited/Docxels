@@ -87,6 +87,7 @@ class Actions(
     val importWord: () -> Unit,
     val scanToWord: () -> Unit,
     val scanToExcel: () -> Unit,
+    val idCard: () -> Unit,
     val wordToPdf: () -> Unit,
     val soon: (String) -> Unit,
     val openWord: (String) -> Unit,
@@ -117,7 +118,7 @@ fun MainShell(
     var pick by remember { mutableStateOf<Pick?>(null) }
     val snackbar = remember { SnackbarHostState() }
 
-    LaunchedEffect(Unit) { vm.cleanUpEmptyDocuments(); vm.emptyOldTrash() }
+    LaunchedEffect(Unit) { vm.cleanUpEmptyDocuments(); vm.emptyOldTrash(); vm.indexContent() }
     val trash by vm.trash.collectAsState()
     LaunchedEffect(message) {
         message?.let {
@@ -147,6 +148,7 @@ fun MainShell(
             importWord = { word.launch(arrayOf(Mime.DOCX, "application/octet-stream")) },
             scanToWord = { pick = Pick.SCAN_TO_WORD },
             scanToExcel = { pick = Pick.SCAN_TO_EXCEL },
+            idCard = { vm.say("Scan the front, then the back. When you export, switch on “ID card layout” to get both sides on one page."); vm.startScan(onScanDoc) },
             wordToPdf = { pick = Pick.WORD_TO_PDF },
             soon = { name -> vm.say("$name is coming in a later update.") },
             openWord = onOpenWord,

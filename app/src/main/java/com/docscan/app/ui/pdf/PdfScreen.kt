@@ -90,7 +90,7 @@ enum class PdfMode(val route: String, val title: String, val hint: String, val m
     SPLIT("split", "Split PDF", "Cut one PDF into several, or pull out just the pages you want.", false),
     ROTATE("rotate", "Rotate pages", "Turn all pages, or only the ones you list.", false),
     ORGANIZE("organize", "Reorder & delete pages", "Move pages up or down, or remove the ones you do not want.", false),
-    SIGN("sign", "Sign & fill PDF", "Put your saved signature, text, the date or ticks on any page, then save a copy.", false),
+    SIGN("sign", "Sign & fill PDF", "Sign, fill in, highlight or draw on any page, then save a copy.", false),
     COMPRESS("compress", "Compress PDF", "Make a PDF with big pictures smaller. Text stays sharp; pictures are re-saved at lower quality.", false),
     PROTECT("protect", "Password protect", "Lock a PDF with a password (AES-256). Keep the password safe: it cannot be recovered.", false);
 

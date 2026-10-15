@@ -20,7 +20,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Settings entry | 1 | IMPLEMENTED — NOT VERIFIED | ui/settings, AppNav | Few settings so far |
 | Bottom navigation (Home / Documents / Tools / Settings) with raised scan button | 1 | IMPLEMENTED — NOT VERIFIED | ui/shell/MainShell | Never run on a phone |
 | Theme (indigo/violet, pastel tints), Light / Dark / System setting | 1 | IMPLEMENTED — NOT VERIFIED | ui/theme, security/UiPrefs | |
-| Tools hub | 2 | IMPLEMENTED — NOT VERIFIED | ui/tools | Live: scan, batch scan, import images, scan to Word, Word to PDF, photos to PDF, new document. Marked "Soon" (not built): ID card, merge, split, compress, reorder, rotate, password protect, PDF to Word, scan to Excel, sign, fill form, templates |
+| Tools hub | 2 | IMPLEMENTED — NOT VERIFIED | ui/tools | Every tool is live: scan, ID card, batch, import, PDF (open, merge, split, compress, reorder, rotate, protect, sign/fill/annotate), scan/PDF/Word conversions, Scan to Excel, new document, templates. No tool is marked Soon any more. |
 
 ## Part 5 – Scanner
 | Feature | Priority | Status | Where | Limits / outstanding |
@@ -32,8 +32,8 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Colour / grey / B&W copy / sharpen | 2 | IMPLEMENTED — NOT VERIFIED | imaging/Enhancer | |
 | Remove fingers, objects, staples, folds | 3 | IMPLEMENTED — NOT VERIFIED | imaging/HandRemover | Staples and folds weakest |
 | Import images from gallery | 2 | IMPLEMENTED — NOT VERIFIED | HomeViewModel | |
-| Searchable PDF (text layer) | 3 | NOT STARTED | | |
-| Print | 3 | NOT STARTED | | |
+| Searchable PDF (text layer) | 3 | IMPLEMENTED — NOT VERIFIED | export/ExportManager | Scan export sheet > PDF > Searchable text. OCR words are written almost transparent over each line. Not yet checked in a PDF reader. |
+| Print | 3 | IMPLEMENTED — NOT VERIFIED | export/PrintHelper | Editor menu and PDF viewer, through Android's print dialog. |
 
 ## Part 6 – Word processor
 | Feature | Priority | Status | Where | Limits / outstanding |
@@ -49,20 +49,20 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Page size, orientation, margins, header / footer, page numbers | 3 | IMPLEMENTED — NOT VERIFIED | ui/write | Dialog; shown live in the Print layout view |
 | Page breaks, print-layout (page) view, pagination | 3 | IMPLEMENTED — NOT VERIFIED | ui/write/PageHost, EditorController, RichEditText | Three views: Print layout (whole sheet fits the screen width, true margins), Text width, Mobile. Page ends are drawn as dashed guides using the same line-by-line rule as the PDF export. Header shown once at the top and footer / last page number once at the bottom (the PDF prints them on every page). Pictures and tables are drawn inline from an estimate of their size; the real size is known only after export. Not verified on a phone; scale-by-density relies on TextPaint.density |
 | Ribbon toolbar (Home / Insert / Layout / Review / View) | 2 | IMPLEMENTED — NOT VERIFIED | ui/write/WordEditorScreen | |
-| Hyperlinks, footnotes, columns, shapes, text boxes, table of contents | 3 | NOT STARTED | | Model has no link / note support yet |
+| Hyperlinks, footnotes, columns, shapes, text boxes, table of contents | 3 | PARTIAL | | Hyperlinks (TESTED, LinkTest), shapes and footnote text (kept as a Notes list) exist. Columns, text boxes, TOC not started. |
 | Find & replace, word / character count, undo / redo | 3 | IMPLEMENTED — NOT VERIFIED | ui/write | |
-| Templates (letter, report, CV, invoice, …) | 4 | NOT STARTED | | |
-| Export to PDF / TXT / RTF from editor | 3 | IMPLEMENTED — NOT VERIFIED | export/WordPdf | PDF and .docx only. PDF not unit-tested (no PDF engine in JVM tests); justified text drawn left-aligned |
+| Templates (letter, report, CV, invoice, memo, minutes) | 4 | IMPLEMENTED — NOT VERIFIED | core/word/Templates, Tools > Templates | Round-trip through .docx tested (TemplatesTest). |
+| Export to PDF / TXT / RTF from editor | 3 | IMPLEMENTED — NOT VERIFIED | export/WordPdf | Justified text is justified in the PDF (not yet compared on a device). Left-signature position differs from the workspace in one user document — cause not found yet; needs that .docx. |
 
 ## Part 7 – PDF workspace
 | Feature | Priority | Status | Notes |
 |---|---|---|---|
-| View PDFs (PdfRenderer) | 2 | NOT STARTED | |
-| Merge, split, reorder, rotate, delete, extract pages | 3 | NOT STARTED | |
-| Compress, convert images / documents | 3 | NOT STARTED | |
-| Annotate (highlight, draw, text, stamps) | 3 | NOT STARTED | |
-| Fill forms, sign | 3 | NOT STARTED | Drawn signature will be labelled as not a certified digital signature |
-| Password protect | 4 | NOT STARTED | |
+| View PDFs (PdfRenderer) | 2 | IMPLEMENTED — NOT VERIFIED | ui/pdf | Also opens PDFs kept in Documents; print, save, save as, share. |
+| Merge, split, reorder, rotate, delete, extract pages | 3 | IMPLEMENTED — NOT VERIFIED | pdf/PdfTools | JVM tests. |
+| Compress, convert images / documents | 3 | IMPLEMENTED — NOT VERIFIED | pdf/PdfTools.compress | Re-saves large pictures as JPEG at three levels; says when nothing can be made smaller. No JVM test (needs real picture codecs). |
+| Annotate (highlight, draw, text, stamps) | 3 | IMPLEMENTED — NOT VERIFIED | ui/pdf/SignBody, PdfTools.stamp | Highlight, pen, text, date, tick, signature. Stamp text/tick covered by PdfToolsTest. Not on rotated pages (asks to rotate first). No sticky notes or stamps library. |
+| Fill forms, sign | 3 | IMPLEMENTED — NOT VERIFIED | ui/pdf/SignBody | Free placement on any page (not AcroForm field detection). Drawn signature is labelled as a picture, not a certified digital signature. |
+| Password protect | 4 | IMPLEMENTED — NOT VERIFIED | pdf/PdfTools | AES-256. |
 | Edit existing PDF text | 4 | NOT STARTED | Advanced; kept separate from annotation |
 
 ## Part 8 – OCR
@@ -70,22 +70,22 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 |---|---|---|---|---|
 | English / Latin OCR on device | 3 | IMPLEMENTED — NOT VERIFIED | ocr/OcrEngine | Hausa untested; Arabic not available on device in ML Kit |
 | Text to Word / TXT | 3 | IMPLEMENTED — NOT VERIFIED | export | Editable-document path waits for the editor |
-| Review / correct recognised text | 3 | NOT STARTED | | |
-| Search OCR text in library | 3 | NOT STARTED | | |
+| Review / correct recognised text | 3 | IMPLEMENTED — NOT VERIFIED | | Scan to Word opens the result in the editor, where text is corrected; Table text is editable before export. |
+| Search OCR text in library | 3 | IMPLEMENTED — NOT VERIFIED | data/SearchIndex | Settings > Search inside documents (off by default): reads scans with OCR in the background, plus Word text. Encrypted index. |
 
 ## Part 9 – Library
 | Feature | Priority | Status | Notes |
 |---|---|---|---|
 | Rename, delete with confirmation, one library for scans and Word files, filter (All / Word / Scans), sort (date / name) | 1 | IMPLEMENTED — NOT VERIFIED | ui/library | Delete is permanent; no PDF kind yet |
-| Folders, move / copy, favourites, tags, grid view | 3 | NOT STARTED | Needs a Room migration |
-| Trash / restore | 3 | NOT STARTED | Needs Room migration |
-| Open DOCX / PDF / TXT / RTF from device | 2 | NOT STARTED | |
+| Folders, move / copy, favourites, tags, grid view | 3 | IMPLEMENTED — NOT VERIFIED | data/LibraryMeta, ui/library | Kept in an encrypted index, so no Room migration was needed. |
+| Trash / restore | 3 | IMPLEMENTED — NOT VERIFIED | LibraryViewModel | Delete moves to Trash for 30 days; restore, delete for good, empty Trash. |
+| Open DOCX / PDF / TXT / RTF from device | 2 | IMPLEMENTED — NOT VERIFIED | ui/Incoming, AndroidManifest | Import menu, and Open with / Share to Docxels for PDF, .docx, text and pictures (copied into Documents). RTF not supported. |
 
 ## Parts 11–13, 20 – AI, sharing, sync, monetisation
 | Feature | Status | Notes |
 |---|---|---|
 | Share sheet, filename edit, success / error messages | IMPLEMENTED — NOT VERIFIED | Page-range selection, batch export not done |
-| Autosave and crash recovery for editor | NOT STARTED | Pages are saved as they are scanned |
+| Autosave and crash recovery for editor | IMPLEMENTED — NOT VERIFIED | Editor saves 1.5 s after each change and when the app goes to the background. |
 | AI assistant | NOT STARTED | Needs a secured backend; no keys in the app |
 | Cloud sync / backup | NOT STARTED | Would need INTERNET permission, which is now removed on purpose |
 | Premium / billing | NOT STARTED | No fake paywalls |
@@ -94,9 +94,9 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Feature | Status | Notes |
 |---|---|---|
 | Light / dark (follows system) | IMPLEMENTED — NOT VERIFIED | |
-| Accessibility labels, contrast, touch targets audit | NOT STARTED | Some icons have labels |
+| Accessibility labels, contrast, touch targets audit | PARTIAL | Icon-only buttons have descriptions (checked in code). No TalkBack run, no contrast measurement. |
 | Settings: app lock, screen protection, storage, clear temp files, about | IMPLEMENTED — NOT VERIFIED | |
-| Settings: theme override, default format / quality, OCR language | NOT STARTED | |
+| Settings: theme override, default format / quality, OCR language | IMPLEMENTED — NOT VERIFIED | Theme (light/dark/system) and accent colour, and the export sheet's starting format and A4 fit, are in Settings. OCR language: not needed — the one on-device Latin model reads English and Hausa. |
 
 ## Part 16 – Security and privacy
 | Feature | Status | Where | Notes |
@@ -117,7 +117,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 |---|---|
 | Version codes from CI run number | DONE |
 | Release APK on GitHub | DONE |
-| Android App Bundle, Play signing, store assets | NOT STARTED (listing text in store/) |
+| Android App Bundle, Play signing, store assets | PARTIAL — CI builds an .aab when the commit message has [bundle] (or the workflow is run by hand) and signs it with the private upload key if the DOCXELS_UPLOAD_* repository secrets exist. Listing text in store/. Needs the owner to create the upload key and secrets. |
 | Public site for search visibility | READY — not published (needs contact email) |
 
 
@@ -127,7 +127,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | PDF engine: merge, pick/reorder/delete pages, split, rotate, AES-256 password, unlock | IMPLEMENTED — NOT VERIFIED | `pdf/PdfTools.kt` (PdfBox-Android, lossless). JVM tests in `PdfToolsTest`; become TESTED only once CI is green. |
 | PDF viewer (scroll, page counter, share) | IMPLEMENTED — NOT VERIFIED | `PdfRenderer`; no pinch-zoom, no text search, no annotation yet. |
 | Merge / Split / Rotate / Reorder / Protect screens | IMPLEMENTED — NOT VERIFIED | Results are shared or saved to Downloads/DocScan. Not stored in the library yet. |
-| Compress, sign, fill form, annotate | NOT STARTED | Still marked Soon. |
+| Compress, sign, fill form, annotate | IMPLEMENTED — NOT VERIFIED | Built — see the PDF workspace rows above. |
 
 ## In-app updates (added)
 | Feature | Status | Notes |
@@ -211,3 +211,14 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Justify not working in the editor | FIXED — SEEN ON EMULATOR run 52 (lines reach margin, last line short, page count stays 4) | Cause: justify was saved/exported to Word but never displayed (getAlignment only mapped centre/right; Android's built-in justification is whole-view only). Now each wrapped line of a justified paragraph gets extra word spacing (GapSpan) so it ends at the margin; last line stays left. |
 | PDF export ignored justify (user comparison: exported PDF vs workspace) | IMPLEMENTED — NOT VERIFIED | WordPdf now lays out runs of justified paragraphs with justification on. Same comparison also showed the left signature lower in the export than in the workspace — CAUSE NOT YET FOUND; need that document to reproduce. |
 | Progress card size/colour/text colour (BusyOverlay) | IMPLEMENTED — NOT VERIFIED | Seen in the 15 Oct screen recording: label had no colour (dark text on dark card in dark theme) and the card stretched to the label. Now a themed Surface, onSurface text, centred, max width 320dp. |
+
+
+## Save and Save as (added)
+| Where | Status | Notes |
+|---|---|---|
+| Word editor menu: Save, Save a copy, Save as .docx / PDF / text / RTF, Save PDF in Docxels | IMPLEMENTED — NOT VERIFIED | Save as uses Android's file picker (choose folder and name). |
+| Documents list: Save as, Save as PDF, Make a copy, for scans, Word files and PDFs | IMPLEMENTED — NOT VERIFIED | |
+| PDF tool results and PDF viewer: Save in Docxels, Save as, Save to phone, Share | IMPLEMENTED — NOT VERIFIED | PDFs kept in Docxels are encrypted and show under the PDF filter. |
+| Scan export and table export: Save as… | IMPLEMENTED — NOT VERIFIED | Several files ask for a folder. |
+| Signatures and letterheads: save to phone (Settings), kept automatically when added in the editor | IMPLEMENTED — NOT VERIFIED | |
+| Open with / Share to Docxels | IMPLEMENTED — NOT VERIFIED | PDF, .docx, text, pictures. |

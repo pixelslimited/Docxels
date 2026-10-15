@@ -60,6 +60,7 @@ class AppContainer(context: Context) {
     val security = SecurityPrefs(context)
     val ui = com.docscan.app.security.UiPrefs(context)
     val words = com.docscan.app.data.WordStore(context)
+    val searchIndex = com.docscan.app.data.SearchIndex(context)
     val pdfs = com.docscan.app.data.PdfStore(context)
     val libraryMeta = com.docscan.app.data.LibraryMeta(context)
     val scanToWord = com.docscan.app.ocr.ScanToWord(renderer, ocr)

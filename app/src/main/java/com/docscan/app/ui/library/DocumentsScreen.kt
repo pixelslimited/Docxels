@@ -36,6 +36,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,7 +91,9 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
     val folders = remember(items) { items.map { it.meta.folder }.filter { it.isNotEmpty() }.distinct().sorted() }
     if (folder != null && folder !in folders) folder = null
 
-    val shown = remember(items, trash, query, filter, sort, folder) {
+    val inside by vm.searchText.collectAsState()
+    LaunchedEffect(Unit) { vm.indexContent() }
+    val shown = remember(items, trash, query, filter, sort, folder, inside) {
         (if (filter == Filter.TRASH) trash else items)
             .filter {
                 when (filter) {
@@ -101,7 +105,8 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                 }
             }
             .filter { folder == null || filter == Filter.TRASH || it.meta.folder == folder }
-            .filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) || it.meta.tags.any { t -> t.contains(query.trim(), ignoreCase = true) } }
+            .filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) || it.meta.tags.any { t -> t.contains(query.trim(), ignoreCase = true) } ||
+                (inside[com.docscan.app.data.LibraryMeta.key(it.kind, it.id)]?.text?.contains(query.trim(), ignoreCase = true) == true) }
             .let { list -> if (sort == Sort.NAME) list.sortedBy { it.title.lowercase() } else list }
     }
 
@@ -139,7 +144,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                placeholder = { Text("Search names") },
+                placeholder = { Text("Search names, tags and words inside") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 shape = CircleShape,
                 colors = TextFieldDefaults.colors(
