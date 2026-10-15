@@ -402,7 +402,7 @@ fun ImageEditorDialog(
                 if (cur !== initial) Text("Background removed on this phone. Works best on a clear subject against a plain background.", style = MaterialTheme.typography.bodySmall)
                 Text("Wrap text", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    com.docscan.app.core.word.ImageWrap.entries.forEach { w ->
+                    com.docscan.app.core.word.ImageWrap.entries.reversed().forEach { w ->
                         FilterChip(wrap == w, { wrap = w }, label = { Text(w.label) })
                     }
                 }
@@ -501,7 +501,7 @@ fun ShapeEditorDialog(
                 }
                 Text("Wrap text", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    com.docscan.app.core.word.ImageWrap.entries.forEach { w -> FilterChip(wrap == w, { wrap = w }, label = { Text(w.label) }) }
+                    com.docscan.app.core.word.ImageWrap.entries.reversed().forEach { w -> FilterChip(wrap == w, { wrap = w }, label = { Text(w.label) }) }
                 }
                 if (wrap.floating) {
                     Text("Drag the shape anywhere on the page with your finger. Tap it to come back here.", style = MaterialTheme.typography.bodySmall)
