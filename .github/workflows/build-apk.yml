@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# One build at a time: two builds publishing together delete each other's release and fail. A newer waiting build
+# replaces an older waiting one.
+concurrency:
+  group: build-and-publish
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
