@@ -679,6 +679,9 @@ private fun Ribbon(
     var open by remember { mutableStateOf(false) }
     var grid by remember { mutableStateOf(true) }
     val wide = tab != 0
+    // Tool groups: only the open group's tools are shown in the grid.
+    var openGroup by remember { mutableStateOf("") }
+    var groupShown = true
     // One item, drawn as a small icon in the compact bar or as a labelled tile in the grid.
     @Composable
     fun Btn(
@@ -704,8 +707,6 @@ private fun Ribbon(
         }
     }
     // A heading that starts a group of tools in the grid. The group's tools show only while it is open (tap the name).
-    var openGroup by remember { mutableStateOf("") }
-    var groupShown = true
     @Composable
     fun Group(title: String) {
         if (!grid) { groupShown = true; return }
