@@ -106,28 +106,6 @@ fun HomeScreen(
             }
         }
 
-        // Featured: the most-requested conversion gets its own card.
-        Row(
-            Modifier
-                .padding(top = 16.dp)
-                .fillMaxWidth()
-                .docCard()
-                .clickable(role = Role.Button, onClickLabel = "Convert a PDF to Word", onClick = actions.pdfToWord)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TintIcon(Icons.Default.PictureAsPdf, t.pink, box = 52.dp, iconSize = 26.dp)
-            Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-                Text("PDF to Word", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Make any PDF editable. Text, headings, lists and tables are kept. Done on this phone; nothing is uploaded.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-
         Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Convert and scan", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             Text(

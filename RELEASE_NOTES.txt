@@ -24,3 +24,4 @@
 80|Fixed: text in the editor ran on one long line off the right edge (introduced with the zoom control in build 74). Lines wrap to the page again.
 81|Home: floating 3D paper sheets in the top card (they stay still if you turn animations off on your phone).
 82|Letterhead and signature can now come from a picture, a PDF page or a Word file. Signature import has a preview with a Remove background switch.
+83|Home: removed the duplicate PDF to Word card (it is in the Convert and scan row).
