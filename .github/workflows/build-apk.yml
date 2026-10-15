@@ -110,7 +110,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk Docxels.apk
-          gh release delete latest --yes --cleanup-tag || true
           {
             echo "Built from commit ${GITHUB_SHA::7}. Download Docxels.apk on your phone and install it (allow installs from unknown sources)."
             echo
@@ -118,11 +117,20 @@ jobs:
             cat size.txt
             echo '```'
           } > notes.md
-          gh release create latest Docxels.apk \
-            --title "Docxels (latest build)" \
-            --notes-file notes.md \
-            --target "$GITHUB_SHA" \
-            --latest
+          # Deleting and re-creating can briefly clash on GitHub's side, so try a few times.
+          for attempt in 1 2 3 4 5; do
+            gh release delete latest --yes --cleanup-tag || true
+            sleep $((attempt * 5))
+            if gh release create latest Docxels.apk \
+              --title "Docxels (latest build)" \
+              --notes-file notes.md \
+              --target "$GITHUB_SHA" \
+              --latest; then
+              exit 0
+            fi
+            echo "release attempt $attempt failed"
+          done
+          exit 1
 
       # Publishes the APK + update.json on the public site repo so the app's "Check for updates" can find it.
       # Needs a repository secret SITE_TOKEN (a token with write access to iCode010101/docxels-site). Skipped if absent.
