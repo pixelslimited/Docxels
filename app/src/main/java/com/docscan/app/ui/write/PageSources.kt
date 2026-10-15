@@ -120,17 +120,12 @@ object PageSources {
 
     class Letterhead(val header: List<PageImage>, val footer: List<PageImage>)
 
-    /** A full-page picture sized to the paper: it fills the sheet when its shape is close to the paper's, else fits the width. */
+    /** A full-page picture: always stretched to fill the whole sheet, edge to edge. */
     fun fullPage(bmp: Bitmap, setup: PageSetup): PageImage {
         val alpha = bmp.hasAlpha()
         val out = java.io.ByteArrayOutputStream()
         bmp.compress(if (alpha) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 88, out)
-        val sw = setup.sheetWidthTwips
-        val sh = setup.sheetHeightTwips
-        val pageAspect = sh.toFloat() / sw
-        val aspect = bmp.height.toFloat() / bmp.width.coerceAtLeast(1)
-        val h = if (kotlin.math.abs(aspect - pageAspect) / pageAspect < 0.15f) sh else minOf(sh, (sw * aspect).toInt())
-        return PageImage(out.toByteArray(), if (alpha) "png" else "jpg", 0, 0, sw, h, behind = true)
+        return PageImage(out.toByteArray(), if (alpha) "png" else "jpg", 0, 0, setup.sheetWidthTwips, setup.sheetHeightTwips, behind = true)
     }
 
     /**

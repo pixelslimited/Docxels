@@ -26,7 +26,7 @@ import com.docscan.app.R
 import com.docscan.app.ui.theme.DocxelsTheme
 
 /**
- * The Docxels mark with a background whose colours drift smoothly round the spectrum. The colours wrap back to where
+ * The Docxels mark, with no background, whose colour drifts smoothly round the spectrum. The colours wrap back to where
  * they began, so the change never jumps. Stays in the theme colour when the phone has animations switched off.
  */
 @Composable
@@ -40,10 +40,13 @@ fun AnimatedMark(size: Dp, modifier: Modifier = Modifier, description: String? =
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(12000, easing = LinearEasing), RepeatMode.Restart), label = "markHue",
     )
-    val brush: Brush = if (still) DocxelsTheme.brand.gradient else Brush.linearGradient(
-        listOf(Color.hsv(hue * 360f, 0.72f, 0.82f), Color.hsv(((hue + 0.16f) % 1f) * 360f, 0.78f, 0.72f)),
-    )
-    Box(modifier.size(size).clip(RoundedCornerShape(size * 0.22f)).background(brush)) {
-        Image(painterResource(R.drawable.ic_docxels_mark_fg), contentDescription = description, modifier = Modifier.size(size))
+    // A floating icon with no plate behind it: the mark itself drifts round the colours.
+    val tint: Color = if (still) DocxelsTheme.brand.a else Color.hsv(hue * 360f, 0.72f, 0.78f)
+    Box(modifier.size(size)) {
+        Image(
+            painterResource(R.drawable.ic_docxels_mark_flat), contentDescription = description,
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint),
+            modifier = Modifier.size(size),
+        )
     }
 }

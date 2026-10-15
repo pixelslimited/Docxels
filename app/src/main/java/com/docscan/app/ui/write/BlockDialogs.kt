@@ -324,6 +324,42 @@ private fun LivePanel(
 private fun Modifier.androidx_navPad(): Modifier = this.then(Modifier.navigationBarsPadding())
 private fun Modifier.androidx_maxH(): Modifier = this.then(Modifier.heightIn(max = 300.dp))
 
+/**
+ * Width and height sliders. With "Keep proportions" on (the default) moving either one resizes both together; switch it
+ * off to change width and height separately.
+ */
+@Composable
+internal fun SizeControls(
+    widthTwips: Int,
+    heightTwips: Int,
+    maxWidth: Int,
+    maxHeight: Int,
+    onChange: (Int, Int) -> Unit,
+    heightToo: Boolean = true,
+) {
+    var locked by remember { mutableStateOf(true) }
+    val ratio = remember { heightTwips.toFloat() / widthTwips.coerceAtLeast(1) }
+    fun cm(t: Int) = "%.1f cm".format(t / 567f)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Width ${cm(widthTwips)}", modifier = Modifier.weight(1f))
+        if (heightToo) {
+            Text("Keep proportions")
+            androidx.compose.material3.Switch(locked, { locked = it }, modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+    Slider(widthTwips.toFloat(), { v ->
+        val w = v.toInt().coerceIn(240, maxWidth)
+        onChange(w, if (heightToo && locked) (w * ratio).toInt().coerceIn(120, maxHeight) else heightTwips)
+    }, valueRange = 240f..maxWidth.toFloat())
+    if (heightToo) {
+        Text("Height ${cm(heightTwips)}")
+        Slider(heightTwips.toFloat(), { v ->
+            val h = v.toInt().coerceIn(120, maxHeight)
+            onChange(if (locked) (h / ratio.coerceAtLeast(0.01f)).toInt().coerceIn(240, maxWidth) else widthTwips, h)
+        }, valueRange = 120f..maxHeight.toFloat())
+    }
+}
+
 /** Size, alignment and removal for an inserted picture. */
 @Composable
 fun ImageEditorDialog(
@@ -334,7 +370,8 @@ fun ImageEditorDialog(
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var fraction by remember { mutableFloatStateOf((initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.1f, 1f)) }
+    var wTw by remember { mutableIntStateOf(initial.widthTwips) }
+    var hTw by remember { mutableIntStateOf(initial.heightTwips) }
     var align by remember { mutableStateOf(initial.align) }
     var wrap by remember { mutableStateOf(initial.wrap) }
     var cur by remember { mutableStateOf(initial) }
@@ -346,19 +383,17 @@ fun ImageEditorDialog(
         BitmapFactory.decodeByteArray(cur.bytes, 0, cur.bytes.size, o)
     }
     fun build(): ImageBlock {
-        val w = (contentWidthTwips * fraction).toInt().coerceAtLeast(720)
-        val h = (w.toLong() * initial.heightTwips / initial.widthTwips.coerceAtLeast(1)).toInt().coerceAtLeast(360)
-        return cur.copy(widthTwips = w, heightTwips = h, align = align, wrap = wrap)
+        return cur.copy(widthTwips = wTw, heightTwips = hTw, align = align, wrap = wrap)
     }
     var started by remember { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(fraction, align, wrap, cur) {
+    androidx.compose.runtime.LaunchedEffect(wTw, hTw, align, wrap, cur) {
         if (started) { kotlinx.coroutines.delay(40); onLive(build()) } else started = true
     }
     LivePanel(
         title = "Picture",
         onDone = { onSave(build()) },
         onRemove = onRemove,
-        onRevert = { fraction = (initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.1f, 1f); align = initial.align; wrap = initial.wrap; cur = initial },
+        onRevert = { wTw = initial.widthTwips; hTw = initial.heightTwips; align = initial.align; wrap = initial.wrap; cur = initial },
     ) {
         run {
             run {
@@ -368,8 +403,7 @@ fun ImageEditorDialog(
                         modifier = Modifier.fillMaxWidth().padding(4.dp).background(if (cur !== initial) Color(0xFFCCCCCC) else Color.Transparent),
                     )
                 }
-                Text("Width ${(fraction * 100).toInt()}% of the page")
-                Slider(fraction, { fraction = it }, valueRange = 0.1f..1f)
+                SizeControls(wTw, hTw, maxOf(contentWidthTwips * 2, initial.widthTwips), maxOf(contentWidthTwips * 3, initial.heightTwips), { w, h -> wTw = w; hTw = h })
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(enabled = !busy, onClick = {
                         busy = true
@@ -438,20 +472,20 @@ fun ShapeEditorDialog(
     onDismiss: () -> Unit,
 ) {
     val isLine = com.docscan.app.core.word.ShapePresets.isLine(initial.preset)
-    var widthFraction by remember { mutableFloatStateOf((initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.05f, 1f)) }
-    var heightFraction by remember { mutableFloatStateOf((initial.heightTwips.toFloat() / contentWidthTwips).coerceIn(0.03f, 1f)) }
+    var wTw by remember { mutableIntStateOf(initial.widthTwips) }
+    var hTw by remember { mutableIntStateOf(initial.heightTwips) }
     var fill by remember { mutableStateOf(initial.fill) }
     var line by remember { mutableIntStateOf(initial.lineColor) }
     var lineWidth by remember { mutableFloatStateOf(initial.lineWidthPt) }
     var align by remember { mutableStateOf(initial.align) }
     var wrap by remember { mutableStateOf(initial.wrap) }
     fun build(): com.docscan.app.core.word.ShapeBlock {
-        val w = (contentWidthTwips * widthFraction).toInt().coerceAtLeast(240)
-        val h = if (isLine) 0 else (contentWidthTwips * heightFraction).toInt().coerceAtLeast(120)
+        val w = wTw.coerceAtLeast(240)
+        val h = if (isLine) 0 else hTw.coerceAtLeast(120)
         return initial.copy(widthTwips = w, heightTwips = h, fill = fill, lineColor = line, lineWidthPt = lineWidth, align = align, wrap = wrap)
     }
     var started by remember { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(widthFraction, heightFraction, fill, line, lineWidth, align, wrap) {
+    androidx.compose.runtime.LaunchedEffect(wTw, hTw, fill, line, lineWidth, align, wrap) {
         if (started) { kotlinx.coroutines.delay(40); onLive(build()) } else started = true
     }
     LivePanel(
@@ -459,18 +493,14 @@ fun ShapeEditorDialog(
         onDone = { onSave(build()) },
         onRemove = onRemove,
         onRevert = {
-            widthFraction = (initial.widthTwips.toFloat() / contentWidthTwips).coerceIn(0.05f, 1f)
-            heightFraction = (initial.heightTwips.toFloat() / contentWidthTwips).coerceIn(0.03f, 1f)
+            wTw = initial.widthTwips; hTw = initial.heightTwips
             fill = initial.fill; line = initial.lineColor; lineWidth = initial.lineWidthPt; align = initial.align; wrap = initial.wrap
         },
     ) {
         run {
             run {
-                Text("Width ${(widthFraction * 100).toInt()}% of the page")
-                Slider(widthFraction, { widthFraction = it }, valueRange = 0.05f..1f)
+                SizeControls(wTw, hTw, maxOf(contentWidthTwips * 2, initial.widthTwips), maxOf(contentWidthTwips * 3, initial.heightTwips), { w, h -> wTw = w; hTw = h }, heightToo = !isLine)
                 if (!isLine) {
-                    Text("Height ${(heightFraction * 100).toInt()}% of the page width")
-                    Slider(heightFraction, { heightFraction = it }, valueRange = 0.03f..1f)
                     Text("Fill", style = MaterialTheme.typography.labelLarge)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         FilterChip(fill == null, { fill = null }, label = { Text("None") })
