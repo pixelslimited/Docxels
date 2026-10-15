@@ -229,3 +229,4 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | PDF to Word keeps the PDF's font names | IMPLEMENTED — NOT VERIFIED | FontNamesTest. Embedded PDF fonts are subsets and are not reused. |
 | Editor tool bar: no bar when closed | IMPLEMENTED — NOT VERIFIED | |
 | Home: tap flings papers away | IMPLEMENTED — NOT VERIFIED | Off when the phone has animations switched off. |
+| Comments (Word): read, add, edit, delete, save to .docx | IMPLEMENTED — NOT VERIFIED | CommentsTest round-trip. A comment that spans several paragraphs is saved attached to its first paragraph only. No replies or resolve. Author for new comments is "Me". |

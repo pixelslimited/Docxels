@@ -71,3 +71,4 @@
 134|The editor's tool bar no longer has a bar behind the Docxels mark when it is closed; the mark just floats in the corner.
 134|Home: tap the paper sheets and some papers are flung away and fade out.
 134|Fonts built into a Word file (embedded fonts) are now used when you open it, so such text shows in its real font.
+134|Comments: Word comments are now kept when you open a file. In Review you can add a comment to selected words (New comment), see all comments (Comments: Go to, Edit, Delete), and they are saved back into the .docx so Word shows them.
