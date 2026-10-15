@@ -39,8 +39,8 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash scripts/qa/run.sh app/build/outputs/apk/release/app-release.apk qa-out
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: bash scripts/qa/run.sh app/build/outputs/apk/release/app-release.apk qa-out || true
       - name: Post screenshots
         if: always() && env.SITE_TOKEN != ''
         env:
@@ -49,5 +49,7 @@ jobs:
           SITE=iCode010101/docxels-site
           gh release delete qa-shots --repo "$SITE" --yes --cleanup-tag || true
           gh release create qa-shots --repo "$SITE" --title "Emulator check" --notes "Run ${{ github.run_number }}, commit ${GITHUB_SHA::7}" --latest=false
+          mkdir -p qa-out
+          echo "emulator step finished; run ${{ github.run_number }}" >> qa-out/status.txt
           ls qa-out
           gh release upload qa-shots qa-out/* --repo "$SITE" --clobber

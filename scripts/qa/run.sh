@@ -3,6 +3,8 @@
 set -u
 APK="$1"; OUT="${2:-qa-out}"
 mkdir -p "$OUT"
+exec > >(tee -a "$OUT/run-log.txt") 2>&1
+echo "start $(date)"; adb devices; adb shell getprop ro.product.cpu.abi
 UI="python3 $(dirname "$0")/ui.py"
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; $UI texts > "$OUT/$1.txt" 2>/dev/null || true; }
 step() { echo "== $*" | tee -a "$OUT/log.txt"; }
