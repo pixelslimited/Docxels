@@ -682,7 +682,7 @@ private fun Ribbon(
             if (!open) {
                 Box(Modifier.fillMaxWidth().height(56.dp).clickable { open = true; grid = true }.padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
                     androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.app_icon),
+                        painter = androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.ic_docxels_mark),
                         contentDescription = "Show tools",
                         modifier = Modifier.size(44.dp),
                     )
