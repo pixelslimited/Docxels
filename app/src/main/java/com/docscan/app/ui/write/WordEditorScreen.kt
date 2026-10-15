@@ -509,6 +509,11 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onParagraph = { paraOpen = true },
                 onSymbol = { symbolOpen = true },
                 onDate = { dateOpen = true },
+                onToc = {
+                    val t = com.docscan.app.core.word.TableOfContents.text(controller.outline())
+                    if (t.isEmpty()) scope.launch { snackbar.showSnackbar("Give some lines a Heading style first, then insert the contents.") }
+                    else controller.insertText("Contents\n$t\n")
+                },
                 onLink = { linkOpen = Triple(controller.selectedText(), "", null) },
                 onNav = { navOpen = true },
                 caseMenu = caseMenu,
@@ -723,6 +728,7 @@ private fun Ribbon(
     onParagraph: () -> Unit,
     onSymbol: () -> Unit,
     onDate: () -> Unit,
+    onToc: () -> Unit,
     onLink: () -> Unit,
     onNav: () -> Unit,
     caseMenu: Boolean,
@@ -924,6 +930,7 @@ private fun Ribbon(
                         Btn("Page break", Icons.Default.InsertPageBreak, close = true) { onPageBreak() }
                         Btn("Link", Icons.Default.Link, close = true) { onLink() }
                         Btn("Date & time", Icons.Default.Event, close = true) { onDate() }
+                        Btn("Contents", Icons.Default.Description, close = true) { onToc() }
                         Btn("Symbol", Icons.Default.Functions, close = true) { onSymbol() }
                     }
                     2 -> {

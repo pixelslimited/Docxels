@@ -76,6 +76,15 @@ object Outline {
     }
 }
 
+/** A contents list built from the headings (no page numbers: pages are only known when the document is laid out). */
+object TableOfContents {
+    fun text(items: List<OutlineItem>): String {
+        val body = items.filter { it.level >= 1 }
+        if (body.isEmpty()) return ""
+        return body.joinToString("\n") { "    ".repeat(it.level - 1) + it.title }
+    }
+}
+
 object FormatDate {
     val PATTERNS = listOf("dd/MM/yyyy", "d MMMM yyyy", "EEEE, d MMMM yyyy", "yyyy-MM-dd", "MMMM d, yyyy", "HH:mm", "d MMMM yyyy HH:mm")
 }

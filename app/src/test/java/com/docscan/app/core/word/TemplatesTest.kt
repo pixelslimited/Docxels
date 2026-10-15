@@ -27,3 +27,11 @@ class TemplatesTest {
         assertTrue(t.columnWidthsTwips.sum() <= width)
     }
 }
+
+class TableOfContentsTest {
+    @org.junit.Test fun indentsByLevelAndSkipsTitle() {
+        val items = listOf(OutlineItem(0, "Doc", 0), OutlineItem(1, "Intro", 5), OutlineItem(2, "Aim", 20))
+        org.junit.Assert.assertEquals("Intro\n    Aim", TableOfContents.text(items))
+        org.junit.Assert.assertEquals("", TableOfContents.text(emptyList()))
+    }
+}
