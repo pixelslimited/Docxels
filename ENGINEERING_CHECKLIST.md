@@ -19,9 +19,9 @@ and what is still open. Status words: DONE (seen in the code), OPEN (a real gap)
 | Feature flags | PARTIAL | Settings switches exist (for example search inside documents is off by default); no remote flags, by design. |
 | Semantic versioning, API versioning | PARTIAL | Build numbers only. update.json is the only "API"; it should carry a format version before it changes. |
 | Database migrations / schema versioning | PARTIAL | Room is used for scans; later stores use plain encrypted files with their own formats. A format-version line for each store is not there yet. |
-| Memory leaks, thread safety, race conditions, deadlocks | OPEN | Not audited. Stores use locks; long PDF and OCR work runs off the main thread. A review and a stress test are not done. |
-| Garbage collection / memory use | OPEN | Large scans are downsampled but peak memory on low-RAM phones is not measured. |
-| Backpressure | PARTIAL | Batch scan and OCR run one page at a time; no queue limits tested. |
+| Memory leaks, thread safety, race conditions, deadlocks | OPEN | Not audited. Stores use locks, but a review and a stress test are not done. |
+| Garbage collection / memory use | OPEN | Peak memory on low-RAM phones is not measured. |
+| Backpressure | OPEN | Not checked. |
 | Observability: logging, metrics, alerts, tracing | OPEN | No crash reporting or telemetry, on purpose (privacy). Add an opt-in "copy diagnostics" button instead. |
 | Health checks | PARTIAL | The emulator check opens the app and screenshots it; it can fail without anyone noticing if nobody looks. |
 | Disaster recovery, backups | OPEN | allowBackup is off and there is no export of the whole library. A "back up everything to a file" option is the answer. |
