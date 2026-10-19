@@ -3,7 +3,8 @@
 # Publishes Docxels.apk, update.json and (when possible) a small patch from the previous build as the "latest"
 # release of the public site repo.
 set -euo pipefail
-APK="$1"; CODE="$2"
+# The run counter restarted when the repo moved to the Pixels Limited account; +200 keeps codes above the old repo's.
+APK="$1"; CODE=$(( $2 + 200 ))
 SITE="${SITE_REPO:-iCode010101/docxels-site}"
 BASE="https://github.com/$SITE/releases/latest/download"
 SHA=$(sha256sum "$APK" | cut -d' ' -f1)
