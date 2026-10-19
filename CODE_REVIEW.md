@@ -9,7 +9,7 @@ Last review: 2026-10-19, before build 204.
 |---|---|---|---|---|
 | 1 | 72 unused imports in 28 files | Nothing in the file used them | Smaller diffs, faster compile, no behaviour change | None: the compiler rejects a wrong removal |
 | 2 | `Updater.installWithSession` and `InstallResultReceiver` (+ manifest entry) | The session installer is refused by some phones; `install()` already calls only the Android installer screen. The receiver was only reachable from the dead function | -60 lines, one fewer manifest component (smaller attack surface) | Only caller was the dead function. Re-add from git history if the session installer is ever wanted again |
-| 3 | `LibraryMeta.forgetExcept`, `SecurityPrefs.lockNow`, `PdfToWord.hasPictures`, `RichOps.flagsOf`, `ExportResult.toShareEvent`, `Rect.sizeF`, `Twips.fromCm/toCm/PER_POINT/PER_INCH`, `ConnResult.component1/2`, a no-op `val pair`, the unused `guide` Paint | Declared, never referenced (searched the whole tree, tests and XML) | -90 lines | Whole-word search over main, test, manifest and res; none destructured |
+| 3 | `LibraryMeta.forgetExcept`, `SecurityPrefs.lockNow`, `PdfToWord.hasPictures`, `RichOps.flagsOf`, `ExportResult.toShareEvent`, `Rect.sizeF`, `Twips.fromCm/toCm/PER_POINT/PER_INCH`, a no-op `val pair`, the unused `guide` Paint | Declared, never referenced (searched the whole tree, tests and XML) | -90 lines | Whole-word search over main, test, manifest and res; none destructured |
 | 4 | Four unused gradient brushes in `Brand` | The app uses `DocxelsTheme.brand.gradient` only | Less theme noise | Searched; none used |
 | 5 | Unused drawables `ic_docxels_mark.xml`, `ic_docxels_mark_fg.xml` | Nothing refers to them (the launcher uses `ic_launcher_*`, the animated mark uses `_flat`) | Smaller APK | No R.drawable, @drawable or manifest reference |
 | 6 | `safeName` existed 3 times with the same regex | Duplicate logic | One function: `core/FileNames.kt: safeFileName` | Same behaviour; fallback word kept per caller ("Scan" for scans) |
@@ -37,3 +37,6 @@ Last review: 2026-10-19, before build 204.
 
 ## Standing rule
 Run this review before every deployment: `python3 scripts/code-review.py`, read the findings, fix or list them here, then deploy.
+
+## Lessons from this pass
+- The first scan wrongly removed `getValue`/`setValue` imports (used by `by` delegates) and `ConnResult.component1/2` (used by destructuring). Both broke the build and were restored; the scan now ignores them. Treat every scan hit as a lead to confirm, never as proof.

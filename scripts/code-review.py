@@ -29,7 +29,7 @@ for p, s in src.items():
     rel = p.replace(ROOT + '/com/docscan/app/', '')
     for m in decl.finditer(s):
         mods, kind, name = m.groups()
-        if 'override' in mods or name == 'MainActivity':
+        if 'override' in mods or name == 'MainActivity' or re.fullmatch(r'component\d+', name):
             continue
         if words[name] <= 1:
             used_in_tests = len(re.findall(r'\b' + name + r'\b', tests))

@@ -195,6 +195,8 @@ class Updater(private val context: Context) {
     }
 
     private class ConnResult(val stream: InputStream, val length: Long, val conn: HttpURLConnection) : AutoCloseable {
+        operator fun component1() = stream
+        operator fun component2() = length
         override fun close() { runCatching { stream.close() }; conn.disconnect() }
     }
 
