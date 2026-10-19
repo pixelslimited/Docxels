@@ -499,7 +499,11 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onShape = { preset ->
                     val w = (page.contentWidthTwips * 0.45f).toInt()
-                    controller.insertBlock(Block.Shape(com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = if (preset == "line") 0 else w / 2, wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT)))
+                    controller.insertBlock(Block.Shape(
+                        if (preset == "textbox") com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = w / 3, fill = 0xFFFFFF, lineColor = 0x808080, lineWidthPt = 0.75f,
+                            wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT, text = "Type here")
+                        else com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = if (preset == "line") 0 else w / 2, wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT),
+                    ))
                 },
                 onPageBreak = { controller.insertPageBreak() },
                 onPageSetup = { pageOpen = true },

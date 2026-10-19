@@ -168,16 +168,22 @@ data class ShapeBlock(
     val wrap: ImageWrap = ImageWrap.IN_LINE,
     val offsetXTwips: Int = 0,
     val offsetYTwips: Int = 0,
+    /** Text inside the shape (a text box when [preset] is "textbox"): one style for all of it. */
+    val text: String = "",
+    val textSizePt: Float = 11f,
+    val textBold: Boolean = false,
+    val textColor: Int = 0x000000,
 )
 
 object ShapePresets {
     /** The shapes offered on the Insert tab: preset name to label. */
     val INSERTABLE = listOf(
-        "rect" to "Rectangle", "roundRect" to "Rounded rectangle", "ellipse" to "Ellipse", "triangle" to "Triangle",
+        "textbox" to "Text box", "rect" to "Rectangle", "roundRect" to "Rounded rectangle", "ellipse" to "Ellipse", "triangle" to "Triangle",
         "diamond" to "Diamond", "line" to "Line", "rightArrow" to "Arrow",
     )
     fun label(preset: String) = INSERTABLE.firstOrNull { it.first == preset }?.second ?: "Shape"
     fun isLine(preset: String) = preset == "line" || preset == "straightConnector1"
+    fun isTextBox(preset: String) = preset == "textbox"
 }
 
 sealed interface Block {

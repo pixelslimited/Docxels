@@ -870,7 +870,8 @@ object DocxReader {
                 val cx = extent?.attr("cx")?.toLongOrNull() ?: 0L
                 val cy = extent?.attr("cy")?.toLongOrNull() ?: 0L
                 val spPr = wsp.child("spPr")
-                val preset = spPr?.child("prstGeom")?.attr("prst") ?: "rect"
+                val isTextBox = wsp.child("cNvSpPr")?.attr("txBox") == "1"
+                val preset = if (isTextBox) "textbox" else (spPr?.child("prstGeom")?.attr("prst") ?: "rect")
                 val styled = wsp.child("style") != null
                 fun colorOf(holder: XNode?, fallback: Int?): Int? {
                     val sf = holder?.child("solidFill") ?: return fallback
@@ -882,8 +883,24 @@ object DocxReader {
                 val lineColor = colorOf(ln, if (styled) 0x2F528F else 0x000000) ?: 0x000000
                 val lineW = if (ln?.child("noFill") != null) 0f else (ln?.attr("w")?.toFloatOrNull()?.div(12700f) ?: if (styled) 1f else 0.75f)
                 flush(false)
+                // Plain, single-style text goes inside the shape; anything richer stays as ordinary paragraphs after it.
+                val box = wsp.find("txbxContent")
+                val paras = box?.childrenNamed("p").orEmpty()
+                val runs = paras.flatMap { it.childrenNamed("r") }
+                val styleKeys = runs.map { r ->
+                    val rp = r.child("rPr")
+                    listOf(rp?.child("b") != null, rp?.child("sz")?.attr("val"), rp?.child("color")?.attr("val"))
+                }.distinct()
+                val simple = box != null && paras.size in 1..12 && styleKeys.size <= 1 && box.find("tbl") == null && box.find("drawing") == null && !ShapePresets.isLine(preset)
+                val inner = if (simple) paras.joinToString("\n") { p -> p.childrenNamed("r").joinToString("") { r -> r.childrenNamed("t").joinToString("") { it.text.toString() } } } else ""
+                val first = runs.firstOrNull()?.child("rPr")
+                flush(false)
                 out += Block.Shape(
                     ShapeBlock(
+                        text = inner,
+                        textBold = first?.child("b") != null,
+                        textSizePt = first?.child("sz")?.attr("val")?.toFloatOrNull()?.div(2f)?.coerceIn(4f, 96f) ?: 11f,
+                        textColor = first?.child("color")?.attr("val")?.let { parseHex(it) } ?: 0x000000,
                         preset = preset,
                         widthTwips = (cx / Twips.EMU_PER_TWIP).toInt().coerceAtLeast(120),
                         heightTwips = (cy / Twips.EMU_PER_TWIP).toInt().coerceAtLeast(0),
@@ -894,7 +911,7 @@ object DocxReader {
                 )
                 emitted = true
                 // Text typed inside the shape is kept as ordinary paragraphs after it, so it is never lost.
-                wsp.find("txbxContent")?.childrenNamed("p")?.forEach { readParagraph(it, out) }
+                if (!simple) wsp.find("txbxContent")?.childrenNamed("p")?.forEach { readParagraph(it, out) }
             }
 
             fun readImage(drawing: XNode) {

@@ -49,5 +49,28 @@ object ShapeDraw {
         }
         s.fill?.let { fill.color = 0xFF000000.toInt() or it; c.drawPath(path, fill) }
         if (lined) c.drawPath(path, stroke)
+        if (s.text.isNotEmpty()) drawText(c, s, b, pxPerPt)
+    }
+
+    /** The text inside a shape: top-left in a text box, centred in any other shape; clipped to the shape. */
+    private fun drawText(c: Canvas, s: ShapeBlock, b: RectF, pxPerPt: Float) {
+        val pad = 4f * pxPerPt
+        val w = (b.width() - 2 * pad).toInt()
+        if (w < 8) return
+        val tp = android.text.TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF000000.toInt() or s.textColor
+            textSize = s.textSizePt * pxPerPt
+            typeface = if (s.textBold) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+        }
+        val centred = !ShapePresets.isTextBox(s.preset)
+        val layout = android.text.StaticLayout.Builder.obtain(s.text, 0, s.text.length, tp, w)
+            .setAlignment(if (centred) android.text.Layout.Alignment.ALIGN_CENTER else android.text.Layout.Alignment.ALIGN_NORMAL)
+            .setIncludePad(false).build()
+        c.save()
+        c.clipRect(b)
+        val dy = if (centred) ((b.height() - layout.height) / 2f).coerceAtLeast(pad) else pad
+        c.translate(b.left + pad, b.top + dy)
+        layout.draw(c)
+        c.restore()
     }
 }

@@ -523,6 +523,16 @@ object DocxWriter {
             wrapEl + "<wp:docPr id=\"$id\" name=\"Picture $id\"/>" + frame + "</wp:anchor></w:drawing>"
     }
 
+    /** The text inside a shape or text box, as Word keeps it. */
+    private fun shapeText(sh: ShapeBlock): String {
+        if (sh.text.isEmpty()) return ""
+        val rPr = "<w:rPr>" + (if (sh.textBold) "<w:b/>" else "") + "<w:color w:val=\"${hex(sh.textColor)}\"/><w:sz w:val=\"${pt2(sh.textSizePt)}\"/><w:szCs w:val=\"${pt2(sh.textSizePt)}\"/></w:rPr>"
+        val paras = sh.text.split("\n").joinToString("") { line ->
+            "<w:p><w:pPr><w:spacing w:after=\"0\"/></w:pPr><w:r>$rPr<w:t xml:space=\"preserve\">${Xml.escape(line)}</w:t></w:r></w:p>"
+        }
+        return "<wps:txbx><w:txbxContent>$paras</w:txbxContent></wps:txbx>"
+    }
+
     private fun writeShape(sh: ShapeBlock, sb: StringBuilder, ctx: Ctx) {
         val cx = sh.widthTwips.toLong() * Twips.EMU_PER_TWIP
         val cy = if (ShapePresets.isLine(sh.preset)) 0L else sh.heightTwips.toLong() * Twips.EMU_PER_TWIP
@@ -530,9 +540,9 @@ object DocxWriter {
         val fill = sh.fill?.let { "<a:solidFill><a:srgbClr val=\"${hex(it)}\"/></a:solidFill>" } ?: "<a:noFill/>"
         val lineW = (sh.lineWidthPt * 12700).toInt().coerceIn(0, 12700 * 40)
         val frame = "<a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\">" +
-            "<wps:wsp><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$cx\" cy=\"$cy\"/></a:xfrm>" +
-            "<a:prstGeom prst=\"${Xml.escape(sh.preset)}\"><a:avLst/></a:prstGeom>$fill" +
-            (if (sh.lineWidthPt <= 0f) "<a:ln><a:noFill/></a:ln>" else "<a:ln w=\"$lineW\"><a:solidFill><a:srgbClr val=\"${hex(sh.lineColor)}\"/></a:solidFill></a:ln>") + "</wps:spPr><wps:bodyPr/></wps:wsp>" +
+            "<wps:wsp><wps:cNvSpPr${if (ShapePresets.isTextBox(sh.preset)) " txBox=\"1\"" else ""}/><wps:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$cx\" cy=\"$cy\"/></a:xfrm>" +
+            "<a:prstGeom prst=\"${Xml.escape(if (ShapePresets.isTextBox(sh.preset)) "rect" else sh.preset)}\"><a:avLst/></a:prstGeom>$fill" +
+            (if (sh.lineWidthPt <= 0f) "<a:ln><a:noFill/></a:ln>" else "<a:ln w=\"$lineW\"><a:solidFill><a:srgbClr val=\"${hex(sh.lineColor)}\"/></a:solidFill></a:ln>") + "</wps:spPr>" + shapeText(sh) + "<wps:bodyPr/></wps:wsp>" +
             "</a:graphicData></a:graphic>"
         sb.append("<w:p>")
         jc(sh.align)?.let { sb.append("<w:pPr><w:jc w:val=\"$it\"/></w:pPr>") }

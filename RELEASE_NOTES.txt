@@ -84,3 +84,4 @@
 206|Quotations, proforma invoices and receipts, in the same three styles as invoices.
 206|Page view now breaks tables between rows like the page preview, repeats the header row, and tables or pictures at the top of a page no longer draw into the gap above.
 207|Tables: set row height and choose borders for each cell side; kept when saving to and opening from Word.
+208|Text boxes: insert a text box (Insert → Shapes → Text box), type inside it, set size/bold; kept when saved to Word and reopened.

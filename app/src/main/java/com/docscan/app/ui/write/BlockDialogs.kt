@@ -629,17 +629,20 @@ fun ShapeEditorDialog(
     var lineWidth by remember { mutableFloatStateOf(initial.lineWidthPt) }
     var align by remember { mutableStateOf(initial.align) }
     var wrap by remember { mutableStateOf(initial.wrap) }
+    var text by remember { mutableStateOf(initial.text) }
+    var textSize by remember { mutableFloatStateOf(initial.textSizePt) }
+    var textBold by remember { mutableStateOf(initial.textBold) }
     fun build(): com.docscan.app.core.word.ShapeBlock {
         val w = wTw.coerceAtLeast(240)
         val h = if (isLine) 0 else hTw.coerceAtLeast(120)
-        return initial.copy(widthTwips = w, heightTwips = h, fill = fill, lineColor = line, lineWidthPt = lineWidth, align = align, wrap = wrap)
+        return initial.copy(widthTwips = w, heightTwips = h, fill = fill, lineColor = line, lineWidthPt = lineWidth, align = align, wrap = wrap, text = text, textSizePt = textSize, textBold = textBold)
     }
     androidx.compose.runtime.LaunchedEffect(current.widthTwips, current.heightTwips) {
         if (current.widthTwips != wTw) wTw = current.widthTwips
         if (current.heightTwips != hTw && !isLine) hTw = current.heightTwips
     }
     var started by remember { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(wTw, hTw, fill, line, lineWidth, align, wrap) {
+    androidx.compose.runtime.LaunchedEffect(wTw, hTw, fill, line, lineWidth, align, wrap, text, textSize, textBold) {
         if (started) { kotlinx.coroutines.delay(40); onLive(build()) } else started = true
     }
     LivePanel(
@@ -649,12 +652,18 @@ fun ShapeEditorDialog(
         onRevert = {
             wTw = initial.widthTwips; hTw = initial.heightTwips
             fill = initial.fill; line = initial.lineColor; lineWidth = initial.lineWidthPt; align = initial.align; wrap = initial.wrap
+            text = initial.text; textSize = initial.textSizePt; textBold = initial.textBold
         },
     ) {
         run {
             run {
                 SizeControls(wTw, hTw, maxOf(contentWidthTwips * 2, initial.widthTwips), maxOf(contentWidthTwips * 3, initial.heightTwips), { w, h -> wTw = w; hTw = h }, heightToo = !isLine)
                 if (!isLine) {
+                    OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("Text inside") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(9f, 11f, 14f, 18f, 24f, 36f).forEach { sz -> FilterChip(textSize == sz, { textSize = sz }, label = { Text("${sz.toInt()} pt") }) }
+                        FilterChip(textBold, { textBold = !textBold }, label = { Text("Bold") })
+                    }
                     Text("Fill", style = MaterialTheme.typography.labelLarge)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         FilterChip(fill == null, { fill = null }, label = { Text("None") })
