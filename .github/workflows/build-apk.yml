@@ -178,7 +178,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.SITE_TOKEN }}
           RUN_NUMBER: ${{ github.run_number }}
-        run: bash scripts/publish-update.sh Docxels.apk "$RUN_NUMBER"
+        run: |
+          set -o pipefail
+          bash scripts/publish-update.sh Docxels.apk "$RUN_NUMBER" 2>&1 | tee publish.log
+
+      - name: Report publish errors on the commit
+        if: failure() && hashFiles('publish.log') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Publishing to the site failed. Last lines of the log:"
+            echo '```'
+            tail -n 25 publish.log
+            echo '```'
+          } > pub.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -f body="$(cat pub.md)" || true
 
       - name: Upload test reports
         if: always()
