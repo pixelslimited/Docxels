@@ -19,9 +19,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.foundation.verticalScroll
@@ -82,6 +93,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
     var deleting by remember { mutableStateOf<LibraryItem?>(null) }
     var foreverOf by remember { mutableStateOf<LibraryItem?>(null) }
     var emptying by remember { mutableStateOf(false) }
+    var actionsFor by remember { mutableStateOf<LibraryItem?>(null) }
     var moving by remember { mutableStateOf<LibraryItem?>(null) }
     var tagging by remember { mutableStateOf<LibraryItem?>(null) }
     var folder by remember { mutableStateOf<String?>(null) }
@@ -106,6 +118,24 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
             .filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) || it.meta.tags.any { t -> t.contains(query.trim(), ignoreCase = true) } ||
                 (inside[com.docscan.app.data.LibraryMeta.key(it.kind, it.id)]?.text?.contains(query.trim(), ignoreCase = true) == true) }
             .let { list -> if (sort == Sort.NAME) list.sortedBy { it.title.lowercase() } else list }
+    }
+
+    val menuFor: (LibraryItem) -> RowMenu = { item ->
+        if (filter == Filter.TRASH) RowMenu(
+            onRename = {}, onDelete = { foreverOf = item }, onRestore = { vm.restore(item) }, trashed = true,
+        ) else RowMenu(
+            onRename = { renaming = item },
+            onDelete = { deleting = item },
+            onShare = if (item.kind == DocKind.DOCX) ({ vm.shareDocx(context, item) }) else null,
+            onSharePdf = if (item.kind != DocKind.SCAN) ({ vm.sharePdf(context, item) }) else null,
+            onSaveAs = ({ vm.withFile(context, item, asPdf = item.kind != DocKind.DOCX) { saveAs(listOf(it)) } }),
+            onSaveAsPdf = if (item.kind != DocKind.PDF) ({ vm.withFile(context, item, asPdf = true) { saveAs(listOf(it)) } }) else null,
+            onDuplicate = if (item.kind == DocKind.DOCX) ({ vm.duplicate(item) }) else null,
+            onToWord = if (item.kind == DocKind.SCAN) ({ vm.scanToWord(item.id) { id -> onOpenWordFromLibrary(actions, id) } }) else null,
+            onFavourite = { vm.setFavourite(item, !item.meta.favourite) },
+            onMove = { moving = item },
+            onTags = { tagging = item },
+        )
     }
 
     if (items.isEmpty() && trash.isEmpty()) {
@@ -196,23 +226,6 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                     modifier = Modifier.padding(24.dp),
                 )
             }
-            val menuFor: (LibraryItem) -> RowMenu = { item ->
-                if (filter == Filter.TRASH) RowMenu(
-                    onRename = {}, onDelete = { foreverOf = item }, onRestore = { vm.restore(item) }, trashed = true,
-                ) else RowMenu(
-                    onRename = { renaming = item },
-                    onDelete = { deleting = item },
-                    onShare = if (item.kind == DocKind.DOCX) ({ vm.shareDocx(context, item) }) else null,
-                    onSharePdf = if (item.kind != DocKind.SCAN) ({ vm.sharePdf(context, item) }) else null,
-                    onSaveAs = ({ vm.withFile(context, item, asPdf = item.kind != DocKind.DOCX) { saveAs(listOf(it)) } }),
-                    onSaveAsPdf = if (item.kind != DocKind.PDF) ({ vm.withFile(context, item, asPdf = true) { saveAs(listOf(it)) } }) else null,
-                    onDuplicate = if (item.kind == DocKind.DOCX) ({ vm.duplicate(item) }) else null,
-                    onToWord = if (item.kind == DocKind.SCAN) ({ vm.scanToWord(item.id) { id -> onOpenWordFromLibrary(actions, id) } }) else null,
-                    onFavourite = { vm.setFavourite(item, !item.meta.favourite) },
-                    onMove = { moving = item },
-                    onTags = { tagging = item },
-                )
-            }
             if (grid) {
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(150.dp),
@@ -222,7 +235,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                 ) {
                     items(shown.size, key = { shown[it].kind.name + shown[it].id }) { idx ->
                         val item = shown[idx]
-                        LibraryTile(item, onClick = { if (filter != Filter.TRASH) onOpen(item) }, menu = menuFor(item))
+                        LibraryTile(item, onClick = { actionsFor = item })
                     }
                 }
             } else {
@@ -231,7 +244,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(shown, key = { it.kind.name + it.id }) { item ->
-                        LibraryRow(item, onClick = { if (filter != Filter.TRASH) onOpen(item) }, menu = menuFor(item))
+                        LibraryRow(item, onClick = { actionsFor = item })
                     }
                 }
             }
@@ -255,7 +268,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
             title = "Delete for good?",
             message = "\"${item.title}\" will be permanently deleted from this phone. This cannot be undone.",
             confirmLabel = "Delete",
-            onConfirm = { vm.deleteForever(item); foreverOf = null },
+            onConfirm = { foreverOf = null; confirmWithLock(context, "Delete \"${item.title}\" for good") { vm.deleteForever(item) } },
             onDismiss = { foreverOf = null },
         )
     }
@@ -264,8 +277,17 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
             title = "Empty Trash?",
             message = "Everything in Trash will be permanently deleted from this phone.",
             confirmLabel = "Empty Trash",
-            onConfirm = { vm.emptyTrash(); emptying = false },
+            onConfirm = { emptying = false; confirmWithLock(context, "Empty Trash") { vm.emptyTrash() } },
             onDismiss = { emptying = false },
+        )
+    }
+    actionsFor?.let { item ->
+        val menu = menuFor(item)
+        ItemActionsSheet(
+            item = item,
+            menu = menu,
+            onOpen = if (filter == Filter.TRASH) null else ({ onOpen(item) }),
+            onDismiss = { actionsFor = null },
         )
     }
     moving?.let { item ->
@@ -296,8 +318,7 @@ class RowMenu(
 )
 
 @Composable
-fun LibraryRow(item: LibraryItem, onClick: () -> Unit, menu: RowMenu?) {
-    var open by remember { mutableStateOf(false) }
+fun LibraryRow(item: LibraryItem, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().docCard().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -315,51 +336,67 @@ fun LibraryRow(item: LibraryItem, onClick: () -> Unit, menu: RowMenu?) {
                 maxLines = 1,
             )
         }
-        if (menu != null) {
-            Box {
-                IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    ItemMenuItems(item, menu) { open = false }
-                }
+    }
+}
+
+/** What can be done with a document. Shown only after the document is tapped. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ItemActionsSheet(item: LibraryItem, menu: RowMenu, onOpen: (() -> Unit)?, onDismiss: () -> Unit) {
+    class Act(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val danger: Boolean = false, val run: () -> Unit)
+    val acts = ArrayList<Act>()
+    if (menu.trashed) {
+        menu.onRestore?.let { acts += Act("Restore", Icons.Default.Restore, run = it) }
+        acts += Act("Delete for good", Icons.Default.DeleteForever, danger = true, run = menu.onDelete)
+    } else {
+        onOpen?.let { acts += Act("Open", Icons.Default.OpenInNew, run = it) }
+        menu.onFavourite?.let { acts += Act(if (item.meta.favourite) "Remove from favourites" else "Add to favourites", Icons.Default.Star, run = it) }
+        menu.onToWord?.let { acts += Act("Convert to Word", Icons.Default.Description, run = it) }
+        acts += Act("Rename", Icons.Default.Edit, run = menu.onRename)
+        menu.onMove?.let { acts += Act("Move to folder…", Icons.Default.Folder, run = it) }
+        menu.onTags?.let { acts += Act("Tags…", Icons.Default.Label, run = it) }
+        menu.onDuplicate?.let { acts += Act("Make a copy", Icons.Default.ContentCopy, run = it) }
+        menu.onSaveAs?.let { acts += Act(if (item.kind == DocKind.DOCX) "Save as .docx…" else "Save as…", Icons.Default.Save, run = it) }
+        menu.onSaveAsPdf?.let { acts += Act("Save as PDF…", Icons.Default.PictureAsPdf, run = it) }
+        menu.onShare?.let { acts += Act("Share as .docx", Icons.Default.Share, run = it) }
+        menu.onSharePdf?.let { acts += Act("Share as PDF", Icons.Default.Share, run = it) }
+        acts += Act("Move to Trash", Icons.Default.Delete, danger = true, run = menu.onDelete)
+    }
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
+            Text(item.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+            Text("${friendlyDate(item.modified)} · ${item.detail}", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp))
+            acts.forEach { a ->
+                val tint = if (a.danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                androidx.compose.material3.ListItem(
+                    leadingContent = { Icon(a.icon, contentDescription = null, tint = tint) },
+                    headlineContent = { Text(a.label, color = tint) },
+                    colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable { onDismiss(); a.run() },
+                )
             }
         }
     }
 }
 
-@Composable
-private fun ItemMenuItems(item: LibraryItem, menu: RowMenu, close: () -> Unit) {
-    if (menu.trashed) {
-        menu.onRestore?.let { f -> DropdownMenuItem(text = { Text("Restore") }, onClick = { close(); f() }) }
-        DropdownMenuItem(text = { Text("Delete for good") }, onClick = { close(); menu.onDelete() })
-        return
+/** Permanent deletes ask for fingerprint, face or screen lock when the phone has one; otherwise the confirmation dialog is the check. */
+private fun confirmWithLock(context: android.content.Context, why: String, run: () -> Unit) {
+    val activity = context as? androidx.fragment.app.FragmentActivity
+    if (activity != null && com.docscan.app.security.Authenticator.available(activity)) {
+        com.docscan.app.security.Authenticator.prompt(activity, "Confirm it is you", why, onSuccess = run)
+    } else {
+        run()
     }
-    menu.onFavourite?.let { f -> DropdownMenuItem(text = { Text(if (item.meta.favourite) "Remove from favourites" else "Add to favourites") }, onClick = { close(); f() }) }
-    menu.onToWord?.let { f -> DropdownMenuItem(text = { Text("Convert to Word") }, onClick = { close(); f() }) }
-    DropdownMenuItem(text = { Text("Rename") }, onClick = { close(); menu.onRename() })
-    menu.onMove?.let { f -> DropdownMenuItem(text = { Text("Move to folder…") }, onClick = { close(); f() }) }
-    menu.onTags?.let { f -> DropdownMenuItem(text = { Text("Tags…") }, onClick = { close(); f() }) }
-    menu.onDuplicate?.let { f -> DropdownMenuItem(text = { Text("Make a copy") }, onClick = { close(); f() }) }
-    menu.onSaveAs?.let { f -> DropdownMenuItem(text = { Text(if (item.kind == DocKind.DOCX) "Save as .docx…" else "Save as…") }, onClick = { close(); f() }) }
-    menu.onSaveAsPdf?.let { f -> DropdownMenuItem(text = { Text("Save as PDF…") }, onClick = { close(); f() }) }
-    menu.onShare?.let { f -> DropdownMenuItem(text = { Text("Share as .docx") }, onClick = { close(); f() }) }
-    menu.onSharePdf?.let { f -> DropdownMenuItem(text = { Text("Share as PDF") }, onClick = { close(); f() }) }
-    DropdownMenuItem(text = { Text("Move to Trash") }, onClick = { close(); menu.onDelete() })
 }
 
 @Composable
-fun LibraryTile(item: LibraryItem, onClick: () -> Unit, menu: RowMenu?) {
-    var open by remember { mutableStateOf(false) }
+fun LibraryTile(item: LibraryItem, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().docCard().clickable(onClick = onClick).padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DocBadge(item.kind)
             Box(Modifier.weight(1f))
             if (item.meta.favourite) Icon(Icons.Default.Star, contentDescription = "Favourite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-            if (menu != null) {
-                Box {
-                    IconButton(onClick = { open = true }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
-                    DropdownMenu(expanded = open, onDismissRequest = { open = false }) { ItemMenuItems(item, menu) { open = false } }
-                }
-            }
         }
         Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, modifier = Modifier.padding(top = 8.dp))
         Text(friendlyDate(item.modified), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)

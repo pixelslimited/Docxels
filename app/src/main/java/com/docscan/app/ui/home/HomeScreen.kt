@@ -17,6 +17,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Download
@@ -25,7 +30,6 @@ import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -83,44 +87,44 @@ fun HomeScreen(
             Text("Search your documents", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp))
         }
 
-        // Hero: the four ways to begin. Touching the card turns the sheets: drag, flick or tap.
+        // Hero: start a document. Touching the card turns the sheets: drag, flick or tap.
         val sheets = rememberSheetsState()
         Column(
             Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(DocxelsTheme.brand.gradient).sheetsTouch(sheets).padding(18.dp),
         ) {
             Box(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(end = 96.dp).align(Alignment.CenterStart)) {
-                    Text("What are we working on?", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                    Text("Scan, write and convert in one place.", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
+                    Text("Your office, in your pocket", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Text("Write, edit and convert documents.", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
                 }
                 FloatingSheets(sheets, Modifier.align(Alignment.CenterEnd))
             }
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HeroAction(Icons.Default.NoteAdd, "New doc", primary = true, modifier = Modifier.weight(1f), onClick = actions.newDoc)
-                HeroAction(Icons.Default.DocumentScanner, "Scan", modifier = Modifier.weight(1f), onClick = actions.scan)
-                HeroAction(Icons.Default.FolderOpen, "Open PDF", modifier = Modifier.weight(1f)) { actions.pdfTool("view") }
+                HeroAction(Icons.Default.Article, "Templates", modifier = Modifier.weight(1f), onClick = actions.templates)
+                HeroAction(Icons.Default.FolderOpen, "Open file", modifier = Modifier.weight(1f)) { actions.pdfTool("view") }
                 HeroAction(Icons.Default.Download, "Import", modifier = Modifier.weight(1f), onClick = actions.importMenu)
             }
         }
 
-        Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Convert and scan", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            Text(
-                "All tools",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clip(CircleShape).clickable(onClick = onAllTools).padding(8.dp),
-            )
+        SectionTitle("Business documents", "All templates", actions.templates)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            ToolTile(Icons.Default.ReceiptLong, "Invoice", t.orange, { actions.newFromTemplate("invoice") }, Modifier.weight(1f))
+            ToolTile(Icons.Default.Mail, "Letter", t.blue, { actions.newFromTemplate("letter") }, Modifier.weight(1f))
+            ToolTile(Icons.Default.Badge, "CV", t.teal, { actions.newFromTemplate("cv") }, Modifier.weight(1f))
+            ToolTile(Icons.Default.Assessment, "Report", t.green, { actions.newFromTemplate("report") }, Modifier.weight(1f))
         }
+
+        SectionTitle("Convert", "All tools", onAllTools)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             ToolTile(Icons.Default.PictureAsPdf, "PDF to Word", t.pink, actions.pdfToWord, Modifier.weight(1f))
-            ToolTile(Icons.Default.TextSnippet, "Scan to Word", t.teal, actions.scanToWord, Modifier.weight(1f))
             ToolTile(Icons.Default.Description, "Word to PDF", t.blue, actions.wordToPdf, Modifier.weight(1f))
             ToolTile(Icons.Default.PhotoLibrary, "Photos to PDF", t.green, actions.importPhotos, Modifier.weight(1f))
+            ToolTile(Icons.Default.DocumentScanner, "Scan paper", t.teal, actions.scan, Modifier.weight(1f))
         }
 
         Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Recent", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text("Continue where you left off", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             if (items.isNotEmpty()) {
                 Text(
                     "See all",
@@ -134,7 +138,7 @@ fun HomeScreen(
             Column(Modifier.fillMaxWidth().docCard().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Nothing here yet", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Scan a paper document or start writing. Everything you make shows up here.",
+                    "Start a document or open a file. Everything you make shows up here.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -143,7 +147,7 @@ fun HomeScreen(
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items.take(5).forEach { item -> LibraryRow(item, onClick = { onOpen(item) }, menu = null) }
+                items.take(5).forEach { item -> LibraryRow(item, onClick = { onOpen(item) }) }
             }
         }
     }
@@ -172,5 +176,18 @@ private fun HeroAction(
     ) {
         Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(26.dp))
         Text(label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String, action: String, onAction: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        Text(
+            action,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clip(CircleShape).clickable(onClick = onAction).padding(8.dp),
+        )
     }
 }

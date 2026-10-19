@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
@@ -84,6 +83,7 @@ enum class Tab { HOME, DOCS, TOOLS, SETTINGS }
 class Actions(
     val newDoc: () -> Unit,
     val templates: () -> Unit,
+    val newFromTemplate: (String) -> Unit,
     val scan: () -> Unit,
     val importMenu: () -> Unit,
     val importPhotos: () -> Unit,
@@ -120,6 +120,8 @@ fun MainShell(
     var templateSheet by remember { mutableStateOf(false) }
     var pick by remember { mutableStateOf<Pick?>(null) }
     val snackbar = remember { SnackbarHostState() }
+    // Back from Documents, Tools or Settings goes to Home first; only Home leaves the app.
+    androidx.activity.compose.BackHandler(enabled = tab != Tab.HOME) { tab = Tab.HOME }
 
     LaunchedEffect(Unit) { vm.cleanUpEmptyDocuments(); vm.emptyOldTrash(); vm.indexContent() }
     val trash by vm.trash.collectAsState()
@@ -145,6 +147,7 @@ fun MainShell(
         Actions(
             newDoc = { vm.newWord(onOpenWord) },
             templates = { templateSheet = true },
+            newFromTemplate = { id -> vm.newFromTemplate(id, onOpenWord) },
             scan = { vm.startScan(onScanDoc) },
             importMenu = { importSheet = true },
             importPhotos = { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -164,7 +167,7 @@ fun MainShell(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
-        bottomBar = { BottomBar(tab, onSelect = { tab = it }, onScan = actions.scan) },
+        bottomBar = { BottomBar(tab, onSelect = { tab = it }) },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
@@ -264,16 +267,14 @@ private fun SheetRow(icon: ImageVector, title: String, body: String, onClick: ()
 }
 
 /**
- * Floating dock: a rounded bar with a coloured "bead" that rides over the active tab (tap a tab, or drag
- * the bead along the bar). The scan button stays in the middle slot.
+ * Floating dock with four tabs. A coloured "bead" rides over the active tab: tap a tab, or drag the bead along the bar.
  */
 @Composable
-private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit) {
-    data class Slot(val tab: Tab?, val label: String, val filled: ImageVector, val outlined: ImageVector)
+private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
+    class Slot(val tab: Tab, val label: String, val filled: ImageVector, val outlined: ImageVector)
     val slots = listOf(
         Slot(Tab.HOME, "Home", Icons.Default.Home, Icons.Outlined.Home),
         Slot(Tab.DOCS, "Documents", Icons.Default.Folder, Icons.Outlined.Folder),
-        Slot(null, "Scan", Icons.Default.DocumentScanner, Icons.Default.DocumentScanner),
         Slot(Tab.TOOLS, "Tools", Icons.Default.GridView, Icons.Outlined.GridView),
         Slot(Tab.SETTINGS, "Settings", Icons.Default.Settings, Icons.Outlined.Settings),
     )
@@ -284,18 +285,12 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit
     ) {
         val slotW = maxWidth / slots.size
         val beadSize = 54.dp
-        // Bead position follows the selected slot, or the finger while dragging.
         var dragX by remember { mutableStateOf<Float?>(null) }
         val slotPx = with(density) { slotW.toPx() }
         val restX = (selIndex + 0.5f) * slotPx
         val beadX by androidx.compose.animation.core.animateFloatAsState(
             dragX ?: restX, androidx.compose.animation.core.spring(stiffness = 500f), label = "bead",
         )
-        fun slotAt(x: Float): Int {
-            var i = (x / slotPx).toInt().coerceIn(0, slots.lastIndex)
-            if (slots[i].tab == null) i = if (x / slotPx - 2f < 0.5f) 1 else 3
-            return i
-        }
         Surface(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(66.dp),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
@@ -304,33 +299,23 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit
         ) {
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                 slots.forEachIndexed { i, slot ->
-                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                        if (slot.tab == null) {
-                            Box(
-                                Modifier.size(44.dp).clip(CircleShape).background(DocxelsTheme.brand.gradient)
-                                    .clickable(onClickLabel = "Scan a document", role = Role.Button, onClick = onScan),
-                                contentAlignment = Alignment.Center,
-                            ) { Icon(Icons.Default.DocumentScanner, contentDescription = "Scan", tint = Color.White, modifier = Modifier.size(24.dp)) }
-                        } else {
-                            val active = i == selIndex
-                            Column(
-                                Modifier.fillMaxSize().clickable(role = Role.Tab, onClickLabel = slot.label) { onSelect(slot.tab) },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                            ) {
-                                // The active icon lives in the bead; keep its space so nothing jumps.
-                                Icon(slot.outlined, contentDescription = null, modifier = Modifier.size(24.dp).alpha(if (active) 0f else 1f),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(slot.label, style = MaterialTheme.typography.labelSmall, maxLines = 1,
-                                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = if (active) androidx.compose.ui.text.font.FontWeight.SemiBold else null)
-                            }
-                        }
+                    val active = i == selIndex
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight().clickable(role = Role.Tab, onClickLabel = slot.label) { onSelect(slot.tab) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        // The active icon lives in the bead; keep its space so nothing jumps.
+                        Icon(slot.outlined, contentDescription = null, modifier = Modifier.size(24.dp).alpha(if (active) 0f else 1f),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(slot.label, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (active) androidx.compose.ui.text.font.FontWeight.SemiBold else null)
                     }
                 }
             }
         }
-        // The bead: sits half above the bar, with a rim in the page colour so it looks cut into the dock.
+        // The bead sits half above the bar; its rim is the page colour so it looks cut into the dock.
         Box(
             Modifier
                 .align(Alignment.TopStart)
@@ -346,7 +331,7 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit
                     detectHorizontalDragGestures(
                         onDragStart = { x = restX; dragX = x },
                         onDragEnd = {
-                            slots[slotAt(x)].tab?.let(onSelect)
+                            onSelect(slots[(x / slotPx).toInt().coerceIn(0, slots.lastIndex)].tab)
                             dragX = null
                         },
                         onDragCancel = { dragX = null },
@@ -354,8 +339,8 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit
                 },
             contentAlignment = Alignment.Center,
         ) {
-            val s = slots[selIndex]
-            Icon(s.filled, contentDescription = s.label, tint = Color.White, modifier = Modifier.size(26.dp))
+            val sl = slots[selIndex]
+            Icon(sl.filled, contentDescription = sl.label, tint = Color.White, modifier = Modifier.size(26.dp))
         }
     }
 }

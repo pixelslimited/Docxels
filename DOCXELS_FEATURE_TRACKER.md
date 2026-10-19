@@ -240,3 +240,5 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Invoice engine: Printed, Online, Minimal styles, amount in words | PARTIAL | Engine and unit tests exist; the form to fill it in and the template entry are NOT built yet. |
 | Floating dock bottom navigation (sliding bead, drag to switch) | IMPLEMENTED — NOT VERIFIED | Modelled on the reel you linked. Not seen on a device. |
 | Code quality scan on every build (scripts/code-review.py, CODE_REVIEW.md) | DONE | Runs in CI and prints into the run summary. |
+| Document-first Home, no floating scan button, Back returns to Home | IMPLEMENTED — NOT VERIFIED | Not seen on a device. |
+| Document actions appear after tap (bottom sheet); permanent delete and Empty Trash need device lock check | IMPLEMENTED — NOT VERIFIED | Moving to Trash needs only the confirmation (it is restorable). If the phone has no lock, the confirmation alone applies. |

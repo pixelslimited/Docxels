@@ -76,3 +76,6 @@
 204|Settings > Storage > Delete all my data: erases every document, letterhead, signature and setting after you type DELETE (asks for your lock first if App lock is on).
 204|A short three-step welcome on a fresh install.
 204|Housekeeping: removed unused code, merged duplicate helpers, and added a code-quality scan to every build.
+205|Home redesigned around documents: New doc, Templates, Open file, Import, business documents (Invoice, Letter, CV, Report), convert tools. One Scan entry instead of three.
+205|Floating scan button removed. New floating bottom bar with a sliding bead; Back from any tab returns to Home.
+205|Document actions now appear only after you tap a document. Deleting for good asks for fingerprint, face or screen lock when your phone has one.
