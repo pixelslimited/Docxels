@@ -76,6 +76,8 @@ data class Paragraph(
     val shading: Int? = null,
     /** Box border colour (RGB), or null for no border. */
     val borderColor: Int? = null,
+    /** Explicit right-to-left paragraph direction (Word's bidi flag). */
+    val rtl: Boolean = false,
 ) {
     val text: String get() = runs.joinToString("") { it.text }
     val isEmpty: Boolean get() = runs.all { it.text.isEmpty() }

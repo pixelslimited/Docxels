@@ -297,6 +297,7 @@ object DocxWriter {
             pPr.append("</w:pBdr>")
         }
         p.shading?.let { pPr.append("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"${String.format("%06X", it and 0xFFFFFF)}\"/>") }
+        if (p.rtl) pPr.append("<w:bidi/>")
         if (p.spaceBeforePt != null || p.spaceAfterPt != null || p.lineSpacing != null) {
             pPr.append("<w:spacing")
             p.spaceBeforePt?.let { pPr.append(" w:before=\"${(it * 20).toInt()}\"") }

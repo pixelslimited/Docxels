@@ -922,6 +922,10 @@ private fun Ribbon(
                                 listOf(null to "Default", 1.0f to "Single", 1.15f to "1.15", 1.5f to "1.5", 2.0f to "Double").forEach { (m, label) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { spacingMenu = false; c.setLineSpacing(m) })
                                 }
+                                DropdownMenuItem(
+                                    text = { Text(if (c.currentParagraph().rtl) "Left-to-right paragraph" else "Right-to-left paragraph") },
+                                    onClick = { spacingMenu = false; c.setRtl(!c.currentParagraph().rtl) },
+                                )
                             }
                         }
                         Box {

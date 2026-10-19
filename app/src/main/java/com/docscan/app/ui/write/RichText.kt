@@ -61,16 +61,17 @@ data class ParaAttrs(
     val keepWithNext: Boolean = false,
     val shading: Int? = null,
     val borderColor: Int? = null,
+    val rtl: Boolean = false,
 ) {
     fun toParagraph(runs: List<Run>) = Paragraph(
         runs, style, align, list, level, indentLeftTwips, indentFirstTwips,
-        spaceBeforePt, spaceAfterPt, lineSpacing, keepWithNext, shading, borderColor,
+        spaceBeforePt, spaceAfterPt, lineSpacing, keepWithNext, shading, borderColor, rtl,
     )
 
     companion object {
         fun of(p: Paragraph) = ParaAttrs(
             p.style, p.align, p.list, p.level, p.indentLeftTwips, p.indentFirstTwips,
-            p.spaceBeforePt, p.spaceAfterPt, p.lineSpacing, p.keepWithNext, p.shading, p.borderColor,
+            p.spaceBeforePt, p.spaceAfterPt, p.lineSpacing, p.keepWithNext, p.shading, p.borderColor, p.rtl,
         )
     }
 }

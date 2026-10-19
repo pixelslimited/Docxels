@@ -24,3 +24,12 @@ class TextBoxTest {
         assertEquals("ellipse", back.preset)
     }
 }
+
+class ParagraphDirectionTest {
+    @Test fun rightToLeftParagraphSurvivesSaving() {
+        val doc = WordDoc("t", listOf(Block.Para(Paragraph(listOf(Run("مرحبا")), rtl = true)), Block.Para(Paragraph(listOf(Run("Hello"))))))
+        val back = DocxReader.read(java.io.ByteArrayInputStream(DocxWriter.toBytes(doc))).blocks.filterIsInstance<Block.Para>()
+        assertTrue(back[0].paragraph.rtl)
+        assertTrue(!back[1].paragraph.rtl)
+    }
+}

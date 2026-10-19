@@ -967,6 +967,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
 
     fun setStyle(style: ParaStyle) = paragraphs { it.copy(style = style) }
     fun setAlign(align: Align) = paragraphs { it.copy(align = align) }
+    fun setRtl(on: Boolean) = paragraphs { it.copy(rtl = on) }
     fun setShading(rgb: Int?) = paragraphs { it.copy(shading = rgb) }
     fun toggleBorder() {
         val on = currentParagraph().borderColor == null

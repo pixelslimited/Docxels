@@ -756,6 +756,7 @@ object DocxReader {
                     spaceAfterPt = spaceAfter,
                     lineSpacing = lineSpacing,
                     keepWithNext = truthy(prop("keepNext")),
+                    rtl = truthy(prop("bidi")),
                     shading = prop("shd")?.attr("fill")?.let { parseHex(it) },
                     borderColor = prop("pBdr")?.children?.firstOrNull { it.local == "top" || it.local == "left" }
                         ?.takeIf { (it.attr("val") ?: "nil") !in setOf("nil", "none") }
