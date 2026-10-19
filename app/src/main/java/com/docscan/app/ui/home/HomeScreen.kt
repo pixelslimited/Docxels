@@ -23,9 +23,8 @@ import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -101,8 +100,8 @@ fun HomeScreen(
             }
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HeroAction(Icons.Default.NoteAdd, "New doc", primary = true, modifier = Modifier.weight(1f), onClick = actions.newDoc)
+                HeroAction(Icons.Default.ReceiptLong, "Invoice", modifier = Modifier.weight(1f), onClick = actions.newInvoice)
                 HeroAction(Icons.Default.Article, "Templates", modifier = Modifier.weight(1f), onClick = actions.templates)
-                HeroAction(Icons.Default.FolderOpen, "Open file", modifier = Modifier.weight(1f)) { actions.pdfTool("view") }
                 HeroAction(Icons.Default.Download, "Import", modifier = Modifier.weight(1f), onClick = actions.importMenu)
             }
         }
@@ -120,7 +119,7 @@ fun HomeScreen(
             ToolTile(Icons.Default.PictureAsPdf, "PDF to Word", t.pink, actions.pdfToWord, Modifier.weight(1f))
             ToolTile(Icons.Default.Description, "Word to PDF", t.blue, actions.wordToPdf, Modifier.weight(1f))
             ToolTile(Icons.Default.PhotoLibrary, "Photos to PDF", t.green, actions.importPhotos, Modifier.weight(1f))
-            ToolTile(Icons.Default.DocumentScanner, "Scan paper", t.teal, actions.scan, Modifier.weight(1f))
+            ToolTile(Icons.Default.CallMerge, "Merge PDFs", t.teal, { actions.pdfTool("merge") }, Modifier.weight(1f))
         }
 
         Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {

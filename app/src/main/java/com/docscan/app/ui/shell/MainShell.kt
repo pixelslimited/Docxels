@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -230,6 +232,14 @@ fun MainShell(
                 SheetRow(Icons.Default.FileOpen, "Word file (.docx)", "Opens in the editor") {
                     importSheet = false
                     actions.importWord()
+                }
+                SheetRow(Icons.Default.PictureAsPdf, "PDF file", "Open to read, sign, fill or edit") {
+                    importSheet = false
+                    actions.pdfTool("view")
+                }
+                SheetRow(Icons.Default.DocumentScanner, "Scan paper", "Use the camera to capture a printed document") {
+                    importSheet = false
+                    actions.scan()
                 }
             }
         }
