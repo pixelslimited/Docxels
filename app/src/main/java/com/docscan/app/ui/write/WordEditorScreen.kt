@@ -454,7 +454,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
-            Text(
+            if (reading) Text(
                 status,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -471,6 +471,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
             } else Ribbon(
                 c = controller,
                 s = state,
+                status = status,
+                onStatus = { statsOpen = true },
                 tab = ribbonTab,
                 onTab = { ribbonTab = it },
                 viewMode = viewMode,
@@ -719,6 +721,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
 private fun Ribbon(
     c: EditorController,
     s: ToolbarState,
+    status: String,
+    onStatus: () -> Unit,
     tab: Int,
     onTab: (Int) -> Unit,
     viewMode: ViewMode,
@@ -771,7 +775,7 @@ private fun Ribbon(
     fun groupsOf(t: Int): List<Pair<String, androidx.compose.ui.graphics.vector.ImageVector>> = when (t) {
         0 -> listOf("Font" to Icons.Default.TextFields, "Paragraph" to Icons.Default.FormatAlignLeft, "Style" to Icons.Default.Title, "Clear" to Icons.Default.FormatClear)
         1 -> listOf("Illustrations" to Icons.Default.Image, "Letterhead and signature" to Icons.Default.Draw, "Text and page" to Icons.Default.Link)
-        2 -> listOf("Page" to Icons.Default.Description, "Paragraph" to Icons.Default.FormatAlignLeft, "Borders and shading" to Icons.Default.CropSquare)
+        2 -> listOf("Page" to Icons.Default.Description)
         3 -> listOf("Find" to Icons.Default.Search, "Proofing" to Icons.Default.Numbers, "Comments" to Icons.Default.Menu)
         else -> listOf("Views" to Icons.Default.Description, "Zoom" to Icons.Default.Search, "Reading" to Icons.Default.Menu)
     }
@@ -814,12 +818,26 @@ private fun Ribbon(
     ) {
         Column {
             if (!open) {
-                Box(Modifier.fillMaxWidth().height(56.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+                // The page and word count share one centre line with the mark, so they read as a single bottom strip.
+                Row(Modifier.fillMaxWidth().height(56.dp).padding(start = 16.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        status,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f).clickable(onClick = onStatus),
+                    )
                     Box(Modifier.size(56.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable { open = true; grid = true }, contentAlignment = Alignment.Center) {
                         com.docscan.app.ui.kit.AnimatedMark(44.dp, description = "Show tools")
                     }
                 }
             } else {
+                Text(
+                    status,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onStatus).padding(horizontal = 16.dp, vertical = 4.dp),
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.weight(1f)) {
                         tabs.forEachIndexed { i, label ->
@@ -898,7 +916,31 @@ private fun Ribbon(
                         Btn("Indent", Icons.Default.FormatIndentIncrease, main = false) { c.indent(1) }
                         Btn("Space before", Icons.Default.FormatLineSpacing, on = s.spaceBefore, main = false) { c.toggleSpaceBefore() }
                         Btn("Space after", Icons.Default.FormatLineSpacing, on = s.spaceAfter, main = false) { c.toggleSpaceAfter() }
+                        Box {
+                            Btn("Line spacing", Icons.Default.FormatLineSpacing, main = false) { spacingMenu = true }
+                            DropdownMenu(expanded = spacingMenu, onDismissRequest = { spacingMenu = false }) {
+                                listOf(null to "Default", 1.0f to "Single", 1.15f to "1.15", 1.5f to "1.5", 2.0f to "Double").forEach { (m, label) ->
+                                    DropdownMenuItem(text = { Text(label) }, onClick = { spacingMenu = false; c.setLineSpacing(m) })
+                                }
+                            }
+                        }
+                        Box {
+                            Btn("Shading", Icons.Default.FormatColorFill, main = false) { shadeMenu = true }
+                            DropdownMenu(expanded = shadeMenu, onDismissRequest = { shadeMenu = false }) {
+                                DropdownMenuItem(text = { Text("No shading") }, onClick = { shadeMenu = false; c.setShading(null) })
+                                androidx.compose.foundation.layout.Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                    SHADES.forEach { rgb ->
+                                        Box(
+                                            Modifier.padding(3.dp).size(28.dp)
+                                                .background(androidx.compose.ui.graphics.Color(0xFF000000.toInt() or rgb), androidx.compose.foundation.shape.CircleShape)
+                                                .clickable { shadeMenu = false; c.setShading(rgb) },
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Btn("Border", Icons.Default.CropSquare, main = false) { c.toggleBorder() }
+                        Btn("Paragraph settings", Icons.Default.Menu, main = false, close = true) { onParagraph() }
                         Group("Style")
                         if (!grid) Box {
                             Btn("Style", glyph = s.style.label) { styleMenu = true }
@@ -958,44 +1000,6 @@ private fun Ribbon(
                     2 -> {
                         Group("Page")
                         Btn("Page setup", Icons.Default.Description, close = true) { onPageSetup() }
-                        Group("Paragraph")
-                        Btn("Paragraph", Icons.Default.FormatAlignLeft, close = true) { onParagraph() }
-                        Box {
-                            Btn("Line spacing", Icons.Default.FormatLineSpacing) { spacingMenu = true }
-                            DropdownMenu(expanded = spacingMenu, onDismissRequest = { spacingMenu = false }) {
-                                listOf(null to "Default", 1.0f to "Single", 1.15f to "1.15", 1.5f to "1.5", 2.0f to "Double").forEach { (m, label) ->
-                                    DropdownMenuItem(text = { Text(label) }, onClick = { spacingMenu = false; c.setLineSpacing(m) })
-                                }
-                                androidx.compose.material3.HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text(if (s.spaceBefore) "Remove space before paragraph" else "Add space before paragraph") },
-                                    onClick = { spacingMenu = false; c.toggleSpaceBefore() },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(if (s.spaceAfter) "Remove space after paragraph" else "Add space after paragraph") },
-                                    onClick = { spacingMenu = false; c.toggleSpaceAfter() },
-                                )
-                            }
-                        }
-                        Btn("Outdent", Icons.Default.FormatIndentDecrease) { c.indent(-1) }
-                        Btn("Indent", Icons.Default.FormatIndentIncrease) { c.indent(1) }
-                        Group("Borders and shading")
-                        Box {
-                            Btn("Shading", Icons.Default.FormatColorFill) { shadeMenu = true }
-                            DropdownMenu(expanded = shadeMenu, onDismissRequest = { shadeMenu = false }) {
-                                DropdownMenuItem(text = { Text("No shading") }, onClick = { shadeMenu = false; c.setShading(null) })
-                                androidx.compose.foundation.layout.Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                                    SHADES.forEach { rgb ->
-                                        Box(
-                                            Modifier.padding(3.dp).size(28.dp)
-                                                .background(androidx.compose.ui.graphics.Color(0xFF000000.toInt() or rgb), androidx.compose.foundation.shape.CircleShape)
-                                                .clickable { shadeMenu = false; c.setShading(rgb) },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        Btn("Border", Icons.Default.CropSquare) { c.toggleBorder() }
                     }
                     3 -> {
                         Group("Find")
@@ -1021,21 +1025,28 @@ private fun Ribbon(
                 }
             }
             if (open && grid) {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    groupsOf(tab).forEach { (name, icon) ->
+                // Group names are plain underlined text, so they read as headings and not as more tool buttons.
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    groupsOf(tab).forEach { (name, _) ->
                         val on = name == pickedGroup
                         Column(
-                            Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
-                                .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                                .clickable { groupPick = groupPick + (tab to name) }
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            Modifier.clickable { groupPick = groupPick + (tab to name) }.padding(top = 8.dp, bottom = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Icon(icon, contentDescription = name, modifier = Modifier.size(24.dp), tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(name, style = MaterialTheme.typography.labelSmall, maxLines = 1, color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                name.uppercase(),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Box(
+                                Modifier.padding(top = 4.dp).height(2.dp).width(if (on) 28.dp else 0.dp)
+                                    .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(1.dp)),
+                            )
                         }
                     }
                 }
+                androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 androidx.compose.foundation.layout.FlowRow(
                     Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
