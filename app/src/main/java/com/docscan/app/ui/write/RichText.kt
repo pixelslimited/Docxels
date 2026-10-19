@@ -787,7 +787,7 @@ class BlockChipSpan(
 
     /** One laid-out table: every cell's text laid out with its own fonts, colours and sizes, as the page preview does. */
     private class TableLayoutCache(val table: com.docscan.app.core.word.TableBlock, val k: Float, val density: Float) {
-        class Placed(val xPx: Float, val wPx: Float, val shading: Int?, val layout: android.text.StaticLayout)
+        class Placed(val xPx: Float, val wPx: Float, val cell: com.docscan.app.core.word.TableCell, val layout: android.text.StaticLayout)
         val rows = ArrayList<List<Placed>>()
         val heights = ArrayList<Float>()
         val total: Float get() = heights.sum()
@@ -849,11 +849,11 @@ class BlockChipSpan(
                     .setIncludePad(false)
                     .build()
                 h = maxOf(h, layout.height + 2 * pad)
-                placed += TableLayoutCache.Placed(x, w, cell.shading, layout)
+                placed += TableLayoutCache.Placed(x, w, cell, layout)
                 x += w
             }
             out.rows += placed
-            out.heights += h
+            out.heights += maxOf(h, com.docscan.app.core.word.CellEdges.rowHeight(row) * k)
         }
         tableCache = out
         return out
@@ -956,24 +956,18 @@ class BlockChipSpan(
         val savedColor = paint.color
         val savedStyle = paint.style
         val savedStroke = paint.strokeWidth
-        val line = 0xFF000000.toInt() or t.borderColor
         val x = x0 + t.indentTwips * k
         val pad = 57f * k
         val plan = paging(paint)
         fun drawRow(ri: Int, y: Float, h: Float) {
             for (cell in lay.rows[ri]) {
                 val r = android.graphics.RectF(x + cell.xPx, y, x + cell.xPx + cell.wPx, y + h)
-                cell.shading?.let {
+                cell.cell.shading?.let {
                     paint.style = Paint.Style.FILL
                     paint.color = 0xFF000000.toInt() or it
                     c.drawRect(r, paint)
                 }
-                if (t.borders) {
-                    paint.style = Paint.Style.STROKE
-                    paint.strokeWidth = (t.borderWidthPt * 20f * k).coerceAtLeast(1f)
-                    paint.color = line
-                    c.drawRect(r, paint)
-                }
+                com.docscan.app.export.CellBorderDraw.draw(c, r, cell.cell, t, 20f * k)
                 c.save()
                 c.clipRect(r)
                 c.translate(r.left + pad, r.top + pad)

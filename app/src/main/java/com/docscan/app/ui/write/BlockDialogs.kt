@@ -267,6 +267,33 @@ fun TableEditorDialog(
                     ) { if (rgb == null) Text("∅") }
                 }
             }
+            Text("Row height", style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val now = com.docscan.app.core.word.CellEdges.rowHeight(table.rows.getOrNull(sr).orEmpty())
+                listOf(0 to "Fit text", 400 to "0.7 cm", 570 to "1 cm", 850 to "1.5 cm", 1140 to "2 cm", 1700 to "3 cm").forEach { (tw, label) ->
+                    FilterChip(now == tw, {
+                        table = table.copy(rows = table.rows.mapIndexed { ri, row -> if (ri == sr) row.map { it.copy(rowHeightTwips = tw) } else row })
+                    }, label = { Text(label) })
+                }
+            }
+            Text("Cell borders (choose the sides, then the line)", style = MaterialTheme.typography.labelLarge)
+            var sides by remember { mutableStateOf(setOf(0, 1, 2, 3)) }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(0 to "Top", 1 to "Left", 2 to "Bottom", 3 to "Right").forEach { (i, label) ->
+                    FilterChip(i in sides, { sides = if (i in sides) sides - i else sides + i }, label = { Text(label) })
+                }
+            }
+            fun setSides(b: com.docscan.app.core.word.CellBorder?) = applyScope { c ->
+                var bs = c.borders ?: com.docscan.app.core.word.CellBorders()
+                for (i in sides) bs = bs.with(i, b)
+                c.copy(borders = if (bs == com.docscan.app.core.word.CellBorders()) null else bs)
+            }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { setSides(com.docscan.app.core.word.CellBorder(true, 0x000000, 0.5f)) }) { Text("Thin line") }
+                OutlinedButton(onClick = { setSides(com.docscan.app.core.word.CellBorder(true, 0x000000, 2f)) }) { Text("Thick line") }
+                OutlinedButton(onClick = { setSides(com.docscan.app.core.word.CellBorder(visible = false)) }) { Text("No line") }
+                OutlinedButton(onClick = { setSides(null) }) { Text("Like the table") }
+            }
             val noVMerge = table.rows.none { r -> r.any { it.vMergeStart || it.vMergeContinue } }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(enabled = noVMerge && cur != null && sc + 1 < table.rows[sr].size, onClick = {

@@ -81,9 +81,23 @@ data class Paragraph(
     val isEmpty: Boolean get() = runs.all { it.text.isEmpty() }
 }
 
+/** One side of a cell's border. A side left null follows the table's border setting. */
+data class CellBorder(val visible: Boolean = true, val color: Int = 0x000000, val widthPt: Float = 0.5f)
+
+data class CellBorders(val top: CellBorder? = null, val left: CellBorder? = null, val bottom: CellBorder? = null, val right: CellBorder? = null) {
+    fun side(i: Int): CellBorder? = when (i) { 0 -> top; 1 -> left; 2 -> bottom; else -> right }
+    fun with(i: Int, b: CellBorder?): CellBorders = when (i) {
+        0 -> copy(top = b); 1 -> copy(left = b); 2 -> copy(bottom = b); else -> copy(right = b)
+    }
+}
+
 data class TableCell(
     val paragraphs: List<Paragraph> = listOf(Paragraph()),
     val shading: Int? = null,
+    /** Borders of this cell's own; null = the table's. */
+    val borders: CellBorders? = null,
+    /** At least this tall (twips); a row is as tall as its tallest cell asks. 0 = fit the text. */
+    val rowHeightTwips: Int = 0,
     val colSpan: Int = 1,
     /** True for the cells that a vertical merge continues into; they carry no content of their own. */
     val vMergeContinue: Boolean = false,

@@ -246,3 +246,4 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Invoice form (Printed / Online / Minimal) | IMPLEMENTED — NOT VERIFIED | Remembers your business details and payment details; invoice number counts up. Opens as a normal Word document you can edit. |
 | Quotation, Proforma and Receipt (same form and three styles as invoices) | IMPLEMENTED — NOT VERIFIED | InvoicesTest checks the wording changes. |
 | Editor splits tables between pages like the PDF preview; tables and pictures no longer draw into the page gap | IMPLEMENTED — NOT VERIFIED | TablePagingTest covers the row-splitting rule (same rule as WordPdf). Editor drawing not seen on a device: please check one long table. |
+| Table row height and per-cell borders (Word compatible) | IMPLEMENTED — NOT VERIFIED | CellBorderTest round-trips them through .docx; editor, PDF and the table editor (Cells tab) use them. Not seen on a device. |

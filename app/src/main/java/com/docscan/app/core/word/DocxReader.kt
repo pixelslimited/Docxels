@@ -983,6 +983,7 @@ object DocxReader {
             rowNodes.forEachIndexed { index, tr ->
                 if (index == 0 && tr.child("trPr")?.child("tblHeader") != null) header = true
                 var colIdx = 0
+                val rowHeight = tr.child("trPr")?.child("trHeight")?.attr("val")?.toIntOrNull()?.coerceIn(0, 20000) ?: 0
                 val cells = ArrayList<TableCell>()
                 for (tc in tr.children) {
                     val cellNode = when (tc.local) {
@@ -1007,9 +1008,18 @@ object DocxReader {
                             tmp.filterIsInstance<Block.Para>().forEach { paragraphs += it.paragraph }
                         }
                     }
+                    fun side(vararg names: String): CellBorder? {
+                        val n = names.firstNotNullOfOrNull { tcPr?.child("tcBorders")?.child(it) } ?: return null
+                        val v = n.attr("val")
+                        if (v == null || v == "nil" || v == "none") return CellBorder(visible = false)
+                        return CellBorder(true, n.attr("color")?.let { parseHex(it) } ?: 0x000000, n.attr("sz")?.toFloatOrNull()?.div(8f)?.coerceIn(0.25f, 12f) ?: 0.5f)
+                    }
+                    val own = if (tcPr?.child("tcBorders") != null) CellBorders(side("top"), side("left", "start"), side("bottom"), side("right", "end")) else null
                     cells += TableCell(
                         paragraphs = paragraphs.ifEmpty { listOf(Paragraph()) },
                         shading = fill,
+                        borders = own,
+                        rowHeightTwips = rowHeight,
                         colSpan = span,
                         vMergeStart = vm != null && vm.attr("val") == "restart",
                         vMergeContinue = vm != null && vm.attr("val") != "restart",

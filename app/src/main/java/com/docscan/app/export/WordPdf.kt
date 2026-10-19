@@ -192,8 +192,6 @@ object WordPdf {
             val total = t.columnWidthsTwips.sum().coerceAtLeast(1) / 20f * ZOOM
             val scale = if (total > contentW) contentW / total else 1f
             val widths = t.columnWidthsTwips.map { it / 20f * ZOOM * scale }
-            val bc = t.borderColor
-            val border = Paint().apply { style = Paint.Style.STROKE; strokeWidth = t.borderWidthPt * ZOOM; color = Color.rgb((bc shr 16) and 0xFF, (bc shr 8) and 0xFF, bc and 0xFF) }
             val indentPx = if (scale < 1f) 0f else t.indentTwips / 20f * ZOOM
             val fill = Paint()
             y += 2f * ZOOM
@@ -201,6 +199,7 @@ object WordPdf {
             class Placed(val x: Float, val w: Float, val cell: com.docscan.app.core.word.TableCell, val layout: StaticLayout)
 
             fun place(row: List<com.docscan.app.core.word.TableCell>): Pair<List<Placed>, Float> {
+                val minH = com.docscan.app.core.word.CellEdges.rowHeight(row) / 20f * ZOOM
                 var col = 0
                 var x = 0f
                 val placed = ArrayList<Placed>()
@@ -215,7 +214,7 @@ object WordPdf {
                     x += w
                     col += span
                 }
-                return placed to h
+                return placed to maxOf(h, minH)
             }
 
             fun draw(row: List<Placed>, h: Float) {
@@ -225,7 +224,7 @@ object WordPdf {
                             fill.color = Color.rgb((it shr 16) and 0xFF, (it shr 8) and 0xFF, it and 0xFF)
                             drawRect(indentPx + p.x, 0f, indentPx + p.x + p.w, h, fill)
                         }
-                        if (t.borders) drawRect(RectF(indentPx + p.x, 0f, indentPx + p.x + p.w, h), border)
+                        CellBorderDraw.draw(this, RectF(indentPx + p.x, 0f, indentPx + p.x + p.w, h), p.cell, t, ZOOM)
                         save()
                         clipRect(indentPx + p.x, 0f, indentPx + p.x + p.w, h)
                         translate(indentPx + p.x + pad, pad)

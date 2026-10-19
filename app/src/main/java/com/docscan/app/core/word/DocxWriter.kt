@@ -435,7 +435,14 @@ object DocxWriter {
         sb.append("</w:tblGrid>")
         t.rows.forEachIndexed { rowIndex, row ->
             sb.append("<w:tr>")
-            if (rowIndex == 0 && t.headerRow) sb.append("<w:trPr><w:cantSplit/><w:tblHeader/></w:trPr>")
+            val rowH = CellEdges.rowHeight(row)
+            if ((rowIndex == 0 && t.headerRow) || rowH > 0) {
+                sb.append("<w:trPr>")
+                if (rowIndex == 0 && t.headerRow) sb.append("<w:cantSplit/>")
+                if (rowH > 0) sb.append("<w:trHeight w:val=\"$rowH\" w:hRule=\"atLeast\"/>")
+                if (rowIndex == 0 && t.headerRow) sb.append("<w:tblHeader/>")
+                sb.append("</w:trPr>")
+            }
             var col = 0
             for (cell in row) {
                 val span = cell.colSpan.coerceAtLeast(1)
@@ -446,6 +453,15 @@ object DocxWriter {
                 if (span > 1) sb.append("<w:gridSpan w:val=\"$span\"/>")
                 if (cell.vMergeStart) sb.append("<w:vMerge w:val=\"restart\"/>")
                 else if (cell.vMergeContinue) sb.append("<w:vMerge/>")
+                cell.borders?.let { bs ->
+                    sb.append("<w:tcBorders>")
+                    for ((i, name) in listOf("top", "left", "bottom", "right").withIndex()) {
+                        val s = bs.side(i) ?: continue
+                        if (!s.visible) sb.append("<w:$name w:val=\"nil\"/>")
+                        else sb.append("<w:$name w:val=\"single\" w:sz=\"${(s.widthPt * 8f).toInt().coerceIn(2, 96)}\" w:space=\"0\" w:color=\"${hex(s.color)}\"/>")
+                    }
+                    sb.append("</w:tcBorders>")
+                }
                 cell.shading?.let { sb.append("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"${hex(it)}\"/>") }
                 sb.append("</w:tcPr>")
                 val before = ctx.currentNumId
