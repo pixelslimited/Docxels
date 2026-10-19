@@ -801,17 +801,52 @@ class BlockChipSpan(
 
     private fun pxPerTwip(paint: Paint): Float = ZOOM * ((paint as? TextPaint)?.density ?: 1f) / 20f
 
-    private fun tableRowTwips(t: com.docscan.app.core.word.TableBlock): List<Int> = t.rows.map { row ->
-        var col = 0
-        var tallest = 1
-        for (cell in row) {
-            val span = cell.colSpan.coerceAtLeast(1)
-            val width = (0 until span).sumOf { t.columnWidthsTwips.getOrElse(col + it) { 1440 } } - 230
-            col += span
-            val perLine = (width / 110).coerceAtLeast(4)
-            tallest = maxOf(tallest, cell.paragraphs.sumOf { p -> ((p.text.length + perLine - 1) / perLine).coerceAtLeast(1) })
+    /** One laid-out table: every cell's text laid out with its own fonts, colours and sizes, as the page preview does. */
+    private class TableLayoutCache(val table: com.docscan.app.core.word.TableBlock, val k: Float, val density: Float) {
+        class Placed(val xPx: Float, val wPx: Float, val shading: Int?, val layout: android.text.StaticLayout)
+        val rows = ArrayList<List<Placed>>()
+        val heights = ArrayList<Float>()
+        val total: Float get() = heights.sum()
+    }
+    private var tableCache: TableLayoutCache? = null
+
+    private fun tableLayout(t: com.docscan.app.core.word.TableBlock, paint: Paint): TableLayoutCache {
+        val density = (paint as? TextPaint)?.density ?: 1f
+        val k = pxPerTwip(paint) * fit(paint)
+        tableCache?.let { if (it.table === t && it.k == k && it.density == density) return it }
+        val out = TableLayoutCache(t, k, density)
+        val body = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.density = density
+            textSize = StyleDefaults.BODY_SIZE_PT * ZOOM * density
+            typeface = Typeface.SANS_SERIF
+            color = 0xFF1B1B1F.toInt()
         }
-        tallest * 264 + 120
+        val pad = 57f * k
+        for (row in t.rows) {
+            var col = 0
+            var x = 0f
+            var h = 0f
+            val placed = ArrayList<TableLayoutCache.Placed>()
+            for (cell in row) {
+                val span = cell.colSpan.coerceAtLeast(1)
+                val wTw = (0 until span).sumOf { t.columnWidthsTwips.getOrElse(col + it) { 1440 } }
+                val w = wTw * k
+                col += span
+                val paras = if (cell.vMergeContinue) listOf(Paragraph()) else cell.paragraphs
+                val text = SpanBridge.toEditable(paras, density)
+                val layout = android.text.StaticLayout.Builder.obtain(text, 0, text.length, body, (w - 2 * pad).toInt().coerceAtLeast(1))
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                    .setIncludePad(false)
+                    .build()
+                h = maxOf(h, layout.height + 2 * pad)
+                placed += TableLayoutCache.Placed(x, w, cell.shading, layout)
+                x += w
+            }
+            out.rows += placed
+            out.heights += h
+        }
+        tableCache = out
+        return out
     }
 
     private fun naturalWidthTwips(): Int? = when (val b = block) {
@@ -834,7 +869,7 @@ class BlockChipSpan(
             val t = if (com.docscan.app.core.word.ShapePresets.isLine(b.shape.preset)) 120 else b.shape.heightTwips
             (t * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8)
         }
-        is com.docscan.app.core.word.Block.Table -> (tableRowTwips(b.table).sum() * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8)
+        is com.docscan.app.core.word.Block.Table -> tableLayout(b.table, paint).total.roundToInt().coerceAtLeast(8)
         else -> null
     }
 
@@ -902,27 +937,22 @@ class BlockChipSpan(
     }
 
     private fun drawTable(c: Canvas, t: com.docscan.app.core.word.TableBlock, x0: Float, top: Int, paint: Paint) {
-        val k = pxPerTwip(paint) * fit(paint)
+        val lay = tableLayout(t, paint)
+        val k = lay.k
         val savedColor = paint.color
         val savedStyle = paint.style
         val savedStroke = paint.strokeWidth
-        val savedTypeface = paint.typeface
-        val rows = tableRowTwips(t)
-        var yTw = 0
         val line = 0xFF000000.toInt() or t.borderColor
         val x = x0 + t.indentTwips * k
-        for ((ri, row) in t.rows.withIndex()) {
-            var xTw = 0
-            var col = 0
+        val pad = 57f * k
+        var y = top.toFloat()
+        for ((ri, row) in lay.rows.withIndex()) {
+            val h = lay.heights[ri]
             for (cell in row) {
-                val span = cell.colSpan.coerceAtLeast(1)
-                val wTw = (0 until span).sumOf { t.columnWidthsTwips.getOrElse(col + it) { 1440 } }
-                col += span
-                val r = android.graphics.RectF(x + xTw * k, top + yTw * k, x + (xTw + wTw) * k, top + (yTw + rows[ri]) * k)
-                val fill = cell.shading?.let { 0xFF000000.toInt() or it } ?: if (t.headerRow && ri == 0) 0xFFE8EAF0.toInt() else null
-                if (fill != null) {
+                val r = android.graphics.RectF(x + cell.xPx, y, x + cell.xPx + cell.wPx, y + h)
+                cell.shading?.let {
                     paint.style = Paint.Style.FILL
-                    paint.color = fill
+                    paint.color = 0xFF000000.toInt() or it
                     c.drawRect(r, paint)
                 }
                 if (t.borders) {
@@ -931,28 +961,13 @@ class BlockChipSpan(
                     paint.color = line
                     c.drawRect(r, paint)
                 }
-                paint.style = Paint.Style.FILL
-                paint.color = 0xFF1B1B1F.toInt()
-                if (t.headerRow && ri == 0) paint.typeface = Typeface.create(savedTypeface ?: Typeface.DEFAULT, Typeface.BOLD)
-                val pad = 57f * k
-                val maxW = r.width() - 2 * pad
-                var ly = r.top + pad + paint.textSize
-                val words = cell.paragraphs.joinToString(" ") { it.text }.split(' ').filter { it.isNotEmpty() }
-                var cur = ""
-                for (w in words) {
-                    val trial = if (cur.isEmpty()) w else "$cur $w"
-                    if (paint.measureText(trial) > maxW && cur.isNotEmpty()) {
-                        if (ly > r.bottom) break
-                        c.drawText(cur, r.left + pad, ly, paint)
-                        ly += paint.textSize * 1.2f
-                        cur = w
-                    } else cur = trial
-                }
-                if (cur.isNotEmpty() && ly <= r.bottom + paint.textSize) c.drawText(cur, r.left + pad, ly, paint)
-                paint.typeface = savedTypeface
-                xTw += wTw
+                c.save()
+                c.clipRect(r)
+                c.translate(r.left + pad, r.top + pad)
+                cell.layout.draw(c)
+                c.restore()
             }
-            yTw += rows[ri]
+            y += h
         }
         paint.color = savedColor
         paint.style = savedStyle

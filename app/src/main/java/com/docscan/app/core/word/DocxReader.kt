@@ -138,10 +138,17 @@ object DocxReader {
 
     private class StyleInfo(val id: String, val name: String, val basedOn: String?, val isDefault: Boolean, val pPr: XNode?, val rPr: XNode?)
 
+    /** A table style: the look every cell gets (font, colour, shading), plus the extra look of first row, banded rows and so on. */
+    private class TableStyleInfo(val id: String, val basedOn: String?, val rPr: XNode?, val fill: Int?, val conds: Map<String, Pair<XNode?, Int?>>)
+
+    /** What a table style gives one cell: text style and shading. */
+    private class CellLook(val run: RunStyle, val fill: Int?)
+
     private class Reader(val parts: Map<String, ByteArray>, val fallbackTitle: String) {
         var rels: Map<String, String> = emptyMap()
         var links: Map<String, String> = emptyMap()
         var styles: Map<String, StyleInfo> = emptyMap()
+        var tableStyles: Map<String, TableStyleInfo> = emptyMap()
         var defaultStyleId: String? = null
         /** The document's own body font when it is not Calibri (from docDefaults / the Normal style / the theme). */
         var defaultFont: String? = null
@@ -264,6 +271,19 @@ object DocxReader {
             val path = rels.values.firstOrNull { it.endsWith("styles.xml") } ?: (if (dir.isEmpty()) "styles.xml" else "$dir/styles.xml")
             val root = xml(path) ?: return
             val map = HashMap<String, StyleInfo>()
+            val tmap = HashMap<String, TableStyleInfo>()
+            for (s in root.childrenNamed("style")) {
+                if (s.attr("type") != "table") continue
+                val id = s.attr("styleId") ?: continue
+                fun fillOf(tcPr: XNode?): Int? = tcPr?.child("shd")?.attr("fill")?.let { parseHex(it) }
+                val conds = HashMap<String, Pair<XNode?, Int?>>()
+                for (c in s.childrenNamed("tblStylePr")) {
+                    val type = c.attr("type") ?: continue
+                    conds[type] = c.child("rPr") to fillOf(c.child("tcPr"))
+                }
+                tmap[id] = TableStyleInfo(id, s.child("basedOn")?.attr("val"), s.child("rPr"), fillOf(s.child("tcPr")), conds)
+            }
+            tableStyles = tmap
             for (s in root.childrenNamed("style")) {
                 if (s.attr("type") != "paragraph" && s.attr("type") != "character") continue
                 val id = s.attr("styleId") ?: continue
@@ -680,10 +700,10 @@ object DocxReader {
         }
 
         /** Paragraph reading accumulates runs; images and page breaks split it into separate blocks. */
-        inner class ParaReader(val p: XNode, val out: MutableList<Block>, val allowImages: Boolean) {
+        inner class ParaReader(val p: XNode, val out: MutableList<Block>, val allowImages: Boolean, val tableRun: RunStyle = RunStyle()) {
             val pPr = p.child("pPr")
             val chain = chainFor(pPr?.child("pStyle")?.attr("val"))
-            val styleRun: RunStyle = chain.custom.asReversed().fold(RunStyle(font = chain.builtinFont ?: defaultFont)) { acc, st -> st.rPr?.let { readRPr(it).over(acc) } ?: acc }
+            val styleRun: RunStyle = chain.custom.asReversed().fold(RunStyle(font = chain.builtinFont ?: tableRun.font ?: defaultFont)) { acc, st -> st.rPr?.let { readRPr(it).over(acc) } ?: acc }
             val runs = ArrayList<Run>()
             var emitted = false
             val base: Paragraph
@@ -899,12 +919,57 @@ object DocxReader {
 
             fun run() {
                 if (pPr?.child("pageBreakBefore") != null && truthy(pPr.child("pageBreakBefore"))) out += Block.PageBreak
-                walk(p, RunStyle())
+                walk(p, tableRun)
                 flush(!emitted)
             }
         }
 
         fun readParagraph(p: XNode, out: MutableList<Block>) = ParaReader(p, out, allowImages = true).run()
+
+        /** The table style's look for the cell at [row]/[col], following the style's own base styles and the table's look flags. */
+        fun tableLook(styleId: String?, tblPr: XNode?, row: Int, col: Int, rows: Int, cols: Int): CellLook {
+            val chain = ArrayList<TableStyleInfo>()
+            var cur = styleId?.let { tableStyles[it] }
+            var guard = 0
+            while (cur != null && guard++ < 10) { chain += cur; cur = cur.basedOn?.let { tableStyles[it] } }
+            if (chain.isEmpty()) return CellLook(RunStyle(), null)
+            val look = tblPr?.child("tblLook")
+            val bits = look?.attr("val")?.toIntOrNull(16) ?: 0x04A0
+            fun flag(name: String, bit: Int): Boolean = look?.attr(name)?.let { it == "1" || it == "true" } ?: ((bits and bit) != 0)
+            val firstRow = flag("firstRow", 0x0020)
+            val lastRow = flag("lastRow", 0x0040)
+            val firstCol = flag("firstColumn", 0x0080)
+            val lastCol = flag("lastColumn", 0x0100)
+            val noHBand = flag("noHBand", 0x0200)
+            val noVBand = flag("noVBand", 0x0400)
+            val types = ArrayList<String>()
+            if (!noHBand) {
+                val bandRow = if (firstRow) row - 1 else row
+                if (!(firstRow && row == 0) && !(lastRow && row == rows - 1)) types += if (bandRow % 2 == 0) "band1Horz" else "band2Horz"
+            }
+            if (!noVBand) {
+                val bandCol = if (firstCol) col - 1 else col
+                if (!(firstCol && col == 0) && !(lastCol && col == cols - 1)) types += if (bandCol % 2 == 0) "band1Vert" else "band2Vert"
+            }
+            if (firstCol && col == 0) types += "firstCol"
+            if (lastCol && col == cols - 1) types += "lastCol"
+            if (firstRow && row == 0) types += "firstRow"
+            if (lastRow && row == rows - 1) types += "lastRow"
+            if (firstRow && row == 0 && firstCol && col == 0) types += "nwCell"
+            var run = RunStyle()
+            var fill: Int? = null
+            // Base styles first, then each style's own whole-table look, then its conditional looks in order.
+            for (st in chain.asReversed()) {
+                st.rPr?.let { run = readRPr(it).over(run) }
+                if (st.fill != null) fill = st.fill
+                for (t in types) {
+                    val c = st.conds[t] ?: continue
+                    c.first?.let { run = readRPr(it).over(run) }
+                    if (c.second != null) fill = c.second
+                }
+            }
+            return CellLook(run, fill)
+        }
 
         fun readTable(tbl: XNode): TableBlock? {
             val grid = tbl.child("tblGrid")?.childrenNamed("gridCol")?.mapNotNull { it.attr("w")?.toIntOrNull() }?.toMutableList() ?: mutableListOf()
@@ -913,8 +978,11 @@ object DocxReader {
             if (rowNodes.isEmpty()) return null
             val rows = ArrayList<List<TableCell>>()
             var header = false
+            val styleId = tblPr?.child("tblStyle")?.attr("val")
+            val colCount = maxOf(grid.size, rowNodes.maxOf { r -> r.children.count { it.local == "tc" } })
             rowNodes.forEachIndexed { index, tr ->
                 if (index == 0 && tr.child("trPr")?.child("tblHeader") != null) header = true
+                var colIdx = 0
                 val cells = ArrayList<TableCell>()
                 for (tc in tr.children) {
                     val cellNode = when (tc.local) {
@@ -925,12 +993,17 @@ object DocxReader {
                     val tcPr = cellNode.child("tcPr")
                     val span = tcPr?.child("gridSpan")?.attr("val")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
                     val vm = tcPr?.child("vMerge")
-                    val fill = tcPr?.child("shd")?.attr("fill")?.let { parseHex(it) }
+                    val look = tableLook(styleId, tblPr, index, colIdx, rowNodes.size, colCount)
+                    colIdx += span
+                    val shdNode = tcPr?.child("shd")
+                    val direct = shdNode?.attr("fill")?.let { parseHex(it) }
+                    // "auto" fill means no colour of its own, so the table style's shading shows through.
+                    val fill = direct ?: look.fill
                     val paragraphs = ArrayList<Paragraph>()
                     for (c in cellNode.children) {
                         if (c.local == "p") {
                             val tmp = ArrayList<Block>()
-                            ParaReader(c, tmp, allowImages = false).run()
+                            ParaReader(c, tmp, allowImages = false, tableRun = look.run).run()
                             tmp.filterIsInstance<Block.Para>().forEach { paragraphs += it.paragraph }
                         }
                     }
