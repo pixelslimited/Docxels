@@ -81,3 +81,4 @@
 205|Document actions now appear only after you tap a document. Deleting for good asks for fingerprint, face or screen lock when your phone has one.
 205|Invoices: pick Printed, Online or Minimal, fill in the form, and get an editable document with totals and the amount in words.
 205|Renaming a document no longer accepts an empty name.
+206|Quotations, proforma invoices and receipts, in the same three styles as invoices.

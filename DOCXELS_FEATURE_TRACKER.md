@@ -244,3 +244,4 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Document actions appear after tap (bottom sheet); permanent delete and Empty Trash need device lock check | IMPLEMENTED — NOT VERIFIED | Moving to Trash needs only the confirmation (it is restorable). If the phone has no lock, the confirmation alone applies. |
 | Name dialogs: blank names blocked, length limit, trimmed | IMPLEMENTED — NOT VERIFIED | Rename dialogs show "A name is needed"; tags may be blank to clear them. |
 | Invoice form (Printed / Online / Minimal) | IMPLEMENTED — NOT VERIFIED | Remembers your business details and payment details; invoice number counts up. Opens as a normal Word document you can edit. |
+| Quotation, Proforma and Receipt (same form and three styles as invoices) | IMPLEMENTED — NOT VERIFIED | InvoicesTest checks the wording changes. |

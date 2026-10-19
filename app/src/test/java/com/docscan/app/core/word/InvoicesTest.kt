@@ -54,4 +54,21 @@ class InvoicesTest {
             .joinToString(" ") { c -> c.paragraphs.joinToString(" ") { it.text } }
         assertTrue(signs.contains("Authorised signature"))
     }
+
+    @Test fun kindChangesWording() {
+        val q = InvoiceData(businessName = "P", customerName = "C", number = "Q1", kind = BillKind.QUOTATION,
+            items = listOf(InvoiceItem("Work", 1.0, 100.0)))
+        for (style in InvoiceStyle.entries) {
+            val doc = Invoices.build(q, style)
+            val all = doc.blocks.joinToString(" ") { b ->
+                when (b) {
+                    is Block.Para -> b.paragraph.text
+                    is Block.Table -> b.table.rows.flatten().joinToString(" ") { c -> c.paragraphs.joinToString(" ") { it.text } }
+                    else -> ""
+                }
+            }
+            assertTrue("$style says Quotation", all.contains("Quotation", ignoreCase = true))
+            assertTrue("$style has no Amount due", !all.contains("Amount due"))
+        }
+    }
 }

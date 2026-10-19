@@ -11,6 +11,14 @@ enum class InvoiceStyle(val label: String, val blurb: String) {
     MINIMAL("Minimal", "Plain and compact: light header, no ruled lines"),
 }
 
+/** What the document is. Same layout, different wording. */
+enum class BillKind(val label: String, val title: String, val dateLabel: String, val dueLabel: String, val totalLabel: String) {
+    INVOICE("Invoice", "Invoice", "Date", "Due date", "Amount due"),
+    PROFORMA("Proforma", "Proforma invoice", "Date", "Valid until", "Total"),
+    QUOTATION("Quotation", "Quotation", "Date", "Valid until", "Total"),
+    RECEIPT("Receipt", "Receipt", "Date", "Paid on", "Amount paid"),
+}
+
 class InvoiceItem(val description: String, val qty: Double, val unitPrice: Double) {
     val amount: Double get() = qty * unitPrice
 }
@@ -40,6 +48,7 @@ class InvoiceData(
     val taxName: String = "VAT",
     val paymentDetails: String = "",
     val notes: String = "",
+    val kind: BillKind = BillKind.INVOICE,
 ) {
     val subtotal: Double get() = items.sumOf { it.amount }
     val discount: Double get() = round2(subtotal * discountPercent / 100.0)
@@ -147,7 +156,7 @@ object Invoices {
         add("Subtotal", sym + money(d.subtotal))
         if (d.discountPercent > 0) add("Discount (${qtyText(d.discountPercent)}%)", "-" + sym + money(d.discount))
         if (d.taxPercent > 0) add("${d.taxName} (${qtyText(d.taxPercent)}%)", sym + money(d.tax))
-        add(if (shadeTotal != null) "Amount due" else "Total", sym + money(d.total), strong = true)
+        add(if (shadeTotal != null) d.kind.totalLabel else "Total", sym + money(d.total), strong = true)
         return rows
     }
 
@@ -169,7 +178,7 @@ object Invoices {
             InvoiceStyle.ONLINE -> online(d)
             InvoiceStyle.MINIMAL -> minimal(d)
         }
-        return WordDoc(title = "Invoice " + d.number.ifBlank { d.customerName }.trim(), page = page, blocks = blocks)
+        return WordDoc(title = d.kind.title + " " + d.number.ifBlank { d.customerName }.trim(), page = page, blocks = blocks)
     }
 
     private fun traditional(d: InvoiceData): List<Block> {
@@ -183,7 +192,7 @@ object Invoices {
         val info = TableBlock(
             listOf(listOf(
                 cell(listOf(p("BILL TO", bold = true, size = 9f, color = GREY)) + lines(d.customerName, bold = true) + lines(d.customerAddress)),
-                cell(listOf(p("Invoice No: ${d.number}", bold = true), p("Date: ${d.date}"), p("Due date: ${d.due}"))),
+                cell(listOf(p("${d.kind.title} No: ${d.number}", bold = true), p("${d.kind.dateLabel}: ${d.date}"), p("${d.kind.dueLabel}: ${d.due}"))),
             )),
             listOf(WIDTH / 2, WIDTH - WIDTH / 2), borders = true, borderColor = 0x000000, borderWidthPt = 0.75f,
         )
@@ -193,7 +202,7 @@ object Invoices {
             listOf(WIDTH / 2, WIDTH - WIDTH / 2), borders = false,
         )
         return buildList {
-            add(Block.Para(p("INVOICE", bold = true, size = 22f, align = Align.CENTER, after = 2f)))
+            add(Block.Para(p(d.kind.title.uppercase(), bold = true, size = 22f, align = Align.CENTER, after = 2f)))
             add(Block.Para(p(d.businessName, bold = true, size = 15f, align = Align.CENTER, after = 0f)))
             lines(d.businessContact, size = 10f, align = Align.CENTER).forEach { add(Block.Para(it)) }
             add(Block.Para(p("", after = 6f)))
@@ -216,13 +225,13 @@ object Invoices {
         val top = TableBlock(
             listOf(listOf(
                 cell(listOf(p(d.businessName, bold = true, size = 13f)) + lines(d.businessContact, size = 10f, color = GREY)),
-                cell(listOf(p("Invoice no", size = 9f, color = GREY, align = Align.RIGHT), p(d.number, bold = true, align = Align.RIGHT, after = 6f),
-                    p("Issued ${d.date}", size = 10f, align = Align.RIGHT), p("Due ${d.due}", size = 10f, bold = true, align = Align.RIGHT))),
+                cell(listOf(p("${d.kind.title} no", size = 9f, color = GREY, align = Align.RIGHT), p(d.number, bold = true, align = Align.RIGHT, after = 6f),
+                    p("${d.kind.dateLabel} ${d.date}", size = 10f, align = Align.RIGHT), p("${d.kind.dueLabel} ${d.due}", size = 10f, bold = true, align = Align.RIGHT))),
             )),
             listOf(5906, 4000), borders = false,
         )
         return buildList {
-            add(Block.Para(p("Invoice", bold = true, size = 30f, color = ACCENT, after = 10f)))
+            add(Block.Para(p(d.kind.title, bold = true, size = 30f, color = ACCENT, after = 10f)))
             add(Block.Table(top))
             add(Block.Para(p("BILLED TO", bold = true, size = 9f, color = GREY, before = 14f)))
             lines(d.customerName, bold = true, size = 12f).forEach { add(Block.Para(it)) }
@@ -242,8 +251,8 @@ object Invoices {
         rows += itemRows(d, serial = false, stripe = null)
         rows += totalRows(d, cols = 4, shadeTotal = null, totalColor = null)
         return buildList {
-            add(Block.Para(p("Invoice ${d.number}", bold = true, size = 20f, after = 2f)))
-            add(Block.Para(p("${d.date}   ·   Due ${d.due}", color = GREY, after = 12f)))
+            add(Block.Para(p("${d.kind.title} ${d.number}", bold = true, size = 20f, after = 2f)))
+            add(Block.Para(p("${d.date}   ·   ${d.kind.dueLabel} ${d.due}", color = GREY, after = 12f)))
             add(Block.Para(p(d.businessName, bold = true)))
             lines(d.businessContact, size = 10f, color = GREY).forEach { add(Block.Para(it)) }
             add(Block.Para(p("To", color = GREY, size = 9f, before = 12f)))

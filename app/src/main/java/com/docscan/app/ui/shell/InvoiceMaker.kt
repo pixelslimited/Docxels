@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.docscan.app.core.word.BillKind
 import com.docscan.app.core.word.InvoiceCurrency
 import com.docscan.app.core.word.InvoiceData
 import com.docscan.app.core.word.InvoiceItem
@@ -60,6 +61,7 @@ fun InvoiceMaker(onCreate: (InvoiceData, InvoiceStyle) -> Unit, onDismiss: () ->
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("invoice", Context.MODE_PRIVATE) }
     var style by remember { mutableStateOf(InvoiceStyle.TRADITIONAL) }
+    var kind by remember { mutableStateOf(BillKind.INVOICE) }
     var business by remember { mutableStateOf(prefs.getString("business", "") ?: "") }
     var contact by remember { mutableStateOf(prefs.getString("contact", "") ?: "") }
     var payment by remember { mutableStateOf(prefs.getString("payment", "") ?: "") }
@@ -81,7 +83,7 @@ fun InvoiceMaker(onCreate: (InvoiceData, InvoiceStyle) -> Unit, onDismiss: () ->
             .map { InvoiceItem(it.desc.trim(), it.qty.toDoubleOrNull() ?: 1.0, it.price.toDoubleOrNull() ?: 0.0) },
         discountPercent = discount.toDoubleOrNull() ?: 0.0,
         taxPercent = tax.toDoubleOrNull() ?: 0.0,
-        paymentDetails = payment.trim(), notes = notes.trim(),
+        paymentDetails = payment.trim(), notes = notes.trim(), kind = kind,
     )
     val preview = data()
 
@@ -89,10 +91,14 @@ fun InvoiceMaker(onCreate: (InvoiceData, InvoiceStyle) -> Unit, onDismiss: () ->
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("New invoice", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                    Text("New ${kind.label.lowercase()}", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "Close") }
                 }
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Label("Document")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BillKind.entries.forEach { k -> FilterChip(kind == k, { kind = k }, label = { Text(k.label) }) }
+                    }
                     Label("Style")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         InvoiceStyle.entries.forEach { st -> FilterChip(style == st, { style = st }, label = { Text(st.label) }) }
@@ -108,10 +114,10 @@ fun InvoiceMaker(onCreate: (InvoiceData, InvoiceStyle) -> Unit, onDismiss: () ->
                     Field(address, { address = it }, "Customer address", lines = 2)
 
                     Label("Details")
-                    Field(number, { number = it }, "Invoice number")
+                    Field(number, { number = it }, "${kind.title} number")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Field(date, { date = it }, "Date", Modifier.weight(1f))
-                        Field(due, { due = it }, "Due date", Modifier.weight(1f))
+                        Field(due, { due = it }, kind.dueLabel, Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         InvoiceCurrency.all.forEach { c -> FilterChip(currency == c, { currency = c }, label = { Text("${c.symbol} ${c.major}") }) }
@@ -153,7 +159,7 @@ fun InvoiceMaker(onCreate: (InvoiceData, InvoiceStyle) -> Unit, onDismiss: () ->
                                 .putInt("next", (number.filter { it.isDigit() }.toIntOrNull() ?: prefs.getInt("next", 1)) + 1).apply()
                             onCreate(preview, style)
                         },
-                    ) { Text("Create invoice") }
+                    ) { Text("Create ${kind.label.lowercase()}") }
                 }
             }
         }
