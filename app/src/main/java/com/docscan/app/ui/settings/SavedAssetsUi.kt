@@ -45,6 +45,8 @@ import com.docscan.app.ui.write.SignatureImportDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private fun thumb(bytes: ByteArray?): Bitmap? = bytes?.let {
     runCatching {

@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.docscan.app.update.UpdateInfo
 import com.docscan.app.update.Updater
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private sealed interface UpdateState {
     data object Idle : UpdateState

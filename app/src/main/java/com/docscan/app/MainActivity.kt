@@ -16,6 +16,7 @@ import com.docscan.app.security.Authenticator
 import com.docscan.app.ui.AppNav
 import com.docscan.app.ui.LockScreen
 import com.docscan.app.ui.theme.DocScanTheme
+import androidx.compose.runtime.getValue
 
 val LocalContainer = staticCompositionLocalOf<AppContainer> { error("AppContainer not provided") }
 

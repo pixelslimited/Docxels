@@ -29,6 +29,8 @@ import com.docscan.app.core.Pt
 import com.docscan.app.ui.fitRect
 import kotlin.math.hypot
 import kotlin.math.max
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private fun DrawScope.drawFitted(bitmap: Bitmap, image: androidx.compose.ui.graphics.ImageBitmap) {
     val r = fitRect(size.width, size.height, bitmap.width, bitmap.height)

@@ -22,6 +22,8 @@ import com.docscan.app.ui.scan.ScanViewModel
 import com.docscan.app.ui.shell.MainShell
 import com.docscan.app.ui.write.WordEditorScreen
 import com.docscan.app.ui.write.WordViewModel
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private const val HOME = "home"
 private const val SCAN = "scan/{docId}"

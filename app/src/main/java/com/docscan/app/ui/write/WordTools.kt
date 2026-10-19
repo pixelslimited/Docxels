@@ -43,6 +43,8 @@ import com.docscan.app.core.word.WordStats
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /** Fonts that Word documents commonly use. Android shows the closest of its own fonts; Word shows the real one. */
 val WORD_FONTS = listOf(

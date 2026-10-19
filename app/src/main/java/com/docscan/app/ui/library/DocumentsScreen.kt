@@ -63,6 +63,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private enum class Filter { ALL, WORD, SCANS, PDFS, FAVOURITES, TRASH }
 private enum class Sort(val label: String) { DATE("Date modified"), NAME("Name") }

@@ -90,6 +90,8 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /** Page outline detected in the live preview, normalised to the (upright) analysed frame. */
 private data class LiveQuad(val points: List<Pt>, val frameWidth: Int, val frameHeight: Int)

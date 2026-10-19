@@ -62,6 +62,8 @@ import com.docscan.app.imaging.DocMode
 import com.docscan.app.ui.BusyOverlay
 import com.docscan.app.ui.UiEvent
 import kotlin.math.roundToInt
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private val TABS = listOf("Crop", "Enhance", "Clean", "Table")
 

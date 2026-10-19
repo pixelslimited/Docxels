@@ -48,6 +48,8 @@ import com.docscan.app.pdf.PdfPreview
 import com.docscan.app.ui.kit.GradientButton
 import com.docscan.app.ui.settings.SavedAssetsDialog
 import kotlin.math.roundToInt
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /** A mark being placed; the numbers are fractions of the page (see [PdfMark]). */
 private class Placed(

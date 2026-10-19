@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import com.docscan.app.LocalContainer
 import com.docscan.app.data.PageEntity
 import java.io.File
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /** One-off messages from a ViewModel to the screen. */
 sealed interface UiEvent {

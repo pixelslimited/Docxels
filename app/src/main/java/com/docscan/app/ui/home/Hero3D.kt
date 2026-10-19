@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
 
 
 /** The sheets' own turning, driven by touch: drag to turn them, flick to spin them, tap to flip them over. */

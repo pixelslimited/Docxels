@@ -75,6 +75,8 @@ import com.docscan.app.ui.library.DocumentsScreen
 import com.docscan.app.ui.settings.SettingsScreen
 import com.docscan.app.ui.theme.DocxelsTheme
 import com.docscan.app.ui.tools.ToolsScreen
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 enum class Tab { HOME, DOCS, TOOLS, SETTINGS }
 

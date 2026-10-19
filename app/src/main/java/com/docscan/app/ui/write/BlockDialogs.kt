@@ -57,6 +57,8 @@ import com.docscan.app.core.word.Run
 import com.docscan.app.core.word.RunStyle
 import com.docscan.app.core.word.TableBlock
 import com.docscan.app.core.word.TableCell
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private const val HEADER_SHADE = 0xD9E2F3
 

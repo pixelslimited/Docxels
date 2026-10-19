@@ -9,6 +9,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 class WordViewModel(private val container: AppContainer, val id: String) : ViewModel() {
     var doc by mutableStateOf<WordDoc?>(null)

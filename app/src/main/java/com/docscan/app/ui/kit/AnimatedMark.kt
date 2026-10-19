@@ -20,6 +20,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import com.docscan.app.R
 import com.docscan.app.ui.theme.DocxelsTheme
+import androidx.compose.runtime.getValue
 
 /**
  * The Docxels mark, with no background, whose colour drifts smoothly round the spectrum. The colours wrap back to where

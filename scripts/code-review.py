@@ -37,7 +37,7 @@ for p, s in src.items():
     body = re.sub(r'^import .*$', '', s, flags=re.M)
     for m in re.finditer(r'^import ([\w.]+?)(?: as (\w+))?$', s, re.M):
         n = m.group(2) or m.group(1).split('.')[-1]
-        if n != '*' and not re.search(r'\b' + re.escape(n) + r'\b', body):
+        if n not in ('getValue', 'setValue', 'provideDelegate', 'plus', 'minus', 'times', 'div', 'invoke', 'compareTo', 'contains', 'rangeTo', 'get', 'set') and n != '*' and not re.search(r'\b' + re.escape(n) + r'\b', body):
             add('Unused imports', f'{rel}: {m.group(1)}')
     if s.count('\n') > 1200:
         add('Oversized files (over 1200 lines, split)', f'{rel}: {s.count(chr(10))} lines')

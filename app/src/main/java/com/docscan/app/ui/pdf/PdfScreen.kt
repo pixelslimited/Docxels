@@ -80,6 +80,8 @@ import com.docscan.app.ui.kit.SoftButton
 import com.docscan.app.ui.kit.docCard
 import com.docscan.app.ui.theme.DocxelsTheme
 import java.io.File
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 enum class PdfMode(val route: String, val title: String, val hint: String, val many: Boolean) {
     VIEW("view", "PDF viewer", "Open a PDF to read it on this phone.", false),

@@ -34,6 +34,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.docscan.app.core.word.WordDoc
 import com.docscan.app.pdf.PdfPreview
 import java.io.File
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
  * Shows the document exactly as it prints: every sheet with its margins, header, footer and letterhead repeated on each

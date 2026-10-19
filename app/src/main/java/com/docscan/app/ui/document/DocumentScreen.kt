@@ -61,6 +61,8 @@ import com.docscan.app.ui.ConfirmDialog
 import com.docscan.app.ui.PageThumb
 import com.docscan.app.ui.TextInputDialog
 import com.docscan.app.ui.UiEvent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

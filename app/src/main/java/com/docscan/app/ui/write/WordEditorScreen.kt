@@ -123,6 +123,8 @@ import com.docscan.app.export.ShareHelper
 import com.docscan.app.ui.TextInputDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private val TEXT_COLORS = listOf(0x000000, 0x595959, 0xC00000, 0xED7D31, 0x00B050, 0x0070C0, 0x7030A0, 0xFFFFFF)
 private val SHADES = listOf(0xF2F2F2, 0xFFF2CC, 0xDDEBF7, 0xE2EFDA, 0xFCE4D6, 0xEADCF4)
