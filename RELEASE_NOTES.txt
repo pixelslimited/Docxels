@@ -79,3 +79,5 @@
 205|Home redesigned around documents: New doc, Invoice, Templates, Import (PDF, Word, photos and Scan paper now live there), business documents, convert tools.
 205|Floating scan button removed. New floating bottom bar with a sliding bead; Back from any tab returns to Home.
 205|Document actions now appear only after you tap a document. Deleting for good asks for fingerprint, face or screen lock when your phone has one.
+205|Invoices: pick Printed, Online or Minimal, fill in the form, and get an editable document with totals and the amount in words.
+205|Renaming a document no longer accepts an empty name.

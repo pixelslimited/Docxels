@@ -88,13 +88,21 @@ fun TextInputDialog(
     confirmLabel: String,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
+    allowBlank: Boolean = false,
+    maxLength: Int = 100,
 ) {
     var text by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true) },
-        confirmButton = { TextButton(onClick = { onConfirm(text) }) { Text(confirmLabel) } },
+        text = {
+            OutlinedTextField(
+                value = text, onValueChange = { text = it.take(maxLength) }, singleLine = true,
+                supportingText = { if (!allowBlank && text.isBlank()) Text("A name is needed") },
+                isError = !allowBlank && text.isBlank(),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }, enabled = allowBlank || text.isNotBlank()) { Text(confirmLabel) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

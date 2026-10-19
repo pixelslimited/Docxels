@@ -294,7 +294,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
         FolderDialog(item, folders, onPick = { vm.moveToFolder(item, it); moving = null }, onDismiss = { moving = null })
     }
     tagging?.let { item ->
-        TextInputDialog("Tags (separate with commas)", item.meta.tags.joinToString(", "), "Save", onConfirm = { vm.setTags(item, it); tagging = null }, onDismiss = { tagging = null })
+        TextInputDialog("Tags (separate with commas)", item.meta.tags.joinToString(", "), "Save", onConfirm = { vm.setTags(item, it); tagging = null }, onDismiss = { tagging = null }, allowBlank = true, maxLength = 200)
     }
 }
 
