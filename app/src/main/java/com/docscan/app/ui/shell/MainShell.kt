@@ -84,6 +84,7 @@ class Actions(
     val newDoc: () -> Unit,
     val templates: () -> Unit,
     val newFromTemplate: (String) -> Unit,
+    val newInvoice: () -> Unit,
     val scan: () -> Unit,
     val importMenu: () -> Unit,
     val importPhotos: () -> Unit,
@@ -118,6 +119,7 @@ fun MainShell(
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var importSheet by remember { mutableStateOf(false) }
     var templateSheet by remember { mutableStateOf(false) }
+    var invoiceMaker by remember { mutableStateOf(false) }
     var pick by remember { mutableStateOf<Pick?>(null) }
     val snackbar = remember { SnackbarHostState() }
     // Back from Documents, Tools or Settings goes to Home first; only Home leaves the app.
@@ -147,7 +149,8 @@ fun MainShell(
         Actions(
             newDoc = { vm.newWord(onOpenWord) },
             templates = { templateSheet = true },
-            newFromTemplate = { id -> vm.newFromTemplate(id, onOpenWord) },
+            newFromTemplate = { id -> if (id == "invoice") invoiceMaker = true else vm.newFromTemplate(id, onOpenWord) },
+            newInvoice = { invoiceMaker = true },
             scan = { vm.startScan(onScanDoc) },
             importMenu = { importSheet = true },
             importPhotos = { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -202,11 +205,18 @@ fun MainShell(
                 com.docscan.app.core.word.Templates.all.forEach { t ->
                     SheetRow(Icons.Default.NoteAdd, t.label, t.blurb) {
                         templateSheet = false
-                        vm.newFromTemplate(t.id, onOpenWord)
+                        actions.newFromTemplate(t.id)
                     }
                 }
             }
         }
+    }
+
+    if (invoiceMaker) {
+        com.docscan.app.ui.shell.InvoiceMaker(
+            onCreate = { data, style -> invoiceMaker = false; vm.createInvoice(data, style, onOpenWord) },
+            onDismiss = { invoiceMaker = false },
+        )
     }
 
     if (importSheet) {

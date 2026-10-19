@@ -149,11 +149,15 @@ jobs:
           if-no-files-found: error
 
       # Publishes the APK on the repo's Releases page (marked "Latest"), replacing the previous one.
+      # The in-app updater reads the site repo, not this release, so a failure here must not stop the site publish below.
       - name: Publish GitHub Release
+        id: release
+        continue-on-error: true
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          exec > >(tee release.log) 2>&1
           cp app/build/outputs/apk/release/app-release.apk Docxels.apk
           {
             echo "Built from commit ${GITHUB_SHA::7}. Download Docxels.apk on your phone and install it (allow installs from unknown sources)."
@@ -176,6 +180,14 @@ jobs:
             echo "release attempt $attempt failed"
           done
           exit 1
+
+      - name: Report release errors on the commit
+        if: steps.release.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo "Publishing the GitHub release failed (the site update still ran). Last lines:"; echo '```'; tail -n 25 release.log; echo '```'; } > rel.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -f body="$(cat rel.md)" || true
 
       # Publishes the APK + update.json on the public site repo so the app's "Check for updates" can find it.
       # Needs a repository secret SITE_TOKEN (a token with write access to iCode010101/docxels-site). Skipped if absent.

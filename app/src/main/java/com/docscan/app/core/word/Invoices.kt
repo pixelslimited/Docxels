@@ -135,13 +135,13 @@ object Invoices {
     }
 
     /** Subtotal / discount / tax / total rows; the label runs across all but the last column. */
-    private fun totalRows(d: InvoiceData, cols: Int, shadeTotal: Int?, totalColor: Int?, boldTotal: Boolean = true): List<List<TableCell>> {
+    private fun totalRows(d: InvoiceData, cols: Int, shadeTotal: Int?, totalColor: Int?): List<List<TableCell>> {
         val sym = d.currency.symbol
         val rows = ArrayList<List<TableCell>>()
         fun add(label: String, value: String, strong: Boolean = false) {
             val shade = if (strong) shadeTotal else null
             val color = if (strong) totalColor else null
-            rows += listOf(cell(label, bold = strong || boldTotal && false, align = Align.RIGHT, span = cols - 1, shading = shade, color = color),
+            rows += listOf(cell(label, bold = strong, align = Align.RIGHT, span = cols - 1, shading = shade, color = color),
                 cell(value, bold = strong, align = Align.RIGHT, shading = shade, color = color))
         }
         add("Subtotal", sym + money(d.subtotal))
@@ -179,7 +179,7 @@ object Invoices {
         rows += listOf(cell("S/N", true, Align.CENTER, head), cell("Description", true, shading = head), cell("Qty", true, Align.RIGHT, head),
             cell("Rate (${d.currency.symbol})", true, Align.RIGHT, head), cell("Amount (${d.currency.symbol})", true, Align.RIGHT, head))
         rows += itemRows(d, serial = true, stripe = null)
-        rows += totalRows(d, cols = 5, shadeTotal = head, totalColor = null).map { r -> r }
+        rows += totalRows(d, cols = 5, shadeTotal = head, totalColor = null)
         val info = TableBlock(
             listOf(listOf(
                 cell(listOf(p("BILL TO", bold = true, size = 9f, color = GREY)) + lines(d.customerName, bold = true) + lines(d.customerAddress)),

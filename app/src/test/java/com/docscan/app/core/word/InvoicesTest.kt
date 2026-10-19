@@ -49,6 +49,9 @@ class InvoicesTest {
     @Test fun printedStyleHasAmountInWordsAndSignature() {
         val doc = Invoices.build(data, InvoiceStyle.TRADITIONAL)
         val text = doc.blocks.filterIsInstance<Block.Para>().joinToString("\n") { it.paragraph.text }
-        assertTrue(text.contains("Amount in words: Twelve Thousand, Ninety-Four Naira, Twenty-Three Kobo Only".replace("Ninety-Four", "and Ninety-Four").let { "Amount in words:" }))
+        assertTrue(text.contains("Amount in words: Twelve Thousand and Ninety-Four Naira, Twenty-Three Kobo Only"))
+        val signs = doc.blocks.filterIsInstance<Block.Table>().last().table.rows.flatten()
+            .joinToString(" ") { c -> c.paragraphs.joinToString(" ") { it.text } }
+        assertTrue(signs.contains("Authorised signature"))
     }
 }
