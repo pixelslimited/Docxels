@@ -245,3 +245,4 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Name dialogs: blank names blocked, length limit, trimmed | IMPLEMENTED — NOT VERIFIED | Rename dialogs show "A name is needed"; tags may be blank to clear them. |
 | Invoice form (Printed / Online / Minimal) | IMPLEMENTED — NOT VERIFIED | Remembers your business details and payment details; invoice number counts up. Opens as a normal Word document you can edit. |
 | Quotation, Proforma and Receipt (same form and three styles as invoices) | IMPLEMENTED — NOT VERIFIED | InvoicesTest checks the wording changes. |
+| Editor splits tables between pages like the PDF preview; tables and pictures no longer draw into the page gap | IMPLEMENTED — NOT VERIFIED | TablePagingTest covers the row-splitting rule (same rule as WordPdf). Editor drawing not seen on a device: please check one long table. |

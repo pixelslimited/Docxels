@@ -794,6 +794,32 @@ class BlockChipSpan(
     }
     private var tableCache: TableLayoutCache? = null
 
+    /** True for a table chip. */
+    val isTable: Boolean get() = block is com.docscan.app.core.word.Block.Table
+
+    /**
+     * Page-view paging, set by the editor: how far down its page the table starts, the text height of a page and the
+     * gap between pages. While [startY] is negative (mobile view) the table is one unbroken block.
+     */
+    var startY = -1f
+    var pageH = 0f
+    var pageGap = 0f
+
+    private var planKey: List<Any?>? = null
+    private var planCache: com.docscan.app.core.word.TablePaging.Plan? = null
+
+    /** The table's page breaks, or null when it is not paged. */
+    fun paging(paint: Paint): com.docscan.app.core.word.TablePaging.Plan? {
+        val b = block as? com.docscan.app.core.word.Block.Table ?: return null
+        if (startY < 0f || pageH <= 0f) return null
+        val lay = tableLayout(b.table, paint)
+        val key = listOf(lay, startY, pageH, pageGap)
+        if (key == planKey) return planCache
+        planKey = key
+        planCache = com.docscan.app.core.word.TablePaging.plan(lay.heights, b.table.headerRow, startY, pageH, pageGap)
+        return planCache
+    }
+
     private fun tableLayout(t: com.docscan.app.core.word.TableBlock, paint: Paint): TableLayoutCache {
         val density = (paint as? TextPaint)?.density ?: 1f
         val k = pxPerTwip(paint) * fit(paint)
@@ -853,7 +879,7 @@ class BlockChipSpan(
             val t = if (com.docscan.app.core.word.ShapePresets.isLine(b.shape.preset)) 120 else b.shape.heightTwips
             (t * pxPerTwip(paint) * fit(paint)).roundToInt().coerceAtLeast(8)
         }
-        is com.docscan.app.core.word.Block.Table -> tableLayout(b.table, paint).total.roundToInt().coerceAtLeast(8)
+        is com.docscan.app.core.word.Block.Table -> (paging(paint)?.height ?: tableLayout(b.table, paint).total).roundToInt().coerceAtLeast(8)
         else -> null
     }
 
@@ -877,13 +903,17 @@ class BlockChipSpan(
 
     override fun draw(c: Canvas, text: CharSequence?, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
         if (floating) return
+        // The line also carries the blank room between pages and paragraph spacing; the object itself ends at the baseline.
+        val h = heightPx(paint)
+        val objTop = if (h != null) y - h else top
+        val objBottom = if (h != null) y else bottom
         when (val b = block) {
-            is com.docscan.app.core.word.Block.Image -> drawImage(c, b.image, x, top, bottom, paint)
+            is com.docscan.app.core.word.Block.Image -> drawImage(c, b.image, x, objTop, objBottom, paint)
             is com.docscan.app.core.word.Block.Shape -> {
                 val w = (widthPx(paint) ?: 0).toFloat()
-                com.docscan.app.export.ShapeDraw.draw(c, b.shape, android.graphics.RectF(x, top.toFloat(), x + w, bottom.toFloat()), pxPerTwip(paint) * 20f)
+                com.docscan.app.export.ShapeDraw.draw(c, b.shape, android.graphics.RectF(x, objTop.toFloat(), x + w, objBottom.toFloat()), pxPerTwip(paint) * 20f)
             }
-            is com.docscan.app.core.word.Block.Table -> drawTable(c, b.table, x, top, paint)
+            is com.docscan.app.core.word.Block.Table -> drawTable(c, b.table, x, objTop, paint)
             else -> drawLabel(c, x, top, y, bottom, paint)
         }
     }
@@ -929,10 +959,9 @@ class BlockChipSpan(
         val line = 0xFF000000.toInt() or t.borderColor
         val x = x0 + t.indentTwips * k
         val pad = 57f * k
-        var y = top.toFloat()
-        for ((ri, row) in lay.rows.withIndex()) {
-            val h = lay.heights[ri]
-            for (cell in row) {
+        val plan = paging(paint)
+        fun drawRow(ri: Int, y: Float, h: Float) {
+            for (cell in lay.rows[ri]) {
                 val r = android.graphics.RectF(x + cell.xPx, y, x + cell.xPx + cell.wPx, y + h)
                 cell.shading?.let {
                     paint.style = Paint.Style.FILL
@@ -951,7 +980,16 @@ class BlockChipSpan(
                 cell.layout.draw(c)
                 c.restore()
             }
-            y += h
+        }
+        var y = top.toFloat()
+        for (ri in lay.rows.indices) {
+            if (plan == null) {
+                drawRow(ri, y, lay.heights[ri])
+                y += lay.heights[ri]
+            } else {
+                plan.breaks.firstOrNull { it.row == ri }?.headerAt?.let { drawRow(0, top + it, plan.rowHeights[0]) }
+                drawRow(ri, top + plan.rowTops[ri], plan.rowHeights[ri])
+            }
         }
         paint.color = savedColor
         paint.style = savedStyle

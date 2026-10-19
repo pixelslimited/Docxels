@@ -82,3 +82,4 @@
 205|Invoices: pick Printed, Online or Minimal, fill in the form, and get an editable document with totals and the amount in words.
 205|Renaming a document no longer accepts an empty name.
 206|Quotations, proforma invoices and receipts, in the same three styles as invoices.
+206|Page view now breaks tables between rows like the page preview, repeats the header row, and tables or pictures at the top of a page no longer draw into the gap above.

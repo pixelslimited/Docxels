@@ -81,6 +81,8 @@ class RichEditText(context: Context) : EditText(context) {
     var decor: PageDecor? = null
         set(v) {
             field = v
+            // Without page view (mobile view) a table is one unbroken block again.
+            if (v == null) (text as? android.text.Spanned)?.let { sp -> sp.getSpans(0, sp.length, BlockChipSpan::class.java).forEach { it.startY = -1f } }
             requestLayout()
             invalidate()
         }
@@ -112,6 +114,14 @@ class RichEditText(context: Context) : EditText(context) {
      * the gap, except for page 1) and the text offsets of those lines. The same rule the PDF export uses: a page
      * ends when the next line would not fit in the text height, or after a hard page break.
      */
+    private var chipsDirty = false
+
+    private fun tableChipAt(ls: Int): BlockChipSpan? {
+        val t = text
+        if (ls >= t.length || t[ls] != CHIP_CHAR) return null
+        return t.getSpans(ls, ls + 1, BlockChipSpan::class.java).firstOrNull { it.isTable && !it.floating }
+    }
+
     private fun scanPages(): Pair<List<Float>, Set<Int>> {
         val d = decor ?: return listOf(0f) to emptySet()
         val l = layout ?: return listOf(0f) to emptySet()
@@ -127,10 +137,29 @@ class RichEditText(context: Context) : EditText(context) {
             val top = l.getLineTop(i).toFloat()
             val bottom = l.getLineBottom(i).toFloat()
             val g = if (ls in gapSpan.starts) has else 0f
-            if (i > 0 && (breakNext || (top > pageStart && (bottom - g) - pageStart > d.contentHeightPx + 0.5f))) {
+            // A table pages itself, row by row, like the PDF export; every other line moves whole.
+            val table = tableChipAt(ls)
+            val brk = i > 0 && (breakNext || (table == null && top > pageStart && (bottom - g) - pageStart > d.contentHeightPx + 0.5f))
+            if (brk) {
                 ys += top
                 set += ls
                 pageStart = top + full
+            }
+            if (table != null) {
+                val startY = if (brk) 0f else (top - pageStart).coerceAtLeast(0f)
+                if (kotlin.math.abs(table.startY - startY) > 0.5f || table.pageH != d.contentHeightPx || table.pageGap != full) {
+                    table.startY = startY
+                    table.pageH = d.contentHeightPx
+                    table.pageGap = full
+                    chipsDirty = true
+                }
+                table.paging(paint)?.let { plan ->
+                    val contentTop = l.getLineBaseline(i) - plan.height
+                    for (b in plan.breaks) {
+                        ys += contentTop + b.gapStart
+                        pageStart = contentTop + b.gapStart + full
+                    }
+                }
             }
             breakNext = ls < t.length && t[ls] == CHIP_CHAR && i < l.lineCount - 1 &&
                 t.getSpans(ls, minOf(t.length, ls + 1), BlockChipSpan::class.java).any { isPageBreak(it.index) }
@@ -201,9 +230,10 @@ class RichEditText(context: Context) : EditText(context) {
         val d = decor ?: return
         if (layout == null) return
         var rounds = 0
-        while (rounds++ < 4) {
+        while (rounds++ < 8) {
+            chipsDirty = false
             val set = scanPages().second
-            if (set == gapSpan.starts) break
+            if (set == gapSpan.starts && !chipsDirty) break
             gapSpan.starts = set
             spacingFlip = !spacingFlip
             setLineSpacing(if (spacingFlip) 0.01f else 0f, 1f) // forces the layout to be rebuilt with the new gaps
