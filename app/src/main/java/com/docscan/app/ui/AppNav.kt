@@ -46,6 +46,11 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
         if (route != null) nav.navigate(route)
     }
 
+    var showIntro by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(FirstRunIntro.shouldShow(appContext, container.ui.introSeen))
+    }
+    if (showIntro) FirstRunIntroDialog(onDone = { container.ui.introSeen = true; showIntro = false })
+
     NavHost(navController = nav, startDestination = HOME) {
         composable(HOME) {
             MainShell(

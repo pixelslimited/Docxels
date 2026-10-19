@@ -230,3 +230,6 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Editor tool bar: no bar when closed | IMPLEMENTED — NOT VERIFIED | |
 | Home: tap flings papers away | IMPLEMENTED — NOT VERIFIED | Off when the phone has animations switched off. |
 | Comments (Word): read, add, edit, delete, save to .docx | IMPLEMENTED — NOT VERIFIED | CommentsTest round-trip. A comment that spans several paragraphs is saved attached to its first paragraph only. No replies or resolve. Author for new comments is "Me". |
+| Different odd and even page headers/footers | IMPLEMENTED — NOT VERIFIED | OddEvenTest round-trip (settings.xml evenAndOddHeaders, even header/footer parts); editor, PDF export and .docx save use the even text on even pages. Only plain text headers, as elsewhere. |
+| Delete all my data (Settings > Storage) | IMPLEMENTED — NOT VERIFIED | Typed-DELETE confirmation (unit-tested), lock check first, then Android clearApplicationUserData. Not exercised on a device; exported files outside the app are untouched. |
+| First-run welcome (3 steps) | IMPLEMENTED — NOT VERIFIED | Shown only when firstInstallTime == lastUpdateTime, so updating users never see it. Not seen on a device. |

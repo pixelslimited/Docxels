@@ -72,3 +72,6 @@
 134|Home: tap the paper sheets and some papers are flung away and fade out.
 134|Fonts built into a Word file (embedded fonts) are now used when you open it, so such text shows in its real font.
 134|Comments: Word comments are now kept when you open a file. In Review you can add a comment to selected words (New comment), see all comments (Comments: Go to, Edit, Delete), and they are saved back into the .docx so Word shows them.
+203|Word files with different headers and footers on odd and even pages now keep both (Page setup > Different odd and even pages), in the editor, in PDF export and when saved back to .docx.
+204|Settings > Storage > Delete all my data: erases every document, letterhead, signature and setting after you type DELETE (asks for your lock first if App lock is on).
+204|A short three-step welcome on a fresh install.

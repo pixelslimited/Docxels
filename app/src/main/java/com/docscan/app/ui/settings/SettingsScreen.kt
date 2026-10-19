@@ -65,6 +65,7 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     var timeout by remember { mutableStateOf(security.lockTimeoutMs) }
     var menu by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    var confirmDeleteAll by remember { mutableStateOf(false) }
     var usage by remember { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -216,6 +217,16 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             OutlinedButton(onClick = { confirmClear = true }, modifier = Modifier.padding(top = 4.dp)) {
                 Text("Clear temporary files")
             }
+            OutlinedButton(onClick = {
+                // With the app lock on, prove it's you before offering to erase everything.
+                if (lockOn && activity != null) {
+                    Authenticator.prompt(activity, "Delete all my data", "Confirm it's you", onSuccess = { confirmDeleteAll = true })
+                } else {
+                    confirmDeleteAll = true
+                }
+            }, modifier = Modifier.padding(top = 4.dp)) {
+                Text("Delete all my data", color = MaterialTheme.colorScheme.error)
+            }
 
             Section("App updates")
             UpdatePanel()
@@ -228,6 +239,16 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 "Scanning, text recognition and exports all run on this phone. Files you export or share leave the app only where you send them. The only network use is checking for and downloading app updates when you ask.",
             )
         }
+    }
+
+    if (confirmDeleteAll) {
+        DeleteAllDialog(
+            onConfirm = {
+                confirmDeleteAll = false
+                if (!DeleteAllData.run(context)) say("Android would not delete the data. Try Settings > Apps > Docxels > Storage > Clear data.")
+            },
+            onDismiss = { confirmDeleteAll = false },
+        )
     }
 
     if (confirmClear) {

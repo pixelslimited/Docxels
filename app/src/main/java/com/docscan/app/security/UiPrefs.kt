@@ -60,4 +60,9 @@ class UiPrefs(context: Context) {
     var exportA4: Boolean
         get() = prefs.getBoolean("export_a4", true)
         set(v) = prefs.edit().putBoolean("export_a4", v).apply()
+
+    /** The short welcome shown on a fresh install has been seen (or was skipped for people who already use the app). */
+    var introSeen: Boolean
+        get() = prefs.getBoolean("intro_seen", false)
+        set(v) = prefs.edit().putBoolean("intro_seen", v).apply()
 }
