@@ -37,6 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -87,6 +88,28 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 Text("Settings", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = if (onBack == null) 12.dp else 0.dp))
             }
 
+            var tab by remember { mutableIntStateOf(0) }
+            androidx.compose.material3.TabRow(selectedTabIndex = tab, containerColor = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.padding(top = 8.dp)) {
+                listOf("Resources", "App settings", "About").forEachIndexed { i, label ->
+                    androidx.compose.material3.Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label, maxLines = 1) })
+                }
+            }
+
+            if (tab == 0) {
+                Text(
+                    "Things you keep and reuse in your documents.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            Section("Letterheads")
+            SavedAssetsPanel(signature = false, say = { say(it) })
+            Section("Signatures")
+            SavedAssetsPanel(signature = true, say = { say(it) })
+
+            }
+
+            if (tab == 1) {
             Section("Appearance")
             val mode by container.ui.theme.collectAsState()
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -132,11 +155,6 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 checked = inside,
                 onChange = { inside = it; container.ui.searchInside = it; if (!it) container.searchIndex.clear() },
             )
-
-            Section("Letterheads")
-            SavedAssetsPanel(signature = false, say = { say(it) })
-            Section("Signatures")
-            SavedAssetsPanel(signature = true, say = { say(it) })
 
             Section("Privacy and security")
             ToggleRow(
@@ -231,13 +249,9 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             Section("App updates")
             UpdatePanel()
 
-            Section("About")
-            InfoRow("Docxels", "Version ${versionName(context)} · build ${versionName(context).substringAfterLast('.')} · by Pixels Limited")
-            InfoRow("Open-source notices", "Interface font: Inter © The Inter Project Authors, SIL Open Font License 1.1. PDF tools: PdfBox-Android (Apache 2.0). Text recognition: Google ML Kit. Image processing: OpenCV (Apache 2.0).")
-            InfoRow(
-                "Privacy",
-                "Scanning, text recognition and exports all run on this phone. Files you export or share leave the app only where you send them. The only network use is checking for and downloading app updates when you ask.",
-            )
+            }
+
+            if (tab == 2) AboutPanel(context)
         }
     }
 
@@ -291,14 +305,14 @@ private fun ToggleRow(title: String, body: String, checked: Boolean, onChange: (
 }
 
 @Composable
-private fun InfoRow(title: String, body: String) {
+internal fun InfoRow(title: String, body: String) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(title, style = MaterialTheme.typography.bodyLarge)
         Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-private fun versionName(context: Context): String =
+internal fun versionName(context: Context): String =
     runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
 
 private fun storageSummary(context: Context): String {
