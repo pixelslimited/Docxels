@@ -1,11 +1,9 @@
 name: Emulator check
 
-# Runs only for commits marked [qa] or by hand (see the job condition). Runs the real app on an Android emulator, walks through it, and posts screenshots to the site repo's "qa-shots"
+# Runs by hand only. Runs the real app on an Android emulator, walks through it, and posts screenshots to the site repo's "qa-shots"
 # release so they can be looked at. Test documents only: no private data is involved.
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  workflow_dispatch:   # by hand only: the emulator costs the most CI minutes
 
 concurrency:
   group: qa-emulator
@@ -13,8 +11,6 @@ concurrency:
 
 jobs:
   emulator:
-    # Costs the most CI minutes, so it runs on a push only when the commit message contains [qa], or when started by hand.
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[qa]')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
