@@ -23,11 +23,11 @@ Last review: 2026-10-19, before build 204.
 | C | Two near-identical stores: `WordStore` and `PdfStore` (index read/write, tab-separated, same filter+sort) | Duplicate logic; a bug fixed in one is missed in the other | Both write the user's index; a format change would lose the library | Extract a small `IndexStore<T>` with a codec per type; keep the on-disk format byte-for-byte; add a round-trip test first |
 | D | `percentile` in `Enhancer` and `HandRemover` | Same histogram walk | Image output could shift by rounding | Share one helper only if tests with fixed images show identical pixels. Low value, low priority |
 | E | `LibraryMeta.cleanName` vs `SavedAssets.cleanName` | Two rules for names (one allows only letters/digits, one strips tabs) | Different rules protect different file formats | Keep both, rename to say what they protect, or unify after a test of every existing name |
-| F | `OcrEngine.Result.pagesWithNumbers` | Computed, never read | None | Remove the field and its constructor argument in the next pass |
+| F | `OcrEngine.Result.pagesWithNumbers` | Computed, never read | None | DONE: removed |
 | G | `Entities.createdAt` column never read | Dead column | Removing needs a Room schema migration | Leave until the next schema change; then drop it in the same migration |
 | H | `DocumentRepository.observe*`/`pages`/`document` are one-line pass-throughs to the DAO | Extra layer with no logic | Callers across the UI | Leave: it keeps the DAO private to the data layer; not worth the churn |
 | I | `XlsxBuilder`, `OfficeXml.addImagePage`, `RichOps.toParagraphs` are used only by tests | Test-only code in the app | Deleting would drop test coverage | Keep `toParagraphs`/`addImagePage` while the tests protect the exporter; remove the day the feature goes |
-| J | `Xml.escape` and `PlainExport.escape` | Different jobs (XML vs RTF), same name | None | Rename the RTF one `rtfEscape` |
+| J | `Xml.escape` and `PlainExport.escape` | Different jobs (XML vs RTF), same name | None | DONE: RTF one renamed `rtfEscape` |
 | K | Dependency `kotlinx-coroutines-play-services` | The scan flags it (no import) but `Task.await()` in OCR needs it | Removing breaks OCR | Keep |
 | L | Signing key committed in the repo | Secrets debt (see ENGINEERING_CHECKLIST) | Needs your upload key | Move to CI secrets before Google Play |
 | M | Redundant queries / API calls | The only network call is the update check; Room queries are observed Flows, no polling found | n/a | Nothing to cut. Re-check when sync or accounts are ever added |

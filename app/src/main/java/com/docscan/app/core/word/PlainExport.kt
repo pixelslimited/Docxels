@@ -72,7 +72,7 @@ object PlainExport {
                 s.font?.let { f.append("\\f").append(fontIdx(it)) }
                 s.color?.let { f.append("\\cf").append(colorIdx(it)) }
                 s.highlight?.let { f.append("\\highlight").append(colorIdx(it)) }
-                into.append('{').append(f).append(' ').append(escape(r.text)).append('}')
+                into.append('{').append(f).append(' ').append(rtfEscape(r.text)).append('}')
             }
         }
 
@@ -151,11 +151,11 @@ object PlainExport {
         }
 
         val head = StringBuilder("{\\rtf1\\ansi\\ansicpg1252\\deff0\n{\\fonttbl")
-        for ((name, i) in fonts) head.append("{\\f").append(i).append("\\fnil ").append(escape(name)).append(";}")
+        for ((name, i) in fonts) head.append("{\\f").append(i).append("\\fnil ").append(rtfEscape(name)).append(";}")
         head.append("}\n{\\colortbl;")
         for (rgb in colors.keys) head.append("\\red${(rgb shr 16) and 255}\\green${(rgb shr 8) and 255}\\blue${rgb and 255};")
         head.append("}\n")
-        head.append("{\\info{\\title ").append(escape(doc.title)).append("}{\\author Kelvin Codes}}\n")
+        head.append("{\\info{\\title ").append(rtfEscape(doc.title)).append("}{\\author Kelvin Codes}}\n")
         head.append("\\paperw${doc.page.sheetWidthTwips}\\paperh${doc.page.sheetHeightTwips}")
         head.append("\\margl${doc.page.marginLeftTwips}\\margr${doc.page.marginRightTwips}")
         head.append("\\margt${doc.page.marginTopTwips}\\margb${doc.page.marginBottomTwips}")
@@ -165,7 +165,7 @@ object PlainExport {
     }
 
     /** RTF escaping: backslash and braces, and every non-ASCII UTF-16 unit as a signed \uN? escape. */
-    internal fun escape(s: String): String {
+    internal fun rtfEscape(s: String): String {
         val sb = StringBuilder()
         for (ch in s) {
             when {

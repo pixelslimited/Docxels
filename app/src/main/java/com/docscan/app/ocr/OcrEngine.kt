@@ -36,7 +36,6 @@ class PageArranger(private val renderer: PageRenderer, private val ocr: OcrEngin
         /** Extra clockwise rotation to apply to each page id. */
         val rotationDeltas: Map<String, Int>,
         val reordered: Boolean,
-        val pagesWithNumbers: Int,
     )
 
     suspend fun arrange(pages: List<PageEntity>): Result {
@@ -52,7 +51,7 @@ class PageArranger(private val renderer: PageRenderer, private val ocr: OcrEngin
         }
         val ids = pages.map { it.id }
         val ordered = ArrangeLogic.order(ids, numbers)
-        return Result(ordered, rotations, ordered != ids, numbers.size)
+        return Result(ordered, rotations, ordered != ids)
     }
 
     private fun uprightHeight(bitmap: Bitmap, rotation: Int) =
