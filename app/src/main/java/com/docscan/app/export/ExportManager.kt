@@ -275,7 +275,7 @@ class ExportManager(
     }
 
     private fun safeName(name: String): String =
-        name.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Scan" }
+        com.docscan.app.core.safeFileName(name, "Scan")
 
     private companion object {
         const val EXPORT_SIDE = 2400

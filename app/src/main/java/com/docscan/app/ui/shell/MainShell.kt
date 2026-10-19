@@ -4,12 +4,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,11 +52,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,7 +73,6 @@ import com.docscan.app.ui.BusyOverlay
 import com.docscan.app.ui.home.HomeScreen
 import com.docscan.app.ui.library.DocumentsScreen
 import com.docscan.app.ui.settings.SettingsScreen
-import com.docscan.app.ui.theme.Brand
 import com.docscan.app.ui.theme.DocxelsTheme
 import com.docscan.app.ui.tools.ToolsScreen
 
@@ -344,7 +341,7 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit
                 .background(DocxelsTheme.brand.gradient)
                 .pointerInput(slotPx, selIndex) {
                     var x = restX
-                    androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                    detectHorizontalDragGestures(
                         onDragStart = { x = restX; dragX = x },
                         onDragEnd = {
                             slots[slotAt(x)].tab?.let(onSelect)

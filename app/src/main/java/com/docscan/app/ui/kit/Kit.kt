@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.docscan.app.data.DocKind
-import com.docscan.app.ui.theme.Brand
 import com.docscan.app.ui.theme.DocxelsTheme
 import com.docscan.app.ui.theme.Tint
 

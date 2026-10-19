@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Download
@@ -43,13 +42,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.docscan.app.data.LibraryItem
-import com.docscan.app.ui.kit.DocBadge
-import com.docscan.app.ui.kit.TintIcon
 import com.docscan.app.ui.kit.ToolTile
 import com.docscan.app.ui.kit.docCard
 import com.docscan.app.ui.library.LibraryRow
 import com.docscan.app.ui.shell.Actions
-import com.docscan.app.ui.theme.Brand
 import com.docscan.app.ui.theme.DocxelsTheme
 
 /** Home: one place to start scanning, writing or opening a file, with the tools and latest documents below. */

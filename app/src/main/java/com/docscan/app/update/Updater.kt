@@ -163,29 +163,6 @@ class Updater(private val context: Context) {
         installWithIntent(apk)
     }
 
-    private fun installWithSession(apk: File) {
-        val installer = context.packageManager.packageInstaller
-        val params = android.content.pm.PackageInstaller.SessionParams(android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-        params.setAppPackageName(context.packageName)
-        if (android.os.Build.VERSION.SDK_INT >= 31) {
-            params.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-        }
-        val id = installer.createSession(params)
-        installer.openSession(id).use { session ->
-            apk.inputStream().use { input ->
-                session.openWrite("docxels.apk", 0, apk.length()).use { o ->
-                    input.copyTo(o, 64 * 1024)
-                    session.fsync(o)
-                }
-            }
-            val intent = Intent(context, InstallResultReceiver::class.java).setPackage(context.packageName)
-            val pending = android.app.PendingIntent.getBroadcast(
-                context, id, intent, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE,
-            )
-            session.commit(pending.intentSender)
-        }
-    }
-
     private fun installWithIntent(apk: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
         val i = Intent(Intent.ACTION_VIEW)
@@ -218,8 +195,6 @@ class Updater(private val context: Context) {
     }
 
     private class ConnResult(val stream: InputStream, val length: Long, val conn: HttpURLConnection) : AutoCloseable {
-        operator fun component1() = stream
-        operator fun component2() = length
         override fun close() { runCatching { stream.close() }; conn.disconnect() }
     }
 

@@ -87,12 +87,6 @@ class RichEditText(context: Context) : EditText(context) {
 
     /** Tells whether the table / picture / page-break chip with this index is a hard page break. */
     var isPageBreak: (Int) -> Boolean = { false }
-
-    private val guide = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        style = android.graphics.Paint.Style.STROKE
-        color = 0xFF9AA0AE.toInt()
-        pathEffect = android.graphics.DashPathEffect(floatArrayOf(14f, 10f), 0f)
-    }
     private val small = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF8A8F9C.toInt() }
 
     private val gapSpan = PageGapSpan()

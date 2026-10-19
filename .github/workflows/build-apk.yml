@@ -45,6 +45,11 @@ jobs:
           gradle :app:testDebugUnitTest --stacktrace 2>&1 | tee build.log
 
       # Posts a generated sample .docx (base64) on the commit so the writer can be checked in real Word-compatible software.
+      - name: Code quality review (dead code, duplicates, unused resources)
+        run: |
+          python3 scripts/code-review.py | tee review.txt
+          { echo '### Code quality review'; echo '```'; cat review.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Post sample document
         if: github.event_name != 'pull_request'
         env:

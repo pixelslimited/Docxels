@@ -1,5 +1,6 @@
 package com.docscan.app.ui.edit
 
+import com.docscan.app.ui.SwitchRow
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
@@ -32,7 +33,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -40,12 +40,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
@@ -54,7 +52,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import com.docscan.app.core.Geometry
 import com.docscan.app.core.Pt
 import com.docscan.app.data.PageEntity
 import com.docscan.app.data.cornerList
@@ -62,7 +59,6 @@ import com.docscan.app.data.settings
 import com.docscan.app.export.ShareHelper
 import kotlinx.coroutines.launch
 import com.docscan.app.imaging.DocMode
-import com.docscan.app.imaging.EnhanceSettings
 import com.docscan.app.ui.BusyOverlay
 import com.docscan.app.ui.UiEvent
 import kotlin.math.roundToInt
@@ -212,14 +208,6 @@ private fun EnhanceTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
                 Button(onClick = { vm.applyLookToAll(settings) }, modifier = Modifier.weight(1f)) { Text("Apply to all pages") }
             }
         }
-    }
-}
-
-@Composable
-private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

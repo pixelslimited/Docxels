@@ -1,8 +1,6 @@
 package com.docscan.app.ui.write
 
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.docscan.app.AppContainer
@@ -57,7 +55,7 @@ class WordViewModel(private val container: AppContainer, val id: String) : ViewM
         }
     }
 
-    private fun safeName(doc: WordDoc) = doc.title.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Document" }
+    private fun safeName(doc: WordDoc) = com.docscan.app.core.safeFileName(doc.title)
 
     suspend fun txtFile(doc: WordDoc, context: android.content.Context): java.io.File = withContext(Dispatchers.IO) {
         val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }

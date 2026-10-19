@@ -43,3 +43,11 @@ webhooks, Terraform, Helm, on-call.
 
 If a feature ever adds a server (cloud sync, an AI assistant, billing), this list is the starting point for it,
 and each of those items must be answered before it ships.
+
+## Before every build is deployed: code quality review (standing rule)
+Run `python3 scripts/code-review.py` (it also runs in CI on every build and writes the report to the run summary).
+Then review by hand for: dead code (functions, files, components, routes, variables, imports, dependencies), duplicate logic,
+unused UI components, over-complex code, legacy code, redundant queries or calls, abandoned files, technical debt.
+For each finding: why it is unnecessary, impact of removing it, risks before deleting, cleanup plan. Be aggressive but safe:
+the scan cannot see reflection, destructuring (componentN), manifest or XML references, so check before deleting.
+The latest review and its open items are in CODE_REVIEW.md.

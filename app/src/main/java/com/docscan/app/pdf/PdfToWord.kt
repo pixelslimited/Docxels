@@ -189,11 +189,6 @@ class PdfToWord(context: Context, private val scan: ScanToWord) {
         return PageSetup(landscape = w > h)
     }
 
-    private fun hasPictures(page: com.tom_roush.pdfbox.pdmodel.PDPage): Boolean = runCatching {
-        val r = page.resources ?: return false
-        r.xObjectNames.any { r.getXObject(it) is PDImageXObject }
-    }.getOrDefault(false)
-
     /** Embedded text of one page as line segments in bitmap pixels. */
     private fun extract(doc: PDDocument, index: Int, scale: Float): List<TextSeg> {
         val out = ArrayList<TextSeg>()

@@ -37,11 +37,6 @@ class LibraryMeta(context: Context) {
         save(map)
     }
 
-    /** Forgets everything about items that no longer exist. */
-    fun forgetExcept(existing: Set<String>) = synchronized(lock) {
-        val map = _all.value.filterKeys { it in existing }
-        if (map.size != _all.value.size) save(map)
-    }
 
     private fun save(map: Map<String, ItemMeta>) {
         SecureFiles.write(file, serialize(map).toByteArray(Charsets.UTF_8))

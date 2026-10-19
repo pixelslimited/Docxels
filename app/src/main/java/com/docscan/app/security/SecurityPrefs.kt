@@ -49,10 +49,6 @@ class SecurityPrefs(context: Context) {
         backgroundedAt = SystemClock.elapsedRealtime()
     }
 
-    fun lockNow() {
-        if (lockEnabled) _locked.value = true
-    }
-
     fun changeLock(enabled: Boolean) {
         lockEnabled = enabled
         if (!enabled) _locked.value = false

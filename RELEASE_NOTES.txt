@@ -75,3 +75,4 @@
 203|Word files with different headers and footers on odd and even pages now keep both (Page setup > Different odd and even pages), in the editor, in PDF export and when saved back to .docx.
 204|Settings > Storage > Delete all my data: erases every document, letterhead, signature and setting after you type DELETE (asks for your lock first if App lock is on).
 204|A short three-step welcome on a fresh install.
+204|Housekeeping: removed unused code, merged duplicate helpers, and added a code-quality scan to every build.

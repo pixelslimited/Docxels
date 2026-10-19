@@ -276,11 +276,7 @@ data class WordDoc(
 )
 
 object Twips {
-    const val PER_POINT = 20
-    const val PER_INCH = 1440
     const val EMU_PER_TWIP = 635
-    fun fromCm(cm: Float): Int = (cm / 2.54f * PER_INCH).toInt()
-    fun toCm(twips: Int): Float = twips / PER_INCH.toFloat() * 2.54f
 }
 
 /** Default look of the built-in paragraph styles. Shared by the editor, the PDF export and the .docx writer. */

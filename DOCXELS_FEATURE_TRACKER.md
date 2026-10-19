@@ -233,3 +233,10 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Different odd and even page headers/footers | IMPLEMENTED — NOT VERIFIED | OddEvenTest round-trip (settings.xml evenAndOddHeaders, even header/footer parts); editor, PDF export and .docx save use the even text on even pages. Only plain text headers, as elsewhere. |
 | Delete all my data (Settings > Storage) | IMPLEMENTED — NOT VERIFIED | Typed-DELETE confirmation (unit-tested), lock check first, then Android clearApplicationUserData. Not exercised on a device; exported files outside the app are untouched. |
 | First-run welcome (3 steps) | IMPLEMENTED — NOT VERIFIED | Shown only when firstInstallTime == lastUpdateTime, so updating users never see it. Not seen on a device. |
+| Table styles from Word (header colour, bold, fonts, banding) | IMPLEMENTED — NOT VERIFIED | TableStyleTest covers header colour/shading, table font vs default, direct formatting wins. Editor draws tables with cell text, shading and borders. Not seen on a device. |
+| Ribbon: status on the closed row, all paragraph tools under Home > Paragraph, group labels styled apart | IMPLEMENTED — NOT VERIFIED | Not seen on a device. |
+| Settings in three tabs (Resources / App settings / About with Pixels logo and sites) | IMPLEMENTED — NOT VERIFIED | Company site pixelslimited.ng is an assumption; please confirm. |
+| New table editor dialog (sections, cell picker, merge/split, rows/columns, styles) | IMPLEMENTED — NOT VERIFIED | Compiles in CI only; not used on a device. |
+| Invoice engine: Printed, Online, Minimal styles, amount in words | PARTIAL | Engine and unit tests exist; the form to fill it in and the template entry are NOT built yet. |
+| Floating dock bottom navigation (sliding bead, drag to switch) | IMPLEMENTED — NOT VERIFIED | Modelled on the reel you linked. Not seen on a device. |
+| Code quality scan on every build (scripts/code-review.py, CODE_REVIEW.md) | DONE | Runs in CI and prints into the run summary. |

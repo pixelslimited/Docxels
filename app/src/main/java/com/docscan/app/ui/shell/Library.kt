@@ -388,5 +388,5 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
     /** Stores a PDF made by a tool or export in the library. Returns the library id. */
     fun savePdfToLibrary(file: File, title: String, pages: Int): String = container.pdfs.add(file, title, pages)
 
-    private fun safeName(title: String) = title.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Document" }
+    private fun safeName(title: String) = com.docscan.app.core.safeFileName(title)
 }

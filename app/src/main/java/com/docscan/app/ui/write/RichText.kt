@@ -384,21 +384,6 @@ object RichOps {
     private fun spansOfKind(text: Spanned, from: Int, to: Int, kind: CharKind): List<Any> =
         text.getSpans(from, to, Any::class.java).filter { kindOf(it) == kind }
 
-    private fun flagsOf(kind: CharKind) = make(
-        when (kind) {
-            CharKind.BOLD -> CharAttr.Bold
-            CharKind.ITALIC -> CharAttr.Italic
-            CharKind.UNDERLINE -> CharAttr.Underline
-            CharKind.STRIKE -> CharAttr.Strike
-            CharKind.COLOR -> CharAttr.Color(0)
-            CharKind.HIGHLIGHT -> CharAttr.Highlight(0)
-            CharKind.SIZE -> CharAttr.Size(11f)
-            CharKind.FONT -> CharAttr.Font("")
-            CharKind.VERT -> CharAttr.Vert(true)
-            CharKind.LINK -> CharAttr.Link("")
-        },
-    ).second
-
     private const val MASK = 0x33
     private fun endInclusive(flags: Int): Boolean {
         val f = flags and MASK
@@ -636,7 +621,6 @@ object SpanBridge {
 
     private fun applyRun(sb: Spannable, s: Int, e: Int, st: RunStyle) {
         fun put(a: CharAttr) {
-            val pair = RichOps::class.java // keep reference stable for readers
             val (span, flags) = makeSpan(a)
             sb.setSpan(span, s, e, flags)
         }

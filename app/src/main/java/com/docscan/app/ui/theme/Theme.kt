@@ -28,11 +28,6 @@ import androidx.compose.ui.unit.sp
 object Brand {
     val Indigo = Color(0xFF4F46E5)
     val Violet = Color(0xFF7C3AED)
-    val Gradient = Brush.linearGradient(listOf(Indigo, Violet))
-    val GradientPink = Brush.linearGradient(listOf(Color(0xFFDB2777), Violet))
-    val GradientBlue = Brush.linearGradient(listOf(Color(0xFF2563EB), Indigo))
-    val GradientGreen = Brush.linearGradient(listOf(Color(0xFF16A34A), Color(0xFF0F766E)))
-    val GradientOrange = Brush.linearGradient(listOf(Color(0xFFEA580C), Color(0xFFDB2777)))
 }
 
 /** A pastel container with the strong colour used for its icon and label. */
