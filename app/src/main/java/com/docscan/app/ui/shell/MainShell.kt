@@ -48,6 +48,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -260,51 +263,99 @@ private fun SheetRow(icon: ImageVector, title: String, body: String, onClick: ()
     )
 }
 
-/** Four tabs with the scan button raised in the middle. */
+/**
+ * Floating dock: a rounded bar with a coloured "bead" that rides over the active tab (tap a tab, or drag
+ * the bead along the bar). The scan button stays in the middle slot.
+ */
 @Composable
 private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit, onScan: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(100.dp)) {
+    data class Slot(val tab: Tab?, val label: String, val filled: ImageVector, val outlined: ImageVector)
+    val slots = listOf(
+        Slot(Tab.HOME, "Home", Icons.Default.Home, Icons.Outlined.Home),
+        Slot(Tab.DOCS, "Documents", Icons.Default.Folder, Icons.Outlined.Folder),
+        Slot(null, "Scan", Icons.Default.DocumentScanner, Icons.Default.DocumentScanner),
+        Slot(Tab.TOOLS, "Tools", Icons.Default.GridView, Icons.Outlined.GridView),
+        Slot(Tab.SETTINGS, "Settings", Icons.Default.Settings, Icons.Outlined.Settings),
+    )
+    val selIndex = slots.indexOfFirst { it.tab == selected }.coerceAtLeast(0)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp).padding(bottom = 8.dp).height(92.dp),
+    ) {
+        val slotW = maxWidth / slots.size
+        val beadSize = 54.dp
+        // Bead position follows the selected slot, or the finger while dragging.
+        var dragX by remember { mutableStateOf<Float?>(null) }
+        val slotPx = with(density) { slotW.toPx() }
+        val restX = (selIndex + 0.5f) * slotPx
+        val beadX by androidx.compose.animation.core.animateFloatAsState(
+            dragX ?: restX, androidx.compose.animation.core.spring(stiffness = 500f), label = "bead",
+        )
+        fun slotAt(x: Float): Int {
+            var i = (x / slotPx).toInt().coerceIn(0, slots.lastIndex)
+            if (slots[i].tab == null) i = if (x / slotPx - 2f < 0.5f) 1 else 3
+            return i
+        }
         Surface(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-            shadowElevation = 12.dp,
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(66.dp),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 10.dp,
         ) {
-            Row(
-                Modifier.fillMaxWidth().navigationBarsPadding().height(72.dp).padding(horizontal = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                NavItem("Home", Icons.Default.Home, Icons.Outlined.Home, selected == Tab.HOME, Modifier.weight(1f)) { onSelect(Tab.HOME) }
-                NavItem("Documents", Icons.Default.Folder, Icons.Outlined.Folder, selected == Tab.DOCS, Modifier.weight(1f)) { onSelect(Tab.DOCS) }
-                Box(Modifier.weight(1f))
-                NavItem("Tools", Icons.Default.GridView, Icons.Outlined.GridView, selected == Tab.TOOLS, Modifier.weight(1f)) { onSelect(Tab.TOOLS) }
-                NavItem("Settings", Icons.Default.Settings, Icons.Outlined.Settings, selected == Tab.SETTINGS, Modifier.weight(1f)) { onSelect(Tab.SETTINGS) }
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                slots.forEachIndexed { i, slot ->
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        if (slot.tab == null) {
+                            Box(
+                                Modifier.size(44.dp).clip(CircleShape).background(DocxelsTheme.brand.gradient)
+                                    .clickable(onClickLabel = "Scan a document", role = Role.Button, onClick = onScan),
+                                contentAlignment = Alignment.Center,
+                            ) { Icon(Icons.Default.DocumentScanner, contentDescription = "Scan", tint = Color.White, modifier = Modifier.size(24.dp)) }
+                        } else {
+                            val active = i == selIndex
+                            Column(
+                                Modifier.fillMaxSize().clickable(role = Role.Tab, onClickLabel = slot.label) { onSelect(slot.tab) },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                // The active icon lives in the bead; keep its space so nothing jumps.
+                                Icon(slot.outlined, contentDescription = null, modifier = Modifier.size(24.dp).alpha(if (active) 0f else 1f),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(slot.label, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (active) androidx.compose.ui.text.font.FontWeight.SemiBold else null)
+                            }
+                        }
+                    }
+                }
             }
         }
+        // The bead: sits half above the bar, with a rim in the page colour so it looks cut into the dock.
         Box(
             Modifier
-                .align(Alignment.TopCenter)
-                .padding(bottom = 0.dp)
-                .size(72.dp)
+                .align(Alignment.TopStart)
+                .offset { androidx.compose.ui.unit.IntOffset((beadX - beadSize.toPx() / 2).toInt(), 0) }
+                .size(beadSize + 8.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.background)
-                .padding(5.dp)
+                .padding(4.dp)
                 .clip(CircleShape)
                 .background(DocxelsTheme.brand.gradient)
-                .clickable(onClickLabel = "Scan a document", role = Role.Button, onClick = onScan),
+                .pointerInput(slotPx, selIndex) {
+                    var x = restX
+                    androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                        onDragStart = { x = restX; dragX = x },
+                        onDragEnd = {
+                            slots[slotAt(x)].tab?.let(onSelect)
+                            dragX = null
+                        },
+                        onDragCancel = { dragX = null },
+                    ) { _, delta -> x = (x + delta).coerceIn(slotPx * 0.5f, slotPx * (slots.size - 0.5f)); dragX = x }
+                },
             contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Default.DocumentScanner, contentDescription = "Scan", tint = Color.White, modifier = Modifier.size(30.dp)) }
-    }
-}
-
-@Composable
-private fun NavItem(label: String, filled: ImageVector, outlined: ImageVector, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    Column(
-        modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).clickable(role = Role.Tab, onClick = onClick).padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Icon(if (selected) filled else outlined, contentDescription = null, tint = color)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
+        ) {
+            val s = slots[selIndex]
+            Icon(s.filled, contentDescription = s.label, tint = Color.White, modifier = Modifier.size(26.dp))
+        }
     }
 }
