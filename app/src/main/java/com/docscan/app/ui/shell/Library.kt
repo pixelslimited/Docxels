@@ -192,7 +192,12 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    fun importWord(context: Context, uri: Uri, onDone: (String) -> Unit) {
+    /** Set when a Word file has tracked changes and the person must choose how to open them. */
+    class TrackedPrompt(val count: Int, val choose: (com.docscan.app.core.word.DocxReader.Tracked?) -> Unit)
+    private val _trackedPrompt = MutableStateFlow<TrackedPrompt?>(null)
+    val trackedPrompt: StateFlow<TrackedPrompt?> = _trackedPrompt
+
+    fun importWord(context: Context, uri: Uri, onDone: (String) -> Unit, tracked: com.docscan.app.core.word.DocxReader.Tracked? = null) {
         viewModelScope.launch {
             _busy.value = "Opening document…"
             val result = withContext(Dispatchers.IO) {
@@ -209,11 +214,18 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
                     val bytes = context.contentResolver.openInputStream(uri)?.use { it.readNBytes(MAX_IMPORT_BYTES.toInt() + 1) }
                         ?: error("Could not read that file.")
                     require(bytes.size <= MAX_IMPORT_BYTES) { "That file is too large to import." }
-                    container.words.importDocx(bytes, name.removeSuffix(".docx").removeSuffix(".DOCX"))
+                    val count = if (tracked == null) com.docscan.app.core.word.DocxReader.trackedCount(bytes) else 0
+                    if (count > 0) {
+                        _trackedPrompt.value = TrackedPrompt(count) { mode ->
+                            _trackedPrompt.value = null
+                            if (mode != null) importWord(context, uri, onDone, mode)
+                        }
+                        null
+                    } else container.words.importDocx(bytes, name.removeSuffix(".docx").removeSuffix(".DOCX"), tracked ?: com.docscan.app.core.word.DocxReader.Tracked.ACCEPT)
                 }
             }
             _busy.value = null
-            result.onSuccess(onDone).onFailure {
+            result.onSuccess { id -> if (id != null) onDone(id) }.onFailure {
                 _message.value = it.message?.takeIf { m -> m.length < 120 } ?: "That file could not be opened as a Word document."
             }
         }

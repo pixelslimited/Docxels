@@ -24,7 +24,29 @@ object DocxReader {
     const val MAX_ENTRY_BYTES = 64L * 1024 * 1024
     const val MAX_ENTRIES = 3000
 
-    fun read(input: InputStream, fallbackTitle: String = "Untitled"): WordDoc {
+    /** What to do with tracked changes (Word's insertions and deletions) when opening a file. */
+    enum class Tracked { ACCEPT, REJECT, MARKUP }
+
+    private val trackedMode = ThreadLocal.withInitial { Tracked.ACCEPT }
+
+    /** How many tracked insertions and deletions the file holds (0 when it has none or cannot be read). */
+    fun trackedCount(bytes: ByteArray): Int {
+        var doc = ""
+        runCatching {
+            ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zip ->
+                var entries = 0
+                while (true) {
+                    val e = zip.nextEntry ?: break
+                    if (++entries > MAX_ENTRIES) break
+                    if (e.name.trimStart('/') == "word/document.xml") { doc = String(readBounded(zip, MAX_ENTRY_BYTES), Charsets.UTF_8); break }
+                }
+            }
+        }
+        return Regex("<w:(ins|del) ").findAll(doc).count()
+    }
+
+    fun read(input: InputStream, fallbackTitle: String = "Untitled", tracked: Tracked = Tracked.ACCEPT): WordDoc {
+        trackedMode.set(tracked)
         val parts = HashMap<String, ByteArray>()
         var total = 0L
         ZipInputStream(input).use { zip ->
@@ -87,7 +109,7 @@ object DocxReader {
             if (en > 0) notes += "endnotes ($en)"
         }
         val tracked = count(doc, "<w:ins ") + count(doc, "<w:del ")
-        if (tracked > 0) notes += "tracked changes ($tracked; the final text is kept)"
+        if (tracked > 0) notes += "tracked changes ($tracked; you chose how to open them)"
         if (names.any { it.startsWith("word/charts/") }) notes += "charts"
         if (names.any { it.startsWith("word/diagrams/") }) notes += "SmartArt diagrams"
         if (names.any { it.startsWith("word/embeddings/") }) notes += "embedded objects"
@@ -131,8 +153,8 @@ object DocxReader {
         return if (ok) out else null
     }
 
-    fun read(bytes: ByteArray, fallbackTitle: String = "Untitled"): WordDoc =
-        read(ByteArrayInputStream(bytes), fallbackTitle)
+    fun read(bytes: ByteArray, fallbackTitle: String = "Untitled", tracked: Tracked = Tracked.ACCEPT): WordDoc =
+        read(ByteArrayInputStream(bytes), fallbackTitle, tracked)
 
     // ---------------------------------------------------------------------------------------------------------
 
@@ -788,7 +810,17 @@ object DocxReader {
                             val url = c.attr("id")?.let { links[it] }
                             walk(c, if (url != null) inherited.copy(link = url) else inherited)
                         }
-                        "ins", "smartTag", "sdtContent", "customXml", "fldSimple", "bookmarkStart" -> walk(c, inherited)
+                        "ins" -> when (trackedMode.get()) {
+                            Tracked.REJECT -> Unit
+                            Tracked.MARKUP -> walk(c, inherited.copy(underline = true, color = 0x1F5FBF))
+                            else -> walk(c, inherited)
+                        }
+                        "del" -> when (trackedMode.get()) {
+                            Tracked.ACCEPT -> Unit
+                            Tracked.REJECT -> walk(c, inherited)
+                            Tracked.MARKUP -> walk(c, inherited.copy(strike = true, color = 0xC00000))
+                        }
+                        "smartTag", "sdtContent", "customXml", "fldSimple", "bookmarkStart" -> walk(c, inherited)
                         "sdt" -> c.child("sdtContent")?.let { walk(it, inherited) }
                     }
                 }
@@ -800,7 +832,7 @@ object DocxReader {
                 val style = direct.over(charStyleOf(rPr)).over(styleRun).over(inherited).let { st -> activeComment?.let { st.copy(comment = it) } ?: st }
                 for (c in r.children) {
                     when (c.local) {
-                        "t" -> addText(c.text.toString(), style)
+                        "t", "delText" -> addText(c.text.toString(), style)
                         "tab" -> addText("\t", style)
                         "br" -> if (c.attr("type") == "page") {
                             flush(false)

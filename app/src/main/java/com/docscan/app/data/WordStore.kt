@@ -75,8 +75,8 @@ class WordStore(context: Context) {
     }
 
     /** Imports a .docx; throws a readable exception when the file is not a usable Word document. */
-    fun importDocx(bytes: ByteArray, fallbackTitle: String): String = synchronized(lock) {
-        val doc = DocxReader.read(bytes, fallbackTitle)
+    fun importDocx(bytes: ByteArray, fallbackTitle: String, tracked: DocxReader.Tracked = DocxReader.Tracked.ACCEPT): String = synchronized(lock) {
+        val doc = DocxReader.read(bytes, fallbackTitle, tracked)
         doc.fonts.forEach { com.docscan.app.ui.write.WordFonts.addCustom(it.name, it.style, it.bytes) }
         val id = UUID.randomUUID().toString()
         val notes = DocxReader.compatNotes(bytes)

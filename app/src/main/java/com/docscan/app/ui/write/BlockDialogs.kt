@@ -561,11 +561,11 @@ fun ImageEditorDialog(
                             val result = withContext(Dispatchers.Default) {
                                 runCatching {
                                     val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                                    BitmapFactory.decodeByteArray(initial.bytes, 0, initial.bytes.size, o)
+                                    BitmapFactory.decodeByteArray(cur.bytes, 0, cur.bytes.size, o)
                                     var sample = 1
                                     while (maxOf(o.outWidth, o.outHeight) / sample > 1600) sample *= 2
                                     val bmp = BitmapFactory.decodeByteArray(
-                                        initial.bytes, 0, initial.bytes.size,
+                                        cur.bytes, 0, cur.bytes.size,
                                         BitmapFactory.Options().apply { inSampleSize = sample },
                                     ) ?: error("decode")
                                     val cut = com.docscan.app.imaging.BackgroundRemover.remove(bmp)
@@ -575,14 +575,20 @@ fun ImageEditorDialog(
                                 }
                             }
                             busy = false
-                            result.onSuccess { cur = initial.copy(bytes = it, extension = "png") }
+                            result.onSuccess { cur = cur.copy(bytes = it, extension = "png") }
                                 .onFailure { note = "Couldn't remove the background from this picture." }
                         }
                     }) { Text(if (busy) "Working…" else "Remove background") }
+                    OutlinedButton(enabled = !busy, onClick = {
+                        scope.launch {
+                            val turned = withContext(Dispatchers.Default) { runCatching { rotateQuarterTurn(build()) }.getOrNull() }
+                            if (turned != null) { cur = turned; wTw = turned.widthTwips; hTw = turned.heightTwips } else note = "Couldn't turn this picture."
+                        }
+                    }) { Text("Rotate 90°") }
                     if (cur !== initial) TextButton(onClick = { cur = initial }) { Text("Restore") }
                 }
                 note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                if (cur !== initial) Text("Background removed on this phone. Works best on a clear subject against a plain background.", style = MaterialTheme.typography.bodySmall)
+                if (cur !== initial) Text("Picture changed on this phone (turned or background removed). Background removal works best on a clear subject against a plain background.", style = MaterialTheme.typography.bodySmall)
                 Text("Wrap text", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                     com.docscan.app.core.word.ImageWrap.entries.reversed().forEach { w ->

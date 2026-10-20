@@ -214,6 +214,24 @@ fun MainShell(
         }
     }
 
+    val trackedPrompt by vm.trackedPrompt.collectAsState()
+    trackedPrompt?.let { prompt ->
+        val modes = com.docscan.app.core.word.DocxReader.Tracked.entries
+        AlertDialog(
+            onDismissRequest = { prompt.choose(null) },
+            title = { Text("This file has tracked changes") },
+            text = { Text("It holds ${prompt.count} insertions and deletions. How should Docxels open it?") },
+            confirmButton = {
+                Column {
+                    TextButton(onClick = { prompt.choose(modes[0]) }) { Text("Accept all (final text)") }
+                    TextButton(onClick = { prompt.choose(modes[1]) }) { Text("Reject all (original text)") }
+                    TextButton(onClick = { prompt.choose(modes[2]) }) { Text("Show changes (blue added, red struck out)") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { prompt.choose(null) }) { Text("Cancel") } },
+        )
+    }
+
     if (invoiceMaker) {
         com.docscan.app.ui.shell.InvoiceMaker(
             onCreate = { data, style -> invoiceMaker = false; vm.createInvoice(data, style, onOpenWord) },
