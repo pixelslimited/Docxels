@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +66,7 @@ private fun Thumb(store: SavedAssets, item: SavedAssets.Item, signature: Boolean
 }
 
 /** Settings: keep letterheads or signatures on the phone (picture, PDF or Word file), ready to insert in any document. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
     val context = LocalContext.current
@@ -76,6 +79,7 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
 
     var pendingBytes by remember { mutableStateOf<ByteArray?>(null) }
     var renaming by remember { mutableStateOf<SavedAssets.Item?>(null) }
+    var acting by remember { mutableStateOf<SavedAssets.Item?>(null) }
 
     fun save(bytes: ByteArray) { pendingBytes = bytes } // asks for a name first
 
@@ -105,20 +109,13 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         items.forEach { item ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // The actions stay hidden until the row is tapped (then they appear in a sheet, as on the Documents list).
+            Row(
+                Modifier.fillMaxWidth().clickable { acting = item }.padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Thumb(store, item, signature, Modifier.width(110.dp))
                 Text(item.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                IconButton(onClick = { renaming = item }) { Icon(Icons.Default.Edit, contentDescription = "Rename ${item.name}") }
-                IconButton(onClick = {
-                    val bytes = store.bytes(item)
-                    if (bytes == null) say("Could not read it.") else {
-                        val ext = if (bytes.size > 3 && bytes[0] == 0x89.toByte()) "png" else "jpg"
-                        val f = java.io.File(java.io.File(context.cacheDir, "exports").apply { mkdirs() }, "${item.name.ifBlank { word }}.$ext")
-                        f.writeBytes(bytes)
-                        saveAs(listOf(f))
-                    }
-                }) { Icon(Icons.Default.SaveAlt, contentDescription = "Save ${item.name} to the phone") }
-                IconButton(onClick = { store.delete(item); items = store.list() }) { Icon(Icons.Default.Delete, contentDescription = "Delete ${item.name}") }
             }
         }
         OutlinedButton(onClick = { picker.launch(PageSources.MIMES) }) {
@@ -133,6 +130,34 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
                 say("Saved as ${SavedAssets.cleanName(n)}. Insert it from the editor's ${if (signature) "Signature" else "Letterhead"} menu.")
             },
             onDismiss = { pendingBytes = null })
+    }
+    acting?.let { item ->
+        androidx.compose.material3.ModalBottomSheet(onDismissRequest = { acting = null }, scrimColor = Color.Black.copy(alpha = 0.7f)) {
+            Column(Modifier.padding(bottom = 24.dp)) {
+                Text(item.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                @Composable
+                fun Act(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, danger: Boolean = false, run: () -> Unit) {
+                    val tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    androidx.compose.material3.ListItem(
+                        leadingContent = { Icon(icon, contentDescription = null, tint = tint) },
+                        headlineContent = { Text(label, color = tint) },
+                        colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.clickable { acting = null; run() },
+                    )
+                }
+                Act("Rename", Icons.Default.Edit) { renaming = item }
+                Act("Save to the phone", Icons.Default.SaveAlt) {
+                    val bytes = store.bytes(item)
+                    if (bytes == null) say("Could not read it.") else {
+                        val ext = if (bytes.size > 3 && bytes[0] == 0x89.toByte()) "png" else "jpg"
+                        val f = java.io.File(java.io.File(context.cacheDir, "exports").apply { mkdirs() }, "${item.name.ifBlank { word }}.$ext")
+                        f.writeBytes(bytes)
+                        saveAs(listOf(f))
+                    }
+                }
+                Act("Delete", Icons.Default.Delete, danger = true) { store.delete(item); items = store.list() }
+            }
+        }
     }
     renaming?.let { item ->
         NameDialog("Rename $word", item.name, "Rename",

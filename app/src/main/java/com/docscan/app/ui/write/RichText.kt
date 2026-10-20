@@ -951,7 +951,35 @@ class BlockChipSpan(
         }
     }
 
+    /** Where the table was last drawn (text-layout coordinates), so a tap can be matched to a cell. */
+    private var lastX = 0f
+    private var lastTop = 0f
+
+    class CellHit(val row: Int, val col: Int, val rect: android.graphics.RectF, val pad: Float)
+
+    /** The cell under a point given in text-layout coordinates, or null (outside the table, or a merged-down cell). */
+    fun cellAt(px: Float, py: Float, paint: Paint): CellHit? {
+        val b = block as? com.docscan.app.core.word.Block.Table ?: return null
+        val lay = tableLayout(b.table, paint)
+        val plan = paging(paint)
+        val x = lastX + b.table.indentTwips * lay.k
+        var acc = 0f
+        for (ri in lay.rows.indices) {
+            val y = lastTop + (plan?.rowTops?.get(ri) ?: acc)
+            val h = plan?.rowHeights?.get(ri) ?: lay.heights[ri]
+            acc += lay.heights[ri]
+            if (py < y || py > y + h) continue
+            for ((ci, cell) in lay.rows[ri].withIndex()) {
+                val r = android.graphics.RectF(x + cell.xPx, y, x + cell.xPx + cell.wPx, y + h)
+                if (r.contains(px, py)) return if (cell.cell.vMergeContinue) null else CellHit(ri, ci, r, 57f * lay.k)
+            }
+        }
+        return null
+    }
+
     private fun drawTable(c: Canvas, t: com.docscan.app.core.word.TableBlock, x0: Float, top: Int, paint: Paint) {
+        lastX = x0
+        lastTop = top.toFloat()
         val lay = tableLayout(t, paint)
         val k = lay.k
         val savedColor = paint.color

@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -187,6 +190,9 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var reading by remember { mutableStateOf(false) }
     var previewDoc by remember { mutableStateOf<WordDoc?>(null) }
     var ribbonTab by remember { mutableIntStateOf(0) }
+    val ribbonOpen = remember { mutableStateOf(false) }
+    var pageHost by remember { mutableStateOf<PageHost?>(null) }
+    var cellEditing by remember { mutableStateOf<Int?>(null) }
     val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     val snackbar = remember { SnackbarHostState() }
     var tableOpen by remember { mutableStateOf(false) }
@@ -423,11 +429,37 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         modifier = Modifier.imePadding(),
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            // A tap on the page hides the tool pane (the touch is only observed, the page still gets it).
+            Box(Modifier.weight(1f).fillMaxWidth().pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    if (ribbonOpen.value) ribbonOpen.value = false
+                }
+            }) {
             AndroidView(
                 factory = { ctx ->
                     PageHost(ctx).also { host ->
                         controller.attach(host.edit)
+                        pageHost = host
                         controller.setChipTapListener { i -> if (!controller.isReadOnly()) editing = i }
+                        host.edit.onCellTap = { idx, row, col, rect, pad ->
+                            val tb = (controller.blockAt(idx) as? Block.Table)?.table
+                            val cell = tb?.rows?.getOrNull(row)?.getOrNull(col)
+                            if (tb != null && cell != null && !controller.isReadOnly() && editing == null) {
+                                cellEditing = idx
+                                val d = host.resources.displayMetrics.density
+                                host.showCellEditor(rect, pad, cell.plain(), com.docscan.app.core.word.StyleDefaults.BODY_SIZE_PT * ZOOM * d,
+                                    0xFF000000.toInt() or (cell.shading ?: 0xFFFFFF)) { typed ->
+                                    cellEditing = null
+                                    val now = (controller.blockAt(idx) as? Block.Table)?.table
+                                    val old = now?.rows?.getOrNull(row)?.getOrNull(col)
+                                    if (now != null && old != null && old.plain() != typed) {
+                                        val rows = now.rows.mapIndexed { ri, r -> if (ri == row) r.mapIndexed { ci, c -> if (ci == col) c.withText(typed) else c } else r }
+                                        controller.replaceBlock(idx, Block.Table(now.copy(rows = rows)))
+                                    }
+                                }
+                            } else if (editing == null) editing = idx
+                        }
                         controller.setLinkTapListener { a, b, u -> linkActions = Triple(a, b, u) }
                         host.onWidth = { w -> controller.setAvailableWidth(w) }
                         host.onPinch = { z -> zoom = z }
@@ -444,8 +476,15 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     controller.setViewConfig(viewMode, page)
                     controller.setReadOnly(reading)
                 },
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.fillMaxSize(),
             )
+            cellEditing?.let { idx ->
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = { pageHost?.closeCellEditor(); editing = idx },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                ) { Text("Table options") }
+            }
+            }
             if (reading) Text(
                 status,
                 style = MaterialTheme.typography.labelMedium,
@@ -461,6 +500,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     androidx.compose.material3.FilledTonalButton(onClick = { reading = false }) { Text("Edit") }
                 }
             } else Ribbon(
+                openState = ribbonOpen,
                 c = controller,
                 s = state,
                 status = status,
@@ -586,8 +626,6 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         tableOpen = false
         tableCustom = false
         controller.insertBlock(Block.Table(newTable(r, c, h, page.contentWidthTwips)))
-        // Open it straight away so the cells can be filled in.
-        controller.lastBlockIndex()?.let { editing = it }
     }
     if (tableOpen && !tableCustom) TablePickerDialog(
         onPick = { r, c, h -> insertTable(r, c, h) },
@@ -750,6 +788,7 @@ private fun Ribbon(
     onCaseMenu: (Boolean) -> Unit,
     painting: Boolean,
     onPainter: () -> Unit,
+    openState: androidx.compose.runtime.MutableState<Boolean>,
 ) {
     var customFor by remember { mutableStateOf(0) }
     var styleMenu by remember { mutableStateOf(false) }
@@ -763,7 +802,7 @@ private fun Ribbon(
     var signMenu by remember { mutableStateOf(false) }
     val tabs = listOf("Home", "Insert", "Layout", "Review", "View")
     CustomColorDialogHost(customFor, { customFor = 0 }, c)
-    var open by remember { mutableStateOf(false) }
+    var open by openState
     var grid by remember { mutableStateOf(true) }
     var tabMenu by remember { mutableStateOf(false) }
     val wide = tab != 0
@@ -811,27 +850,64 @@ private fun Ribbon(
     Surface(
         tonalElevation = if (open) 3.dp else 0.dp,
         color = if (open) MaterialTheme.colorScheme.surface else Color.Transparent,
-        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = if (open) 40.dp else 28.dp),
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = if (open) 40.dp else 12.dp),
     ) {
         Column {
             if (!open) {
-                // The page and word count share one centre line with the mark, so they read as a single bottom strip.
-                Row(Modifier.fillMaxWidth().height(72.dp).padding(start = 16.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // The tools button (just the pixel D, no plate) sits on the left; the page and word count on the right.
+                // Closed: the quick bar (frequent tools) with the pixel D beside it; the page and word count sit above.
+                Text(
+                    status,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.align(Alignment.End).clickable(onClick = onStatus).padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+                Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box {
-                        Box(Modifier.size(68.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).clickable { tabMenu = true }, contentAlignment = Alignment.Center) {
-                            com.docscan.app.ui.kit.AnimatedMark(52.dp, description = "Show tools")
+                        Box(Modifier.size(44.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).clickable { tabMenu = true }, contentAlignment = Alignment.Center) {
+                            com.docscan.app.ui.kit.AnimatedMark(30.dp, description = "Show tools")
                         }
                         TabMenu(tabs, tab, tabMenu, { tabMenu = false }) { i -> tabMenu = false; onTab(i); open = true; grid = true }
                     }
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        status,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        modifier = Modifier.clickable(onClick = onStatus).padding(8.dp),
-                    )
+                    Spacer(Modifier.width(6.dp))
+                    val pill = Color(0xFF2A2A2A)
+                    val ink = Color.White
+                    @Composable
+                    fun Q(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, on: Boolean = false, onClick: () -> Unit) {
+                        Box(
+                            Modifier.weight(1f).height(44.dp).padding(vertical = 3.dp, horizontal = 1.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                                .background(if (on) Color(0xFF555555) else Color.Transparent)
+                                .clickable(onClick = onClick),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(icon, contentDescription = label, tint = ink, modifier = Modifier.size(22.dp)) }
+                    }
+                    Row(
+                        Modifier.weight(1f).height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Q(Icons.Default.Add, "Insert") { onTab(1); open = true; grid = true }
+                        Q(Icons.Default.FormatBold, "Bold", s.bold) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
+                        Q(Icons.Default.FormatItalic, "Italic", s.italic) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
+                        Q(Icons.Default.FormatUnderlined, "Underline", s.underline) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
+                        Box(Modifier.weight(1f)) {
+                            Row(Modifier.fillMaxWidth()) { Q(Icons.Default.FormatColorFill, "Highlight") { fillMenu = true } }
+                            DropdownMenu(expanded = fillMenu, onDismissRequest = { fillMenu = false }) {
+                                Swatches(HIGHLIGHTS, "No highlight", { fillMenu = false; c.remove(CharKind.HIGHLIGHT) }) { fillMenu = false; c.apply(CharAttr.Highlight(it)) }
+                                TextButton(onClick = { fillMenu = false; customFor = 2 }) { Text("More colours…") }
+                            }
+                        }
+                        Box(Modifier.weight(1f)) {
+                            Row(Modifier.fillMaxWidth()) { Q(Icons.Default.FormatColorText, "Text colour") { colorMenu = true } }
+                            DropdownMenu(expanded = colorMenu, onDismissRequest = { colorMenu = false }) {
+                                Swatches(TEXT_COLORS, "Automatic", { colorMenu = false; c.remove(CharKind.COLOR) }) { colorMenu = false; c.apply(CharAttr.Color(it)) }
+                                TextButton(onClick = { colorMenu = false; customFor = 1 }) { Text("More colours…") }
+                            }
+                        }
+                        Q(Icons.AutoMirrored.Filled.FormatListBulleted, "Bullets", s.list == ListKind.BULLET) { c.toggleList(ListKind.BULLET) }
+                        Q(Icons.Default.FormatListNumbered, "Numbering", s.list == ListKind.NUMBER) { c.toggleList(ListKind.NUMBER) }
+                        Q(Icons.Default.MoreVert, "More tools") { onTab(0); open = true; grid = true }
+                    }
                 }
             } else {
                 Text(
@@ -847,7 +923,7 @@ private fun Ribbon(
                                 .clickable { tabMenu = true }.padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            com.docscan.app.ui.kit.AnimatedMark(26.dp, modifier = Modifier.padding(horizontal = 4.dp))
+                            com.docscan.app.ui.kit.AnimatedMark(20.dp, modifier = Modifier.padding(horizontal = 4.dp))
                             Text(tabs[tab], style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 10.dp))
                             Icon(Icons.Default.ExpandMore, contentDescription = "Choose another menu", modifier = Modifier.padding(start = 4.dp))
                         }

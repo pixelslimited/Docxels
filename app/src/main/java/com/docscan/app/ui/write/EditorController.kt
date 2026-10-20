@@ -320,6 +320,19 @@ class RichEditText(context: Context) : EditText(context) {
     /** Called with the block index when a table / image placeholder is tapped. */
     var onChipTap: ((Int) -> Unit)? = null
 
+    /** Called with (block, row, column, cell rectangle in this view, cell padding) when a table cell is tapped. */
+    var onCellTap: ((Int, Int, Int, android.graphics.RectF, Float) -> Unit)? = null
+
+    private fun chipTapped(sp: BlockChipSpan, x: Float, y: Float) {
+        val hit = if (sp.isTable) sp.cellAt(x - paddingLeft, y - totalPaddingTop, paint) else null
+        val cb = onCellTap
+        if (hit != null && cb != null) {
+            val r = android.graphics.RectF(hit.rect)
+            r.offset(paddingLeft.toFloat(), totalPaddingTop.toFloat())
+            cb(sp.index, hit.row, hit.col, r, hit.pad)
+        } else onChipTap?.invoke(sp.index)
+    }
+
     /** Called with (start, end, address) when a hyperlink is tapped. */
     var onLinkTap: ((Int, Int, String) -> Unit)? = null
     private val taps = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
@@ -328,7 +341,7 @@ class RichEditText(context: Context) : EditText(context) {
             val off = getOffsetForPosition(e.x, e.y)
             val chip = t.getSpans(maxOf(0, off - 1), minOf(t.length, off + 1), BlockChipSpan::class.java)
                 .firstOrNull { t.getSpanStart(it) <= off && off <= t.getSpanEnd(it) }
-            if (chip != null) onChipTap?.invoke(chip.index)
+            if (chip != null) chipTapped(chip, e.x, e.y)
             else {
                 val link = t.getSpans(maxOf(0, off - 1), minOf(t.length, off + 1), LinkSpan::class.java)
                     .firstOrNull { t.getSpanStart(it) <= off && off < t.getSpanEnd(it) }
@@ -551,7 +564,7 @@ class RichEditText(context: Context) : EditText(context) {
                     if (moved && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
                         val r = selectedRect()
                         if (r != null && (event.y < r.top - r.height() * 0.2f || event.y > r.bottom + 20f)) onTableMoved?.invoke(sp.index, event.y)
-                    } else if (!moved && event.actionMasked == android.view.MotionEvent.ACTION_UP) onChipTap?.invoke(sp.index)
+                    } else if (!moved && event.actionMasked == android.view.MotionEvent.ACTION_UP) chipTapped(sp, event.x, event.y)
                     return true
                 } else if (grip != Grip.NONE) {
                     grip = Grip.NONE

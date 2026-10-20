@@ -95,3 +95,7 @@
 216|The editor's tools button changes colour again, more slowly.
 217|The bottom bar has three tabs (Home, Documents, Tools); Settings is the button at the top of Home.
 218|Fixes: Receipt button no longer wraps in the invoice maker; the Continue card no longer repeats the document type; no stale warning after choosing how to open tracked changes.
+219|Editor: with the tools closed, a quick bar (insert, bold, italic, underline, highlight, text colour, bullets, numbering, more) sits beside the pixel D. Tapping the page hides the tools. The D is smaller.
+220|Tables: tap a cell and type straight into it on the page; "Table options" opens the full table panel.
+221|Settings: letterheads and signatures show only their picture and name; tap one for Rename, Save to the phone and Delete.
+222|Invoices: type straight onto the invoice page; amounts, subtotal, discount, tax, total and the amount in words are worked out as you type.

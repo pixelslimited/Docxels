@@ -129,7 +129,7 @@ class CompatNotesTest {
         val notes = DocxReader.compatNotes(bytes)
         assertEquals(true, notes.any { it.startsWith("footnotes (2)") })
         assertEquals(false, notes.any { it.startsWith("comments") }) // comments are kept now
-        assertEquals(true, notes.any { it.startsWith("tracked changes (2") })
+        assertEquals(false, notes.any { it.startsWith("tracked changes") }) // handled by the open prompt
         assertEquals(true, notes.contains("charts"))
     }
 

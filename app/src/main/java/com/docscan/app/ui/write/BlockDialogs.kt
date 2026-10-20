@@ -74,9 +74,9 @@ fun newTable(rows: Int, cols: Int, header: Boolean, contentWidthTwips: Int): Tab
     return TableBlock(grid, List(cols) { w }, headerRow = header)
 }
 
-private fun TableCell.plain() = paragraphs.joinToString("\n") { it.text }
+internal fun TableCell.plain() = paragraphs.joinToString("\n") { it.text }
 
-private fun TableCell.withText(s: String): TableCell {
+internal fun TableCell.withText(s: String): TableCell {
     if (s == plain()) return this
     val lines = s.split("\n")
     val firstStyle = paragraphs.firstOrNull()?.runs?.firstOrNull()?.style ?: RunStyle()

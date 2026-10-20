@@ -46,6 +46,14 @@ class PageHost(context: Context) : ScrollView(context) {
     })
 
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        cellEditor?.let { ed ->
+            if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                val loc = IntArray(2)
+                ed.getLocationOnScreen(loc)
+                val inside = ev.rawX >= loc[0] && ev.rawX <= loc[0] + ed.width && ev.rawY >= loc[1] && ev.rawY <= loc[1] + ed.height
+                if (!inside) closeCellEditor()
+            }
+        }
         if (pinchEnabled) {
             scaler.onTouchEvent(ev)
             if (scaler.isInProgress && !pinching) {
@@ -72,6 +80,46 @@ class PageHost(context: Context) : ScrollView(context) {
         addView(across, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         across.addView(sheet, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         sheet.addView(edit, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    private var cellEditor: android.widget.EditText? = null
+    private var cellDone: ((String) -> Unit)? = null
+
+    /** Types straight into a table cell: an edit box laid exactly over the cell, scrolling with the page. */
+    fun showCellEditor(r: android.graphics.RectF, pad: Float, initial: String, sizePx: Float, bg: Int, onDone: (String) -> Unit) {
+        closeCellEditor()
+        val ed = android.widget.EditText(context).apply {
+            setText(initial)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, sizePx)
+            setTextColor(0xFF1B1B1F.toInt())
+            setBackgroundColor(bg)
+            includeFontPadding = false
+            gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            setPadding(pad.toInt(), pad.toInt(), pad.toInt(), pad.toInt())
+            minHeight = r.height().toInt()
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        }
+        val lp = FrameLayout.LayoutParams(r.width().toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
+        lp.leftMargin = edit.left + r.left.toInt()
+        lp.topMargin = edit.top + r.top.toInt()
+        sheet.addView(ed, lp)
+        cellEditor = ed
+        cellDone = onDone
+        ed.requestFocus()
+        ed.setSelection(ed.length())
+        (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(ed, 0)
+    }
+
+    /** Ends cell typing and hands the text back. */
+    fun closeCellEditor() {
+        val ed = cellEditor ?: return
+        val done = cellDone
+        cellEditor = null
+        cellDone = null
+        val t = ed.text.toString()
+        (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(ed.windowToken, 0)
+        sheet.removeView(ed)
+        done?.invoke(t)
     }
 
     fun setDesk(color: Int, gutterPx: Int, verticalGutterPx: Int) {
