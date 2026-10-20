@@ -15,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.painterResource
 import com.docscan.app.R
-import com.docscan.app.data.DocKind
 import com.docscan.app.ui.TextInputDialog
 import com.docscan.app.ui.library.friendlyDate
 import androidx.compose.foundation.clickable
@@ -258,11 +257,6 @@ private fun ContinueCard(item: LibraryItem, onClick: () -> Unit) {
                 Text(
                     "Edited ${friendlyDate(item.modified).replaceFirstChar { it.lowercase() }} · ${item.detail}",
                     color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, modifier = Modifier.padding(top = 4.dp),
-                )
-                Text(
-                    when (item.kind) { DocKind.DOCX -> "Word document"; DocKind.PDF -> "PDF"; else -> "Scan" },
-                    color = Color.White, style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 10.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)).padding(horizontal = 14.dp, vertical = 7.dp),
                 )
             }
         }

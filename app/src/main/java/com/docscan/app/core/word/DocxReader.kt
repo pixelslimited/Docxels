@@ -108,8 +108,6 @@ object DocxReader {
             val en = count(doc, "<w:endnoteReference")
             if (en > 0) notes += "endnotes ($en)"
         }
-        val tracked = count(doc, "<w:ins ") + count(doc, "<w:del ")
-        if (tracked > 0) notes += "tracked changes ($tracked; you chose how to open them)"
         if (names.any { it.startsWith("word/charts/") }) notes += "charts"
         if (names.any { it.startsWith("word/diagrams/") }) notes += "SmartArt diagrams"
         if (names.any { it.startsWith("word/embeddings/") }) notes += "embedded objects"

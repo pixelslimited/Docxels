@@ -94,3 +94,4 @@
 215|Editor: tools button is now the bare pixel D on the left with the page and word count on the right. Home: the animated pages are back on the Continue card.
 216|The editor's tools button changes colour again, more slowly.
 217|The bottom bar has three tabs (Home, Documents, Tools); Settings is the button at the top of Home.
+218|Fixes: Receipt button no longer wraps in the invoice maker; the Continue card no longer repeats the document type; no stale warning after choosing how to open tracked changes.

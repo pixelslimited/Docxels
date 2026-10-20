@@ -1,6 +1,7 @@
 package com.docscan.app.ui.shell
 
 import android.content.Context
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -96,11 +97,11 @@ fun InvoiceMaker(onCreate: (InvoiceData, InvoiceStyle) -> Unit, onDismiss: () ->
                 }
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Label("Document")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         BillKind.entries.forEach { k -> FilterChip(kind == k, { kind = k }, label = { Text(k.label) }) }
                     }
                     Label("Style")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         InvoiceStyle.entries.forEach { st -> FilterChip(style == st, { style = st }, label = { Text(st.label) }) }
                     }
                     Text(style.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -115,11 +116,11 @@ fun InvoiceMaker(onCreate: (InvoiceData, InvoiceStyle) -> Unit, onDismiss: () ->
 
                     Label("Details")
                     Field(number, { number = it }, "${kind.title} number")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Field(date, { date = it }, "Date", Modifier.weight(1f))
                         Field(due, { due = it }, kind.dueLabel, Modifier.weight(1f))
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         InvoiceCurrency.all.forEach { c -> FilterChip(currency == c, { currency = c }, label = { Text("${c.symbol} ${c.major}") }) }
                     }
 
