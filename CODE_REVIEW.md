@@ -40,3 +40,6 @@ Run this review before every deployment: `python3 scripts/code-review.py`, read 
 
 ## Lessons from this pass
 - The first scan wrongly removed `getValue`/`setValue` imports (used by `by` delegates) and `ConnResult.component1/2` (used by destructuring). Both broke the build and were restored; the scan now ignores them. Treat every scan hit as a lead to confirm, never as proof.
+
+### 2026-10-20: editor file split
+Moved the Find, Page setup and Comments dialogs out of `WordEditorScreen.kt` (1342 to ~1140 lines) into `EditorDialogs.kt`; code unchanged, only visibility `private` to `internal`. `EditorController.kt` (one large class) is left whole: splitting it needs extension-function plumbing for no behaviour gain, so the risk outweighs the benefit.
