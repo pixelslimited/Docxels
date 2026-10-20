@@ -820,11 +820,7 @@ private fun Ribbon(
                     // The tools button (just the pixel D, no plate) sits on the left; the page and word count on the right.
                     Box {
                         Box(Modifier.size(68.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).clickable { tabMenu = true }, contentAlignment = Alignment.Center) {
-                            androidx.compose.foundation.Image(
-                                androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_d), contentDescription = "Show tools",
-                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary),
-                                modifier = Modifier.height(52.dp),
-                            )
+                            com.docscan.app.ui.kit.AnimatedMark(52.dp, description = "Show tools")
                         }
                         TabMenu(tabs, tab, tabMenu, { tabMenu = false }) { i -> tabMenu = false; onTab(i); open = true; grid = true }
                     }
@@ -851,11 +847,7 @@ private fun Ribbon(
                                 .clickable { tabMenu = true }.padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            androidx.compose.foundation.Image(
-                                androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_d), contentDescription = null,
-                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary),
-                                modifier = Modifier.height(26.dp).padding(horizontal = 4.dp),
-                            )
+                            com.docscan.app.ui.kit.AnimatedMark(26.dp, modifier = Modifier.padding(horizontal = 4.dp))
                             Text(tabs[tab], style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 10.dp))
                             Icon(Icons.Default.ExpandMore, contentDescription = "Choose another menu", modifier = Modifier.padding(start = 4.dp))
                         }
