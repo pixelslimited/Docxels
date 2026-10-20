@@ -36,9 +36,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.ReceiptLong
-import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.Badge
-import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.CallMerge
@@ -249,19 +246,13 @@ private fun greeting(): String {
 /** The most recent document as a large card: a little page, its title and details, and a button to carry on. */
 @Composable
 private fun ContinueCard(item: LibraryItem, onClick: () -> Unit) {
+    val sheets = rememberSheetsState()
     Column(
-        Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(DocxelsTheme.brand.gradient).padding(20.dp),
+        Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(DocxelsTheme.brand.gradient).sheetsTouch(sheets).padding(20.dp),
     ) {
         Text("CONTINUE WHERE YOU STOPPED", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelLarge, letterSpacing = 1.sp)
         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(
-                Modifier.size(width = 74.dp, height = 96.dp).clip(RoundedCornerShape(10.dp)).background(Color.White).padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Box(Modifier.width(28.dp).height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
-                repeat(4) { i -> Box(Modifier.fillMaxWidth(if (i == 3) 0.6f else 1f).height(3.dp).clip(CircleShape).background(Color(0xFFD5D7E3))) }
-                Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFE6E7FB)))
-            }
+            FloatingSheets(sheets)
             Column(Modifier.padding(start = 16.dp).weight(1f)) {
                 Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 2)
                 Text(

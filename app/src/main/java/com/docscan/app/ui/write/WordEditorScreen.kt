@@ -817,22 +817,25 @@ private fun Ribbon(
             if (!open) {
                 // The page and word count share one centre line with the mark, so they read as a single bottom strip.
                 Row(Modifier.fillMaxWidth().height(72.dp).padding(start = 16.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // The tools button (just the pixel D, no plate) sits on the left; the page and word count on the right.
+                    Box {
+                        Box(Modifier.size(68.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).clickable { tabMenu = true }, contentAlignment = Alignment.Center) {
+                            androidx.compose.foundation.Image(
+                                androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_d), contentDescription = "Show tools",
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier.height(52.dp),
+                            )
+                        }
+                        TabMenu(tabs, tab, tabMenu, { tabMenu = false }) { i -> tabMenu = false; onTab(i); open = true; grid = true }
+                    }
+                    Spacer(Modifier.weight(1f))
                     Text(
                         status,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        modifier = Modifier.weight(1f).clickable(onClick = onStatus),
+                        modifier = Modifier.clickable(onClick = onStatus).padding(8.dp),
                     )
-                    Box {
-                        Box(Modifier.size(68.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).clickable { tabMenu = true }, contentAlignment = Alignment.Center) {
-                            androidx.compose.foundation.Image(
-                                androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_logo), contentDescription = "Show tools",
-                                modifier = Modifier.size(58.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
-                            )
-                        }
-                        TabMenu(tabs, tab, tabMenu, { tabMenu = false }) { i -> tabMenu = false; onTab(i); open = true; grid = true }
-                    }
                 }
             } else {
                 Text(
@@ -849,8 +852,9 @@ private fun Ribbon(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             androidx.compose.foundation.Image(
-                                androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_logo), contentDescription = null,
-                                modifier = Modifier.size(32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp)),
+                                androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_d), contentDescription = null,
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier.height(26.dp).padding(horizontal = 4.dp),
                             )
                             Text(tabs[tab], style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 10.dp))
                             Icon(Icons.Default.ExpandMore, contentDescription = "Choose another menu", modifier = Modifier.padding(start = 4.dp))
