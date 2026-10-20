@@ -64,8 +64,8 @@ import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -765,6 +765,7 @@ private fun Ribbon(
     CustomColorDialogHost(customFor, { customFor = 0 }, c)
     var open by remember { mutableStateOf(false) }
     var grid by remember { mutableStateOf(true) }
+    var tabMenu by remember { mutableStateOf(false) }
     val wide = tab != 0
     // Tool groups: a row of group icons; the picked group's tools show below as icon tiles (no dropdowns).
     var groupPick by remember { mutableStateOf(mapOf<Int, String>()) }
@@ -810,12 +811,12 @@ private fun Ribbon(
     Surface(
         tonalElevation = if (open) 3.dp else 0.dp,
         color = if (open) MaterialTheme.colorScheme.surface else Color.Transparent,
-        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = if (open) 14.dp else 4.dp),
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = if (open) 40.dp else 28.dp),
     ) {
         Column {
             if (!open) {
                 // The page and word count share one centre line with the mark, so they read as a single bottom strip.
-                Row(Modifier.fillMaxWidth().height(56.dp).padding(start = 16.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().height(72.dp).padding(start = 16.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         status,
                         style = MaterialTheme.typography.labelMedium,
@@ -823,8 +824,14 @@ private fun Ribbon(
                         maxLines = 1,
                         modifier = Modifier.weight(1f).clickable(onClick = onStatus),
                     )
-                    Box(Modifier.size(56.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable { open = true; grid = true }, contentAlignment = Alignment.Center) {
-                        com.docscan.app.ui.kit.AnimatedMark(44.dp, description = "Show tools")
+                    Box {
+                        Box(Modifier.size(68.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).clickable { tabMenu = true }, contentAlignment = Alignment.Center) {
+                            androidx.compose.foundation.Image(
+                                androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_logo), contentDescription = "Show tools",
+                                modifier = Modifier.size(58.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
+                            )
+                        }
+                        TabMenu(tabs, tab, tabMenu, { tabMenu = false }) { i -> tabMenu = false; onTab(i); open = true; grid = true }
                     }
                 }
             } else {
@@ -834,12 +841,23 @@ private fun Ribbon(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth().clickable(onClick = onStatus).padding(horizontal = 16.dp, vertical = 4.dp),
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TabRow(selectedTabIndex = tab, containerColor = Color.Transparent, modifier = Modifier.weight(1f)) {
-                        tabs.forEachIndexed { i, label ->
-                            Tab(selected = tab == i, onClick = { if (tab == i && grid) grid = false else { onTab(i); grid = true } }, text = { Text(label, maxLines = 1) })
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box {
+                        Row(
+                            Modifier.clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.secondaryContainer)
+                                .clickable { tabMenu = true }.padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.foundation.Image(
+                                androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_logo), contentDescription = null,
+                                modifier = Modifier.size(32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp)),
+                            )
+                            Text(tabs[tab], style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 10.dp))
+                            Icon(Icons.Default.ExpandMore, contentDescription = "Choose another menu", modifier = Modifier.padding(start = 4.dp))
                         }
+                        TabMenu(tabs, tab, tabMenu, { tabMenu = false }) { i -> tabMenu = false; onTab(i); grid = true }
                     }
+                    Spacer(Modifier.weight(1f))
                     IconButton(onClick = { open = false }, modifier = Modifier.size(52.dp)) { Icon(Icons.Default.Close, contentDescription = "Hide tools", modifier = Modifier.size(30.dp)) }
                 }
             }
@@ -1042,12 +1060,12 @@ private fun Ribbon(
                     groupsOf(tab).forEach { (name, _) ->
                         val on = name == pickedGroup
                         Column(
-                            Modifier.clickable { groupPick = groupPick + (tab to name) }.padding(top = 8.dp, bottom = 4.dp),
+                            Modifier.clickable { groupPick = groupPick + (tab to name) }.padding(top = 12.dp, bottom = 6.dp, start = 4.dp, end = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
                                 name.uppercase(),
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelLarge,
                                 maxLines = 1,
                                 color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1060,7 +1078,7 @@ private fun Ribbon(
                 }
                 androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 androidx.compose.foundation.layout.FlowRow(
-                    Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
+                    Modifier.fillMaxWidth().heightIn(max = 380.dp).verticalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) { items() }
@@ -1069,20 +1087,33 @@ private fun Ribbon(
     }
 }
 
+/** The menus (Home, Insert, ...) listed down the side, one under another, opened from the logo. */
+@Composable
+private fun TabMenu(tabs: List<String>, selected: Int, expanded: Boolean, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        tabs.forEachIndexed { i, label ->
+            DropdownMenuItem(
+                text = { Text(label, style = MaterialTheme.typography.titleMedium, color = if (i == selected) MaterialTheme.colorScheme.primary else Color.Unspecified, modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp)) },
+                onClick = { onPick(i) },
+            )
+        }
+    }
+}
+
 @Composable
 private fun RibbonTile(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, glyph: String?, on: Boolean, onClick: () -> Unit) {
     Column(
         Modifier
-            .width(76.dp)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+            .width(88.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
             .background(if (on) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp, horizontal = 4.dp),
+            .padding(vertical = 14.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(Modifier.height(26.dp), contentAlignment = Alignment.Center) {
-            if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Box(Modifier.height(32.dp), contentAlignment = Alignment.Center) {
+            if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(30.dp))
             else Text(glyph.orEmpty(), style = MaterialTheme.typography.titleMedium, maxLines = 1)
         }
         Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)

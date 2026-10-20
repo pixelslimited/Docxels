@@ -1,6 +1,21 @@
 package com.docscan.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.res.painterResource
+import com.docscan.app.R
+import com.docscan.app.data.DocKind
+import com.docscan.app.ui.TextInputDialog
+import com.docscan.app.ui.library.friendlyDate
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,16 +75,41 @@ fun HomeScreen(
     onSearch: () -> Unit,
     onAllTools: () -> Unit,
     onAllDocs: () -> Unit,
+    name: String,
+    onName: (String) -> Unit,
+    onSettings: () -> Unit,
 ) {
     val t = DocxelsTheme.tints
+    var editingName by remember { mutableStateOf(false) }
+    if (editingName) {
+        TextInputDialog("Your name", name, "Save", { onName(it); editingName = false }, { editingName = false }, allowBlank = true, maxLength = 30)
+    }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp).padding(bottom = 24.dp),
     ) {
         Row(Modifier.padding(top = 14.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(DocxelsTheme.brand.gradient), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Description, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            Image(
+                painterResource(R.drawable.docxels_logo), contentDescription = "Docxels",
+                modifier = Modifier.size(56.dp).shadow(10.dp, RoundedCornerShape(18.dp), ambientColor = DocxelsTheme.brand.a, spotColor = DocxelsTheme.brand.a).clip(RoundedCornerShape(18.dp)),
+            )
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text(greeting(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    name.ifBlank { "Welcome" },
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClickLabel = "Change your name") { editingName = true },
+                )
             }
-            Text("Docxels", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 12.dp))
+            Box(Modifier.height(48.dp).clip(CircleShape).background(Color(0xFFFFF0C2)).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
+                Text("Free", fontWeight = FontWeight.Bold, color = Color(0xFF6B4E00))
+            }
+            Box(
+                Modifier.padding(start = 10.dp).size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .clickable(role = Role.Button, onClickLabel = "Open settings", onClick = onSettings),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Default.Tune, contentDescription = "Settings") }
         }
 
         Row(
@@ -83,12 +123,26 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Search your documents", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp))
+            Text("Search names and scanned text", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp).weight(1f), maxLines = 1)
+            Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            }
+        }
+
+        // The latest document, big, with one tap to carry on.
+        items.firstOrNull()?.let { last ->
+            ContinueCard(last, onClick = { onOpen(last) })
+            Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                QuickAction(Icons.Default.NoteAdd, "New doc", Modifier.weight(1f), actions.newDoc)
+                QuickAction(Icons.Default.ReceiptLong, "Invoice", Modifier.weight(1f), actions.newInvoice)
+                QuickAction(Icons.Default.Article, "Templates", Modifier.weight(1f), actions.templates)
+                QuickAction(Icons.Default.Download, "Import", Modifier.weight(1f), actions.importMenu)
+            }
         }
 
         // Hero: start a document. Touching the card turns the sheets: drag, flick or tap.
         val sheets = rememberSheetsState()
-        Column(
+        if (items.isEmpty()) Column(
             Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(DocxelsTheme.brand.gradient).sheetsTouch(sheets).padding(18.dp),
         ) {
             Box(Modifier.fillMaxWidth()) {
@@ -188,5 +242,63 @@ private fun SectionTitle(title: String, action: String, onAction: () -> Unit) {
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clip(CircleShape).clickable(onClick = onAction).padding(8.dp),
         )
+    }
+}
+
+private fun greeting(): String {
+    val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    return when { h < 12 -> "Good morning"; h < 17 -> "Good afternoon"; else -> "Good evening" }
+}
+
+/** The most recent document as a large card: a little page, its title and details, and a button to carry on. */
+@Composable
+private fun ContinueCard(item: LibraryItem, onClick: () -> Unit) {
+    Column(
+        Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(DocxelsTheme.brand.gradient).padding(20.dp),
+    ) {
+        Text("CONTINUE WHERE YOU STOPPED", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelLarge, letterSpacing = 1.sp)
+        Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                Modifier.size(width = 74.dp, height = 96.dp).clip(RoundedCornerShape(10.dp)).background(Color.White).padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Box(Modifier.width(28.dp).height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+                repeat(4) { i -> Box(Modifier.fillMaxWidth(if (i == 3) 0.6f else 1f).height(3.dp).clip(CircleShape).background(Color(0xFFD5D7E3))) }
+                Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFE6E7FB)))
+            }
+            Column(Modifier.padding(start = 16.dp).weight(1f)) {
+                Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 2)
+                Text(
+                    "Edited ${friendlyDate(item.modified).replaceFirstChar { it.lowercase() }} · ${item.detail}",
+                    color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    when (item.kind) { DocKind.DOCX -> "Word document"; DocKind.PDF -> "PDF"; else -> "Scan" },
+                    color = Color.White, style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 10.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)).padding(horizontal = 14.dp, vertical = 7.dp),
+                )
+            }
+        }
+        Row(
+            Modifier.padding(top = 18.dp).fillMaxWidth().height(56.dp).clip(CircleShape).background(Color.White)
+                .clickable(role = Role.Button, onClick = onClick),
+            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Continue editing", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+            Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 10.dp).size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .clickable(role = Role.Button, onClick = onClick).padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }

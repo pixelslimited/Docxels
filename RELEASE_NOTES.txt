@@ -89,3 +89,4 @@
 210|Style menu previews each style; the page column setting of Word files is kept when saving; draft notice removed from the site's privacy and terms pages.
 211|Scan to Word now shows a check screen: the scanned page above the recognised text, so you can fix mistakes before opening the editor.
 212|Word files with tracked changes now ask how to open them (accept, reject or show). Pictures can be rotated 90° in the picture dialog.
+213|New Docxels logo and icon; redesigned Home with a greeting and a Continue card; the editor's tools open from the logo as a side menu, then groups, then tools, in a higher and larger pane.

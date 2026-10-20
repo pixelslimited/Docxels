@@ -23,7 +23,7 @@ adb shell monkey -p ng.pixelslimited.docxels -c android.intent.category.LAUNCHER
 # Let the emulator settle, and dismiss "System UI isn't responding" if the slow image shows it.
 for i in $(seq 1 40); do [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ] && break; sleep 3; done
 sleep 30
-dismiss() { for i in 1 2 3 4; do { $UI tap "^Wait$" || $UI tap "^Got it$"; } >/dev/null 2>&1 && sleep 2 || break; done; }
+dismiss() { for i in 1 2 3 4 5 6; do { $UI tap "^Wait$" || $UI tap "^Got it$" || $UI tap "^Skip$" || $UI tap "^Done$" || $UI tap "^Start$"; } >/dev/null 2>&1 && sleep 2 || break; done; }
 dismiss
 step home; shot 01_home
 
@@ -120,10 +120,11 @@ tap "^Home$" 2
 for p in "^New doc$" "^New document$"; do tap "$p" 4 && break; done
 dismiss
 adb shell input tap 540 520; sleep 1
-adb shell input tap 980 2170; sleep 2; shot 40_ribbon
-tap "^Insert" 2; shot 41_insert_tab
-tap "Shape" 2; shot 42_shapes
-tap "Text box" 3; shot 43_textbox_inserted
-adb shell input tap 540 520; sleep 2; shot 44_textbox_dialog
+tap "Show tools" 2; shot 40_logo_menu
+tap "^Insert$" 3; shot 41_insert_groups
+tap "Illustrations" 2; shot 42_illustrations
+tap "Shape" 2; shot 43_shapes_menu
+tap "Text box" 3; shot 44_textbox_inserted
+adb shell input tap 540 520; sleep 2; shot 45_textbox_dialog
 adb logcat -d -s AndroidRuntime:E > "$OUT/crashes4.txt" 2>&1 || true
 adb logcat -d > "$OUT/logcat-full2.txt" 2>&1 || true
