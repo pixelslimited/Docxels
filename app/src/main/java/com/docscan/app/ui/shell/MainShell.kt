@@ -318,7 +318,6 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
         Slot(Tab.HOME, "Home", Icons.Default.Home, Icons.Outlined.Home),
         Slot(Tab.DOCS, "Documents", Icons.Default.Folder, Icons.Outlined.Folder),
         Slot(Tab.TOOLS, "Tools", Icons.Default.GridView, Icons.Outlined.GridView),
-        Slot(Tab.SETTINGS, "Settings", Icons.Default.Settings, Icons.Outlined.Settings),
     )
     val selIndex = slots.indexOfFirst { it.tab == selected }.coerceAtLeast(0)
     val density = androidx.compose.ui.platform.LocalDensity.current
