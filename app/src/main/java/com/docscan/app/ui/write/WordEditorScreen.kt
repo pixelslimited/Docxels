@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Draw
@@ -72,6 +73,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -950,7 +952,19 @@ private fun Ribbon(
                             Btn("Style", glyph = s.style.label) { styleMenu = true }
                             DropdownMenu(expanded = styleMenu, onDismissRequest = { styleMenu = false }) {
                                 ParaStyle.entries.forEach { st ->
-                                    DropdownMenuItem(text = { Text(st.label) }, onClick = { styleMenu = false; c.setStyle(st) })
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                st.label,
+                                                fontSize = (com.docscan.app.core.word.StyleDefaults.sizePt(st) * 0.85f).sp,
+                                                fontWeight = if (com.docscan.app.core.word.StyleDefaults.bold(st)) androidx.compose.ui.text.font.FontWeight.Bold else null,
+                                                fontStyle = if (com.docscan.app.core.word.StyleDefaults.italic(st)) androidx.compose.ui.text.font.FontStyle.Italic else null,
+                                                color = com.docscan.app.core.word.StyleDefaults.color(st)?.let { androidx.compose.ui.graphics.Color(0xFF000000.toInt() or it) } ?: androidx.compose.ui.graphics.Color.Unspecified,
+                                            )
+                                        },
+                                        trailingIcon = if (s.style == st) ({ Icon(Icons.Default.Check, null) }) else null,
+                                        onClick = { styleMenu = false; c.setStyle(st) },
+                                    )
                                 }
                             }
                         }

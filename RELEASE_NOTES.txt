@@ -86,3 +86,4 @@
 207|Tables: set row height and choose borders for each cell side; kept when saving to and opening from Word.
 208|Text boxes: insert a text box (Insert → Shapes → Text box), type inside it, set size/bold; kept when saved to Word and reopened.
 209|Right-to-left paragraph direction is kept when opening and saving Word files, and can be set from the editor.
+210|Style menu previews each style; the page column setting of Word files is kept when saving; draft notice removed from the site's privacy and terms pages.

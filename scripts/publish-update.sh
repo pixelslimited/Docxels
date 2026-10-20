@@ -70,6 +70,17 @@ for OLDNAME in $(gh release view history --repo "$SITE" --json assets --jq '.ass
   gh release delete-asset history "$OLDNAME" --repo "$SITE" --yes || true
 done
 
+# One-off site tidy: the draft notice was removed from the privacy and terms pages. Does nothing once the pages are clean.
+(
+  T=$(mktemp -d)
+  git clone --depth 1 "https://x-access-token:$(gh auth token)@github.com/$SITE" "$T/site" >/dev/null 2>&1 || exit 0
+  cd "$T/site"
+  if grep -ql 'class="notice">Draft text for review' privacy.html terms.html 2>/dev/null; then
+    sed -i '/<div class="notice">Draft text for review/d' privacy.html terms.html
+    git -c user.name="Kelvin Codes" -c user.email="noreply@pixelslimited.ng" commit -qam "Remove draft notice from privacy and terms" && git push -q origin HEAD || true
+  fi
+) || true
+
 # Last check: the public update file must be reachable (GitHub's download address can take a little while to appear).
 for i in $(seq 1 12); do
   if curl -fsSL "$BASE/update.json" | grep -q "\"versionCode\":$CODE"; then echo "update.json for build $CODE is live"; exit 0; fi

@@ -69,6 +69,7 @@ object DocxWriter {
                 "w:bottom=\"${page.marginBottomTwips}\" w:left=\"${page.marginLeftTwips}\" " +
                 "w:header=\"${page.headerDistTwips}\" w:footer=\"${page.footerDistTwips}\" w:gutter=\"0\"/>",
         )
+        if (page.columns > 1) body.append("<w:cols w:num=\"${page.columns}\" w:space=\"720\"/>")
         if (first) body.append("<w:titlePg/>")
         body.append("</w:sectPr>")
 

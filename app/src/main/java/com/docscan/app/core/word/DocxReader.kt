@@ -98,7 +98,7 @@ object DocxReader {
         if (boxes > 0) notes += "text boxes"
         val sections = count(doc, "<w:sectPr")
         if (sections > 1) notes += "several sections (only the last page setup is kept)"
-        if (Regex("<w:cols [^>]*w:num=\"([2-9]|\\d\\d)\"").containsMatchIn(doc)) notes += "multiple columns"
+        if (Regex("<w:cols [^>]*w:num=\"([2-9]|\\d\\d)\"").containsMatchIn(doc)) notes += "multiple columns (shown as one column; the column setting is kept when you save)"
         if (count(doc, "<w:sdt>") + count(doc, "<w:sdt ") > 0) notes += "content controls (their text is kept)"
         return notes
     }
@@ -464,6 +464,7 @@ object DocxReader {
                     footerDistTwips = m.attr("footer")?.toIntOrNull()?.coerceAtLeast(0) ?: setup.footerDistTwips,
                 )
             }
+            sect.child("cols")?.attr("num")?.toIntOrNull()?.let { n -> if (n in 2..6) setup = setup.copy(columns = n) }
             val headerRef = sect.childrenNamed("headerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull { it.attr("type") == null } }
             val footerRef = sect.childrenNamed("footerReference").let { l -> l.firstOrNull { it.attr("type") == "default" } ?: l.firstOrNull { it.attr("type") == null } }
             val firstHeaderRef = sect.childrenNamed("headerReference").firstOrNull { it.attr("type") == "first" }

@@ -33,3 +33,10 @@ class ParagraphDirectionTest {
         assertTrue(!back[1].paragraph.rtl)
     }
 }
+
+class ColumnsTest {
+    @Test fun columnCountSurvivesSaving() {
+        val doc = WordDoc("t", listOf(Block.Para(Paragraph(listOf(Run("Hi"))))), page = PageSetup(columns = 3))
+        assertEquals(3, DocxReader.read(java.io.ByteArrayInputStream(DocxWriter.toBytes(doc))).page.columns)
+    }
+}

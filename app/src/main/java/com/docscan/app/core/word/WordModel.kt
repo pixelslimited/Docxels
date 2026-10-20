@@ -239,6 +239,8 @@ data class PageSetup(
     val marginBottomTwips: Int = 1440,
     val marginLeftTwips: Int = 1440,
     val marginRightTwips: Int = 1440,
+    /** Word's column count for the page (1-6). The editor lays text in one column; the setting is kept when saving. */
+    val columns: Int = 1,
     val headerText: String = "",
     val footerText: String = "",
     val pageNumbers: Boolean = false,
