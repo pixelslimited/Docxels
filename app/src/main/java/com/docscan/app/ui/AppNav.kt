@@ -30,6 +30,7 @@ private const val SCAN = "scan/{docId}"
 private const val DOC = "doc/{docId}"
 private const val EDIT = "edit/{docId}/{pageId}"
 private const val WRITE = "write/{id}"
+private const val REVIEW = "review"
 private const val PDF = "pdf/{mode}"
 private const val PDFDOC = "pdfdoc/{id}"
 
@@ -58,7 +59,7 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 container = container,
                 onScanDoc = { docId -> nav.navigate("scan/$docId") },
                 onOpenScan = { docId -> nav.navigate("doc/$docId") },
-                onOpenWord = { id -> nav.navigate("write/$id") },
+                onOpenWord = { id -> nav.navigate(if (id == com.docscan.app.ui.write.REVIEW_ID) REVIEW else "write/$id") },
                 onPdfTool = { mode -> nav.navigate("pdf/$mode") },
                 onOpenPdf = { id -> nav.navigate("pdfdoc/$id") },
             )
@@ -81,6 +82,19 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
             )
             androidx.compose.runtime.LaunchedEffect(id) { vm.openStored(id) }
             PdfScreen(vm = vm, mode = PdfMode.VIEW, onBack = { nav.popBackStack() }, autoPick = false, storedId = id)
+        }
+        composable(REVIEW) {
+            val review = container.pendingReview
+            if (review == null) {
+                androidx.compose.runtime.LaunchedEffect(Unit) { nav.popBackStack() }
+            } else {
+                com.docscan.app.ui.write.ScanReviewScreen(
+                    container = container,
+                    review = review,
+                    onDone = { id -> container.pendingReview = null; nav.navigate("write/$id") { popUpTo(REVIEW) { inclusive = true } } },
+                    onCancel = { container.pendingReview = null; nav.popBackStack() },
+                )
+            }
         }
         composable(WRITE) { entry ->
             val id = entry.arguments?.getString("id") ?: return@composable
@@ -119,7 +133,7 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 onBack = { nav.popBackStack() },
                 onAddPages = { nav.navigate("scan/$docId") },
                 onEditPage = { pageId -> nav.navigate("edit/$docId/$pageId") },
-                onOpenWord = { id -> nav.navigate("write/$id") },
+                onOpenWord = { id -> nav.navigate(if (id == com.docscan.app.ui.write.REVIEW_ID) REVIEW else "write/$id") },
             )
         }
         composable(EDIT) { entry ->

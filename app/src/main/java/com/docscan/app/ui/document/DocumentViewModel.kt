@@ -99,9 +99,9 @@ class DocumentViewModel(private val container: AppContainer, private val docId: 
             runCatching {
                 container.scanToWord.convert(current, name) { n, total -> _busyLabel.value = "Reading page $n of $total…" }
             }.onSuccess { doc ->
-                val id = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { container.words.add(doc) }
+                container.pendingReview = com.docscan.app.ui.write.ScanReview(doc, current)
                 _busyLabel.value = null
-                onDone(id)
+                onDone(com.docscan.app.ui.write.REVIEW_ID)
             }.onFailure {
                 _busyLabel.value = null
                 events.send(UiEvent.Message("Could not convert to a Word document."))

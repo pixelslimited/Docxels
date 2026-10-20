@@ -64,5 +64,7 @@ class AppContainer(context: Context) {
     val pdfs = com.docscan.app.data.PdfStore(context)
     val libraryMeta = com.docscan.app.data.LibraryMeta(context)
     val scanToWord = com.docscan.app.ocr.ScanToWord(renderer, ocr)
+    /** A scan that has been read into Word text and is waiting for the person to check it (see ScanReviewScreen). */
+    var pendingReview: com.docscan.app.ui.write.ScanReview? = null
     val pdfToWord = com.docscan.app.pdf.PdfToWord(context, scanToWord)
 }

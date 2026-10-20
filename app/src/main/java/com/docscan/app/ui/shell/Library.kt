@@ -274,9 +274,9 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
             runCatching {
                 container.scanToWord.convert(pages, name) { n, total -> _busy.value = "Reading page $n of $total…" }
             }.onSuccess { doc ->
-                val id = withContext(Dispatchers.IO) { container.words.add(doc) }
+                container.pendingReview = com.docscan.app.ui.write.ScanReview(doc, pages)
                 _busy.value = null
-                onDone(id)
+                onDone(com.docscan.app.ui.write.REVIEW_ID)
             }.onFailure {
                 _busy.value = null
                 _message.value = "Could not convert to a Word document."
