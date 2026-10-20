@@ -205,7 +205,7 @@ fun MainShell(
     }
 
     if (templateSheet) {
-        ModalBottomSheet(onDismissRequest = { templateSheet = false }) {
+        ModalBottomSheet(onDismissRequest = { templateSheet = false }, scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)) {
             Column(Modifier.padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
                 Text("Templates", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 com.docscan.app.core.word.Templates.all.forEach { t ->
@@ -244,7 +244,7 @@ fun MainShell(
     }
 
     if (importSheet) {
-        ModalBottomSheet(onDismissRequest = { importSheet = false }) {
+        ModalBottomSheet(onDismissRequest = { importSheet = false }, scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)) {
             Column(Modifier.padding(bottom = 24.dp)) {
                 Text("Import", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 SheetRow(Icons.Default.PhotoLibrary, "Photos from gallery", "Becomes a scan you can clean up and export") {

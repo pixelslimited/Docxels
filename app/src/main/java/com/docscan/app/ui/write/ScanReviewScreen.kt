@@ -94,6 +94,16 @@ fun ScanReviewScreen(container: AppContainer, review: ScanReview, onDone: (Strin
         image = runCatching { container.renderer.render(entity, 1200).asImageBitmap() }.getOrNull()
     }
 
+    fun save(withEdits: Boolean) {
+        if (saving) return
+        saving = true
+        scope.launch {
+            val doc = if (withEdits) review.doc.copy(blocks = applyReviewEdits(pages, edits)) else review.doc
+            val id = withContext(Dispatchers.IO) { container.words.add(doc) }
+            onDone(id)
+        }
+    }
+
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -102,6 +112,7 @@ fun ScanReviewScreen(container: AppContainer, review: ScanReview, onDone: (Strin
                     Text("Check the text", style = MaterialTheme.typography.titleMedium)
                     Text("Page ${index + 1} of ${pages.size}", style = MaterialTheme.typography.bodySmall)
                 }
+                androidx.compose.material3.TextButton(onClick = { save(false) }, enabled = !saving) { Text("Skip") }
                 IconButton(onClick = { if (index > 0) index-- }, enabled = index > 0) { Icon(Icons.Default.ChevronLeft, "Previous page") }
                 IconButton(onClick = { if (index < pages.size - 1) index++ }, enabled = index < pages.size - 1) { Icon(Icons.Default.ChevronRight, "Next page") }
             }
@@ -133,15 +144,7 @@ fun ScanReviewScreen(container: AppContainer, review: ScanReview, onDone: (Strin
                 }
             }
             Button(
-                onClick = {
-                    if (saving) return@Button
-                    saving = true
-                    scope.launch {
-                        val doc = review.doc.copy(blocks = applyReviewEdits(pages, edits))
-                        val id = withContext(Dispatchers.IO) { container.words.add(doc) }
-                        onDone(id)
-                    }
-                },
+                onClick = { save(true) },
                 enabled = !saving,
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
             ) { Text(if (saving) "Saving…" else "Open in editor") }

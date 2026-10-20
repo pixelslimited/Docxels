@@ -2,6 +2,8 @@ package com.docscan.app.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.FilterList
@@ -160,20 +162,14 @@ fun HomeScreen(
             }
         }
 
-        SectionTitle("Business documents", "All templates", actions.templates)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            ToolTile(Icons.Default.ReceiptLong, "Invoice", t.orange, { actions.newFromTemplate("invoice") }, Modifier.weight(1f))
-            ToolTile(Icons.Default.Mail, "Letter", t.blue, { actions.newFromTemplate("letter") }, Modifier.weight(1f))
-            ToolTile(Icons.Default.Badge, "CV", t.teal, { actions.newFromTemplate("cv") }, Modifier.weight(1f))
-            ToolTile(Icons.Default.Assessment, "Report", t.green, { actions.newFromTemplate("report") }, Modifier.weight(1f))
-        }
-
         SectionTitle("Convert", "All tools", onAllTools)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            ToolTile(Icons.Default.PictureAsPdf, "PDF to Word", t.pink, actions.pdfToWord, Modifier.weight(1f))
-            ToolTile(Icons.Default.Description, "Word to PDF", t.blue, actions.wordToPdf, Modifier.weight(1f))
-            ToolTile(Icons.Default.PhotoLibrary, "Photos to PDF", t.green, actions.importPhotos, Modifier.weight(1f))
-            ToolTile(Icons.Default.CallMerge, "Merge PDFs", t.teal, { actions.pdfTool("merge") }, Modifier.weight(1f))
+        // Tiles are a fixed width so the next one always peeks in from the edge, telling the eye that the row scrolls.
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ToolTile(Icons.Default.PictureAsPdf, "PDF to Word", t.pink, actions.pdfToWord, Modifier.width(92.dp))
+            ToolTile(Icons.Default.Description, "Word to PDF", t.blue, actions.wordToPdf, Modifier.width(92.dp))
+            ToolTile(Icons.Default.PhotoLibrary, "Photos to PDF", t.green, actions.importPhotos, Modifier.width(92.dp))
+            ToolTile(Icons.Default.CallMerge, "Merge PDFs", t.teal, { actions.pdfTool("merge") }, Modifier.width(92.dp))
+            ToolTile(Icons.Default.TextSnippet, "Scan to Word", t.orange, actions.scanToWord, Modifier.width(92.dp))
         }
 
         Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
