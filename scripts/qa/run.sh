@@ -86,3 +86,44 @@ adb root >/dev/null 2>&1; sleep 3
 adb pull /data/data/ng.pixelslimited.docxels/cache/exports/sample-letter.pdf "$OUT/export.pdf" 2>&1 | tee -a "$OUT/log.txt" || true
 adb logcat -d -s AndroidRuntime:E > "$OUT/crashes3.txt" 2>&1 || true
 adb logcat -d -s System.out:I > "$OUT/measure-log.txt" 2>&1 || true
+
+# ---- New features: invoice maker, text box, tracked changes ----
+step "restart for new features"
+adb shell am force-stop ng.pixelslimited.docxels; sleep 2
+adb push "$(dirname "$0")/tracked-sample.docx" /sdcard/Download/tracked-sample.docx >/dev/null
+adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/tracked-sample.docx >/dev/null 2>&1
+adb logcat -c
+adb shell monkey -p ng.pixelslimited.docxels -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 8
+dismiss
+tap "^Home$" 2
+shot 20_home_again
+
+step "invoice maker"
+if tap "Invoice" 3; then shot 21_invoice_maker; adb shell input keyevent 4; sleep 2; else echo "Invoice tile not found"; fi
+dismiss
+
+step "tracked changes"
+if tap "^Import$" 3; then
+  shot 30_import_sheet
+  if tap "Word file" 4; then
+    shot 31_word_picker
+    tap "tracked-sample" 4 || { tap "Show roots" 2; tap "^Downloads$" 3; tap "tracked-sample" 4; }
+    shot 32_tracked_prompt
+    tap "Show changes" 5; shot 33_tracked_markup
+    adb shell input keyevent 4; sleep 2
+  fi
+fi
+dismiss
+
+step "text box"
+tap "^Home$" 2
+for p in "^New doc$" "^New document$"; do tap "$p" 4 && break; done
+dismiss
+adb shell input tap 540 520; sleep 1
+adb shell input tap 980 2170; sleep 2; shot 40_ribbon
+tap "^Insert" 2; shot 41_insert_tab
+tap "Shape" 2; shot 42_shapes
+tap "Text box" 3; shot 43_textbox_inserted
+adb shell input tap 540 520; sleep 2; shot 44_textbox_dialog
+adb logcat -d -s AndroidRuntime:E > "$OUT/crashes4.txt" 2>&1 || true
+adb logcat -d > "$OUT/logcat-full2.txt" 2>&1 || true
