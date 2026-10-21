@@ -87,7 +87,7 @@ object BackgroundRemover {
      * Returns null when the result is not believable (nothing, or nearly everything, was cut), so the caller can
      * fall back to [removeWithRect].
      */
-    fun removeSmart(src: Bitmap, strict: Boolean = false): Bitmap? {
+    fun removeSmart(src: Bitmap, subjectOnly: Boolean = false): Bitmap? {
         val full = src.toRgbMat()
         try {
             val scale = min(1.0, SMART_SIDE / max(full.cols(), full.rows()))
@@ -178,18 +178,21 @@ object BackgroundRemover {
 
             // The subject model (U^2-Net-P, on the phone) finds the main object whatever the background looks like.
             // When it finds one, its outline replaces the colour guess as the starting mask for GrabCut.
+            val sureT: Float = if (subjectOnly) 0.85f else 0.5f
+            val probT: Float = if (subjectOnly) 0.5f else 0.08f
+            val growPx: Double = if (subjectOnly) 41.0 else 61.0
             val prior = subjectPrior(small, w, h)
             if (prior != null) {
                 val salient = Mat(h, w, CvType.CV_8UC1)
-                salient.put(0, 0, ByteArray(n) { if (prior[it] > (if (strict) 0.5f else 0.08f)) 1 else 0 })
+                salient.put(0, 0, ByteArray(n) { if (prior[it] > probT) 1 else 0 })
                 val nearSubject = Mat()
-                Imgproc.dilate(salient, nearSubject, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(if (strict) 41.0 else 61.0, if (strict) 41.0 else 61.0)))
+                Imgproc.dilate(salient, nearSubject, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(growPx, growPx)))
                 val nearBytes = ByteArray(n)
                 nearSubject.get(0, 0, nearBytes)
                 for (i in 0 until n) {
                     m[i] = when {
-                        prior[i] > (if (strict) 0.85f else 0.5f) -> Imgproc.GC_FGD.toByte()
-                        prior[i] > (if (strict) 0.5f else 0.08f) -> Imgproc.GC_PR_FGD.toByte()
+                        prior[i] > sureT -> Imgproc.GC_FGD.toByte()
+                        prior[i] > probT -> Imgproc.GC_PR_FGD.toByte()
                         nearBytes[i].toInt() == 0 -> Imgproc.GC_BGD.toByte()
                         else -> Imgproc.GC_PR_BGD.toByte()
                     }
@@ -223,7 +226,7 @@ object BackgroundRemover {
     }
 
     /** The smart method, falling back to the rectangle method when it finds nothing believable. */
-    fun remove(src: Bitmap, strict: Boolean = false): Bitmap = runCatching { removeSmart(src, strict) }.getOrNull() ?: removeWithRect(src)
+    fun remove(src: Bitmap, subjectOnly: Boolean = false): Bitmap = runCatching { removeSmart(src, subjectOnly) }.getOrNull() ?: removeWithRect(src)
 
     private fun applyAlpha(src: Bitmap, alpha: Mat): Bitmap {
         val pixels = IntArray(src.width * src.height)
