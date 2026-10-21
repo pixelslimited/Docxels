@@ -125,3 +125,7 @@ Signature pad: "Use signature" and Undo now switch on as soon as you have drawn 
 Signature pad (in the editor): a Save button keeps the signature in My signatures for every document, and you can still insert it straight away. Undo and Clear moved under the pad.
 Double-tap a phone number (in text or in a table cell, such as a list of imams) to open the phone dialer with that number ready; press call. Works with 0803 123 4567, 08031234567 and +234 803 123 4567.
 PDF viewer: phone numbers in a PDF that has real text are underlined; tap one to open the phone dialer with it ready. (A scanned PDF with no text has none to find; convert it to Word first if you need that.)
+Editor: a search icon in the tools panel finds any tool by name (try "table", "spelling", "page number", "margins").
+Review → Check spelling underlines misspelled words using your phone's spell checker; tap a word for suggestions. Turn on a spell checker in Android settings if it says none answered.
+Home now has a Clipboard group: Paste, Paste as plain text, Cut, Copy, Select all.
+Page setup: headers and footers can have several lines, be left, centred or right, and show "Page X of Y". They carry through to PDF and Word.

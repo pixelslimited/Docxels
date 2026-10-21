@@ -117,15 +117,15 @@ object DocxWriter {
                 putText("word/_rels/$name.rels", HEAD + sb)
             }
         }
-        if (hasHeader) part("header1.xml", { ids -> headerXml(page.headerText, page.headerImages, ids, 1001) }, page.headerImages)
-        if (hasFooter) part("footer1.xml", { ids -> footerXml(page.footerText, page.pageNumbers, page.footerImages, ids, 1101) }, page.footerImages)
-        if (hasFirstHeader) part("header2.xml", { ids -> headerXml(page.firstHeaderText, page.firstHeaderImages, ids, 1201) }, page.firstHeaderImages)
+        if (hasHeader) part("header1.xml", { ids -> headerXml(page.headerText, page.headerImages, ids, 1001, page.headerAlign) }, page.headerImages)
+        if (hasFooter) part("footer1.xml", { ids -> footerXml(page.footerText, page.pageNumbers, page.footerImages, ids, 1101, page.footerAlign) }, page.footerImages)
+        if (hasFirstHeader) part("header2.xml", { ids -> headerXml(page.firstHeaderText, page.firstHeaderImages, ids, 1201, page.headerAlign) }, page.firstHeaderImages)
         if (even) {
             putText("word/settings.xml", HEAD + "<w:settings $NS><w:evenAndOddHeaders/></w:settings>")
-            part("header3.xml", { ids -> headerXml(page.evenHeaderText, emptyList(), ids, 1401) }, emptyList())
-            part("footer3.xml", { ids -> footerXml(page.evenFooterText, page.pageNumbers, emptyList(), ids, 1501) }, emptyList())
+            part("header3.xml", { ids -> headerXml(page.evenHeaderText, emptyList(), ids, 1401, page.headerAlign) }, emptyList())
+            part("footer3.xml", { ids -> footerXml(page.evenFooterText, page.pageNumbers, emptyList(), ids, 1501, page.footerAlign) }, emptyList())
         }
-        if (hasFirstFooter) part("footer2.xml", { ids -> footerXml(page.firstFooterText, page.firstPageNumbers, page.firstFooterImages, ids, 1301) }, page.firstFooterImages)
+        if (hasFirstFooter) part("footer2.xml", { ids -> footerXml(page.firstFooterText, page.firstPageNumbers, page.firstFooterImages, ids, 1301, page.footerAlign) }, page.firstFooterImages)
         ctx.images.forEachIndexed { i, img -> put(zip, "word/media/image${i + 1}.${img.extension}", img.bytes) }
         zip.finish()
         zip.flush()
@@ -153,26 +153,37 @@ object DocxWriter {
     private fun pictures(images: List<PageImage>, ids: List<String>, firstId: Int): String =
         images.indices.joinToString("") { pageImageXml(images[it], ids[it], firstId + it) }
 
-    private fun headerXml(text: String, images: List<PageImage>, ids: List<String>, firstId: Int): String {
-        val textRun = if (text.isBlank()) "" else "<w:r><w:t xml:space=\"preserve\">${Xml.escape(text)}</w:t></w:r>"
-        return "<w:hdr $NS><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr>$textRun${pictures(images, ids, firstId)}</w:p></w:hdr>"
+    private fun jc(align: Int) = when (align) { 0 -> "left"; 2 -> "right"; else -> "center" }
+
+    private fun fieldRuns(instr: String, shown: String) =
+        "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r>" +
+            "<w:r><w:instrText xml:space=\"preserve\"> $instr </w:instrText></w:r>" +
+            "<w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>" +
+            "<w:r><w:t>$shown</w:t></w:r>" +
+            "<w:r><w:fldChar w:fldCharType=\"end\"/></w:r>"
+
+    /** One paragraph per line of header/footer text; {page} and {pages} become real PAGE and NUMPAGES fields. */
+    private fun textParagraphs(text: String, align: Int): String = HeaderFooter.lines(text).joinToString("") { line ->
+        val runs = HeaderFooter.pieces(line).joinToString("") { piece ->
+            when (piece) {
+                HeaderFooter.PAGE -> fieldRuns("PAGE", "1")
+                HeaderFooter.PAGES -> fieldRuns("NUMPAGES", "1")
+                else -> "<w:r><w:t xml:space=\"preserve\">${Xml.escape(piece)}</w:t></w:r>"
+            }
+        }
+        "<w:p><w:pPr><w:jc w:val=\"${jc(align)}\"/></w:pPr>$runs</w:p>"
     }
 
-    private fun footerXml(text: String, numbers: Boolean, images: List<PageImage>, ids: List<String>, firstId: Int): String {
-        val sb = StringBuilder()
-        if (text.isNotBlank()) {
-            sb.append("<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t xml:space=\"preserve\">${Xml.escape(text)}</w:t></w:r></w:p>")
-        }
-        if (numbers) {
-            sb.append(
-                "<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr>" +
-                    "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r>" +
-                    "<w:r><w:instrText xml:space=\"preserve\"> PAGE </w:instrText></w:r>" +
-                    "<w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>" +
-                    "<w:r><w:t>1</w:t></w:r>" +
-                    "<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
-            )
-        }
+    private fun headerXml(text: String, images: List<PageImage>, ids: List<String>, firstId: Int, align: Int): String {
+        val sb = StringBuilder(textParagraphs(text, align))
+        if (images.isNotEmpty()) sb.append("<w:p>${pictures(images, ids, firstId)}</w:p>")
+        if (sb.isEmpty()) sb.append("<w:p/>")
+        return "<w:hdr $NS>$sb</w:hdr>"
+    }
+
+    private fun footerXml(text: String, numbers: Boolean, images: List<PageImage>, ids: List<String>, firstId: Int, align: Int): String {
+        val sb = StringBuilder(textParagraphs(text, align))
+        if (numbers) sb.append("<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr>${fieldRuns("PAGE", "1")}</w:p>")
         if (images.isNotEmpty()) sb.append("<w:p>${pictures(images, ids, firstId)}</w:p>")
         if (sb.isEmpty()) sb.append("<w:p/>")
         return "<w:ftr $NS>$sb</w:ftr>"

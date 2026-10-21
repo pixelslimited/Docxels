@@ -49,6 +49,8 @@ class PageDecor(
     val topMarginPx: Float = 0f,
     /** Height of the coloured strip drawn between one sheet and the next. */
     val deskGapPx: Float = 0f,
+    val headerAlign: Int = 1,
+    val footerAlign: Int = 1,
 ) {
     /** Extra vertical room the first line of every page after the first carries: bottom margin + strip + top margin. */
     val pageGapPx: Float get() = bottomMarginPx + deskGapPx + topMarginPx
@@ -308,16 +310,27 @@ class RichEditText(context: Context) : EditText(context) {
             val header = if (first) d.firstHeaderText else if (evenPage) d.evenHeaderText else d.headerText
             val footer = if (first) d.firstFooterText else if (evenPage) d.evenFooterText else d.footerText
             val numbered = if (first) d.firstPageNumbers else d.pageNumbers
-            if (header.isNotEmpty()) {
-                canvas.drawText(header, paddingLeft.toFloat(), sheetTop + d.topMarginPx / 2f + d.smallTextPx / 3f, small)
-            }
+            val lineH = d.smallTextPx * 1.3f
+            val headLines = com.docscan.app.core.word.HeaderFooter.lines(com.docscan.app.core.word.HeaderFooter.fill(header, k + 1, n))
+            val footLines = com.docscan.app.core.word.HeaderFooter.lines(com.docscan.app.core.word.HeaderFooter.fill(footer, k + 1, n))
+            val headY = sheetTop + d.topMarginPx / 2f + d.smallTextPx / 3f - (headLines.size - 1) * lineH / 2f
+            headLines.forEachIndexed { i, line -> drawAligned(canvas, line, d.headerAlign, headY + i * lineH) }
             val footY = sheetBottom - d.bottomMarginPx / 2f + d.smallTextPx / 3f
-            if (footer.isNotEmpty()) canvas.drawText(footer, paddingLeft.toFloat(), footY, small)
+            footLines.forEachIndexed { i, line -> drawAligned(canvas, line, d.footerAlign, footY - (footLines.size - 1 - i) * lineH) }
             if (numbered) {
                 val label = (k + 1).toString()
                 canvas.drawText(label, width - paddingRight - small.measureText(label), footY, small)
             }
         }
+    }
+
+    /** One line of header/footer text, left, centred or right between the margins. */
+    private fun drawAligned(canvas: android.graphics.Canvas, line: String, align: Int, y: Float) {
+        val left = paddingLeft.toFloat()
+        val right = (width - paddingRight).toFloat()
+        val w = small.measureText(line)
+        val x = when (align) { 0 -> left; 2 -> right - w; else -> (left + right - w) / 2f }
+        canvas.drawText(line, x, y, small)
     }
 
     /** Called with the block index when a table / image placeholder is tapped. */
@@ -907,6 +920,8 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
                 pxPerTwip = ZOOM * eff / 20f,
                 topMarginPx = pageSetup.marginTopTwips / 20f * ZOOM * eff,
                 deskGapPx = 14f * d0,
+                headerAlign = pageSetup.headerAlign,
+                footerAlign = pageSetup.footerAlign,
             )
         }
         v.requestLayout()
@@ -1229,6 +1244,25 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
                 a, b, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
             )
         }
+    }
+
+    /** Underlines misspelled words; tapping one shows the checker's suggestions. [base] is where the checked text starts in the document. */
+    fun markSpelling(base: Int, hits: List<SpellHit>) {
+        val v = view ?: return
+        val t = v.text
+        clearIssues()
+        hits.forEach { h ->
+            val a = (base + h.start).coerceIn(0, t.length); val b = (base + h.end).coerceIn(a, t.length)
+            if (b > a) t.setSpan(
+                android.text.style.SuggestionSpan(v.context, h.suggestions.toTypedArray(), android.text.style.SuggestionSpan.FLAG_MISSPELLED),
+                a, b, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
+    }
+
+    /** Cut, copy, paste, paste as plain text or select all, with the phone's own clipboard handling. [id] is an android.R.id value. */
+    fun clipboard(id: Int) {
+        view?.onTextContextMenuItem(id)
     }
 
     fun clearIssues() {

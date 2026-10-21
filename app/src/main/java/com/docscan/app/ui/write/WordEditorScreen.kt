@@ -42,6 +42,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Spellcheck
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Functions
@@ -638,6 +643,21 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     onFind = { findOpen = true },
                     onAssistant = { assistantOpen = true },
                     onCount = { statsOpen = true },
+                    onSpelling = {
+                        scope.launch {
+                            val sc = controller.assistantScope()
+                            if (sc.text.isBlank()) { snackbar.showSnackbar("There is no text to check."); return@launch }
+                            val note = launch { snackbar.showSnackbar("Checking spelling…", duration = androidx.compose.material3.SnackbarDuration.Indefinite) }
+                            val hits = Spelling.check(context, sc.text)
+                            note.cancel()
+                            if (hits == null) {
+                                snackbar.showSnackbar("No spell checker answered. Turn one on in Android settings (Languages and input, then Spell checker) and try again.")
+                                return@launch
+                            }
+                            controller.markSpelling(sc.start, hits)
+                            snackbar.showSnackbar(if (hits.isEmpty()) "No spelling mistakes found." else "${hits.size} possible mistakes. Tap an underlined word to fix it.")
+                        }
+                    },
                     onFont = { fontOpen = true },
                     onSize = { sizeOpen = true },
                     onParagraph = { paraOpen = true },
@@ -926,6 +946,7 @@ private fun Ribbon(
     onFind: () -> Unit,
     onAssistant: () -> Unit,
     onCount: () -> Unit,
+    onSpelling: () -> Unit,
     onFont: () -> Unit,
     onSize: () -> Unit,
     onParagraph: () -> Unit,
@@ -961,11 +982,82 @@ private fun Ribbon(
     var open by openState
     var grid by remember { mutableStateOf(true) }
     var tabMenu by remember { mutableStateOf(false) }
+    var searching by remember { mutableStateOf(false) }
+    if (searching) {
+        val list = ArrayList<Command>()
+        fun cmd(label: String, where: String, words: String = "", run: () -> Unit) { list += Command(label, where, words) { open = false; run() } }
+        cmd("Bold", "Home · Font", "strong heavy") { c.toggle(CharKind.BOLD, CharAttr.Bold) }
+        cmd("Italic", "Home · Font", "slant") { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
+        cmd("Underline", "Home · Font", "line under") { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
+        cmd("Strikethrough", "Home · Font", "cross out") { c.toggle(CharKind.STRIKE, CharAttr.Strike) }
+        cmd("Superscript", "Home · Font", "raise") { c.toggleVert(true) }
+        cmd("Subscript", "Home · Font", "lower") { c.toggleVert(false) }
+        cmd("Bigger text", "Home · Font", "increase size larger") { c.sizeStep(1) }
+        cmd("Smaller text", "Home · Font", "decrease size") { c.sizeStep(-1) }
+        cmd("Font", "Home · Font", "typeface name") { onFont() }
+        cmd("Font size", "Home · Font", "points") { onSize() }
+        com.docscan.app.core.word.CaseMode.entries.forEach { m -> cmd("Change case: ${m.label}", "Home · Font", "capital upper lower") { c.changeCase(m) } }
+        cmd("Clear formatting", "Home · Clear", "reset plain") { c.clearFormatting() }
+        cmd("Format painter", "Home · Font", "copy formatting") { onPainter() }
+        cmd("Paste", "Home · Clipboard", "clipboard") { c.clipboard(android.R.id.paste) }
+        cmd("Paste as plain text", "Home · Clipboard", "unformatted clipboard") { c.clipboard(android.R.id.pasteAsPlainText) }
+        cmd("Cut", "Home · Clipboard", "clipboard") { c.clipboard(android.R.id.cut) }
+        cmd("Copy", "Home · Clipboard", "clipboard") { c.clipboard(android.R.id.copy) }
+        cmd("Select all", "Home · Clipboard", "everything") { c.clipboard(android.R.id.selectAll) }
+        cmd("Undo", "Home", "back") { c.undo() }
+        cmd("Redo", "Home", "forward") { c.redo() }
+        cmd("Bullets", "Home · Paragraph", "list bulleted") { c.toggleList(ListKind.BULLET) }
+        cmd("Numbering", "Home · Paragraph", "list numbered") { c.toggleList(ListKind.NUMBER) }
+        cmd("Align left", "Home · Paragraph", "") { c.setAlign(Align.LEFT) }
+        cmd("Align centre", "Home · Paragraph", "center middle") { c.setAlign(Align.CENTER) }
+        cmd("Align right", "Home · Paragraph", "") { c.setAlign(Align.RIGHT) }
+        cmd("Justify", "Home · Paragraph", "both sides") { c.setAlign(Align.JUSTIFY) }
+        cmd("Indent", "Home · Paragraph", "increase") { c.indent(1) }
+        cmd("Outdent", "Home · Paragraph", "decrease unindent") { c.indent(-1) }
+        cmd("Line spacing: single", "Home · Paragraph", "") { c.setLineSpacing(1.0f) }
+        cmd("Line spacing: 1.5", "Home · Paragraph", "") { c.setLineSpacing(1.5f) }
+        cmd("Line spacing: double", "Home · Paragraph", "") { c.setLineSpacing(2.0f) }
+        cmd("Space before paragraph", "Home · Paragraph", "spacing") { c.toggleSpaceBefore() }
+        cmd("Space after paragraph", "Home · Paragraph", "spacing") { c.toggleSpaceAfter() }
+        cmd("Border around paragraph", "Home · Paragraph", "box") { c.toggleBorder() }
+        cmd("Paragraph settings", "Home · Paragraph", "indent spacing hanging") { onParagraph() }
+        ParaStyle.entries.forEach { st -> cmd("Style: ${st.label}", "Home · Style", "heading title normal") { c.setStyle(st) } }
+        cmd("My styles", "Home · Style", "saved style") { onMyStyles() }
+        cmd("Table", "Insert", "grid rows columns") { onTable() }
+        cmd("Picture", "Insert", "photo image") { onPicture() }
+        com.docscan.app.core.word.ShapePresets.INSERTABLE.forEach { (preset, label) -> cmd("Shape: $label", "Insert", "draw") { onShape(preset) } }
+        cmd("Two columns", "Insert", "newspaper") { onColumns(2) }
+        cmd("Three columns", "Insert", "newspaper") { onColumns(3) }
+        cmd("Letterhead: my letterheads", "Insert", "logo header paper") { onLetterhead("saved") }
+        cmd("Signature: my signatures", "Insert", "sign saved") { onSignature("saved") }
+        cmd("Signature: draw with finger", "Insert", "sign pen") { onSignature("draw") }
+        cmd("Signature: from a picture", "Insert", "sign photo") { onSignature("picture") }
+        cmd("Page break", "Insert", "new page") { onPageBreak() }
+        cmd("Link", "Insert", "hyperlink web address email phone") { onLink() }
+        cmd("Date and time", "Insert", "today") { onDate() }
+        cmd("Contents", "Insert", "table of contents headings") { onToc() }
+        cmd("Symbol", "Insert", "special character") { onSymbol() }
+        cmd("New comment", "Review", "note") { onNewComment() }
+        cmd("Page setup", "Layout", "margins orientation landscape portrait paper size a4 header footer page number first page odd even") { onPageSetup() }
+        cmd("Find and replace", "Review", "search") { onFind() }
+        cmd("Check spelling", "Review · Proofing", "spell mistakes typo") { onSpelling() }
+        cmd("Assistant", "Review", "ai rewrite summarise grammar translate") { onAssistant() }
+        cmd("Word count", "Review · Proofing", "statistics characters pages") { onCount() }
+        cmd("Comments", "Review", "notes") { onComments() }
+        cmd("Page preview", "View", "print") { onPreview() }
+        cmd("Navigation", "View", "headings pane") { onNav() }
+        cmd("Read mode", "View", "reading") { onRead() }
+        cmd("Zoom", "View", "magnify") { onZoom() }
+        cmd("Print layout", "View", "pages") { onViewMode(ViewMode.PAGE) }
+        cmd("Text width", "View", "") { onViewMode(ViewMode.TEXT) }
+        cmd("Mobile view", "View", "phone") { onViewMode(ViewMode.MOBILE) }
+        CommandSearchDialog(list, onDismiss = { searching = false })
+    }
     val wide = tab != 0
     // Tool groups: a row of group icons; the picked group's tools show below as icon tiles (no dropdowns).
     var groupPick by remember { mutableStateOf(mapOf<Int, String>()) }
     fun groupsOf(t: Int): List<Pair<String, androidx.compose.ui.graphics.vector.ImageVector>> = when (t) {
-        0 -> listOf("Font" to Icons.Default.TextFields, "Paragraph" to Icons.Default.FormatAlignLeft, "Style" to Icons.Default.Title, "Clear" to Icons.Default.FormatClear)
+        0 -> listOf("Font" to Icons.Default.TextFields, "Clipboard" to Icons.Default.ContentPaste, "Paragraph" to Icons.Default.FormatAlignLeft, "Style" to Icons.Default.Title, "Clear" to Icons.Default.FormatClear)
         1 -> listOf("Illustrations" to Icons.Default.Image, "Letterhead and signature" to Icons.Default.Draw, "Text and page" to Icons.Default.Link)
         2 -> listOf("Page" to Icons.Default.Description)
         3 -> listOf("Find" to Icons.Default.Search, "Proofing" to Icons.Default.Numbers, "Comments" to Icons.Default.Menu)
@@ -1105,6 +1197,7 @@ private fun Ribbon(
                         TabMenu(tabs, tab, tabMenu, { tabMenu = false }) { i -> tabMenu = false; onTab(i); grid = true }
                     }
                     Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { searching = true }, modifier = Modifier.size(52.dp)) { Icon(Icons.Default.Search, contentDescription = "Search tools", modifier = Modifier.size(28.dp)) }
                     IconButton(onClick = { open = false }, modifier = Modifier.size(52.dp)) { Icon(Icons.Default.Close, contentDescription = "Hide tools", modifier = Modifier.size(30.dp)) }
                 }
             }
@@ -1166,6 +1259,12 @@ private fun Ribbon(
                                 TextButton(onClick = { fillMenu = false; customFor = 2 }) { Text("More colours…") }
                             }
                         }
+                        Group("Clipboard")
+                        Btn("Paste", Icons.Default.ContentPaste, main = false) { c.clipboard(android.R.id.paste) }
+                        Btn("Paste as plain text", Icons.Default.ContentPaste, main = false) { c.clipboard(android.R.id.pasteAsPlainText) }
+                        Btn("Cut", Icons.Default.ContentCut, main = false) { c.clipboard(android.R.id.cut) }
+                        Btn("Copy", Icons.Default.ContentCopy, main = false) { c.clipboard(android.R.id.copy) }
+                        Btn("Select all", Icons.Default.SelectAll, main = false) { c.clipboard(android.R.id.selectAll) }
                         Group("Paragraph")
                         Btn("Bullets", Icons.AutoMirrored.Filled.FormatListBulleted, on = s.list == ListKind.BULLET) { c.toggleList(ListKind.BULLET) }
                         Btn("Numbering", Icons.Default.FormatListNumbered, on = s.list == ListKind.NUMBER) { c.toggleList(ListKind.NUMBER) }
@@ -1293,6 +1392,7 @@ private fun Ribbon(
                         Group("Assistant")
                         Btn("Assistant", Icons.Default.AutoFixHigh, close = true) { onAssistant() }
                         Group("Proofing")
+                        Btn("Check spelling", Icons.Default.Spellcheck, close = true) { onSpelling() }
                         Btn("Word count", Icons.Default.Numbers, close = true) { onCount() }
                         Group("Comments")
                         Btn("New comment", Icons.Default.Add, close = true) { onNewComment() }

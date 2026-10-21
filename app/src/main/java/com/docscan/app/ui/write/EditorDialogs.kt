@@ -77,6 +77,8 @@ internal fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDi
     var header by remember { mutableStateOf(page.headerText) }
     var footer by remember { mutableStateOf(page.footerText) }
     var numbers by remember { mutableStateOf(page.pageNumbers) }
+    var headerAlign by remember { mutableStateOf(page.headerAlign) }
+    var footerAlign by remember { mutableStateOf(page.footerAlign) }
     var diffFirst by remember { mutableStateOf(page.differentFirstPage) }
     var header1 by remember { mutableStateOf(page.firstHeaderText) }
     var oddEven by remember { mutableStateOf(page.differentOddEven) }
@@ -117,8 +119,18 @@ internal fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDi
                     OutlinedTextField(mLeft, { mLeft = it.take(5) }, singleLine = true, label = { Text("Left") }, modifier = Modifier.weight(1f))
                     OutlinedTextField(mRight, { mRight = it.take(5) }, singleLine = true, label = { Text("Right") }, modifier = Modifier.weight(1f))
                 }
-                OutlinedTextField(header, { header = it }, label = { Text("Header text") }, singleLine = true)
-                OutlinedTextField(footer, { footer = it }, label = { Text("Footer text") }, singleLine = true)
+                OutlinedTextField(header, { header = it }, label = { Text("Header text (one line per row)") }, minLines = 1, maxLines = 4)
+                AlignChips(headerAlign) { headerAlign = it }
+                OutlinedTextField(footer, { footer = it }, label = { Text("Footer text (one line per row)") }, minLines = 1, maxLines = 4)
+                AlignChips(footerAlign) { footerAlign = it }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    FilterChip(false, { footer = if (footer.isBlank()) "{page}" else footer.trimEnd() + " {page}" }, label = { Text("Add page number") })
+                    FilterChip(false, { footer = if (footer.isBlank()) "Page {page} of {pages}" else footer.trimEnd() + "\nPage {page} of {pages}" }, label = { Text("Add Page X of Y") })
+                }
+                Text(
+                    "{page} is replaced by the page number and {pages} by the number of pages, on screen, in PDF and in Word.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 if (picCount > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -142,12 +154,12 @@ internal fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDi
                 }
                 if (oddEven) {
                     Text("The header and footer above are for odd pages (1, 3, 5…).", style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(headerEven, { headerEven = it }, label = { Text("Even page header") }, singleLine = true)
-                    OutlinedTextField(footerEven, { footerEven = it }, label = { Text("Even page footer") }, singleLine = true)
+                    OutlinedTextField(headerEven, { headerEven = it }, label = { Text("Even page header") }, minLines = 1, maxLines = 4)
+                    OutlinedTextField(footerEven, { footerEven = it }, label = { Text("Even page footer") }, minLines = 1, maxLines = 4)
                 }
                 if (diffFirst) {
-                    OutlinedTextField(header1, { header1 = it }, label = { Text("First page header") }, singleLine = true)
-                    OutlinedTextField(footer1, { footer1 = it }, label = { Text("First page footer") }, singleLine = true)
+                    OutlinedTextField(header1, { header1 = it }, label = { Text("First page header") }, minLines = 1, maxLines = 4)
+                    OutlinedTextField(footer1, { footer1 = it }, label = { Text("First page footer") }, minLines = 1, maxLines = 4)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(numbers1, { numbers1 = it })
                         Text("  Page number on first page")
@@ -162,7 +174,7 @@ internal fun PageSetupDialog(page: PageSetup, onApply: (PageSetup) -> Unit, onDi
                         widthTwips = paper.widthTwips, heightTwips = paper.heightTwips, landscape = landscape,
                         marginLeftTwips = tw(mLeft, page.marginLeftTwips), marginRightTwips = tw(mRight, page.marginRightTwips),
                         marginTopTwips = tw(mTop, page.marginTopTwips), marginBottomTwips = tw(mBottom, page.marginBottomTwips),
-                        headerText = header.trim(), footerText = footer.trim(), pageNumbers = numbers,
+                        headerText = header.trim(), footerText = footer.trim(), pageNumbers = numbers, headerAlign = headerAlign, footerAlign = footerAlign,
                         differentFirstPage = diffFirst, firstHeaderText = header1.trim(), firstFooterText = footer1.trim(), firstPageNumbers = numbers1,
                         differentOddEven = oddEven, evenHeaderText = headerEven.trim(), evenFooterText = footerEven.trim(),
                     ).let { if (dropPics) it.copy(headerImages = emptyList(), footerImages = emptyList(), firstHeaderImages = emptyList(), firstFooterImages = emptyList()) else it },
@@ -271,4 +283,13 @@ internal fun MyStylesDialog(c: EditorController, onClose: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = onClose) { Text("Close") } },
     )
+}
+
+
+/** Left / Centre / Right for a header or footer. */
+@Composable
+private fun AlignChips(value: Int, onPick: (Int) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(0 to "Left", 1 to "Centre", 2 to "Right").forEach { (v, label) -> FilterChip(value == v, { onPick(v) }, label = { Text(label) }) }
+    }
 }

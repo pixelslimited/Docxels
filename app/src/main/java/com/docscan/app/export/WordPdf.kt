@@ -33,10 +33,12 @@ import java.io.OutputStream
 object WordPdf {
     /** [onProgress] gets 0..1 as the document's blocks are drawn. */
     fun write(doc: WordDoc, out: OutputStream, onProgress: (Float) -> Unit = {}) {
-        Writer(doc, onProgress).run(out)
+        // "Page 2 of 5" needs the page count first, so lay the document out once to count when a header or footer asks for it.
+        val total = if (com.docscan.app.core.word.HeaderFooter.usesTotal(doc.page)) Writer(doc, {}, 0).run(object : OutputStream() { override fun write(b: Int) {}; override fun write(b: ByteArray, off: Int, len: Int) {} }) else 0
+        Writer(doc, onProgress, total).run(out)
     }
 
-    private class Writer(val doc: WordDoc, val onProgress: (Float) -> Unit = {}) {
+    private class Writer(val doc: WordDoc, val onProgress: (Float) -> Unit = {}, val totalPages: Int = 0) {
         val page = doc.page
         val pageW = page.sheetWidthTwips / 20f
         val pageH = page.sheetHeightTwips / 20f
@@ -59,7 +61,8 @@ object WordPdf {
             color = Color.rgb(0x1B, 0x1B, 0x1F)
         }
 
-        fun run(out: OutputStream) {
+        /** Draws everything and returns how many pages there are. */
+        fun run(out: OutputStream): Int {
             try {
                 newPage()
                 var pending = ArrayList<Paragraph>()
@@ -82,6 +85,7 @@ object WordPdf {
                 flush()
                 finishPage()
                 pdf.writeTo(out)
+                return pageNo
             } finally {
                 pdf.close()
             }
@@ -120,9 +124,18 @@ object WordPdf {
             for (img in (if (firstPage) page.firstHeaderImages + page.firstFooterImages else page.headerImages + page.footerImages)) {
                 if (!img.behind) drawPageImage(c, img)
             }
-            if (headerText.isNotEmpty()) c.drawText(headerText, mL, mT / 2f + 3f, small)
+            val lineH = small.textSize * 1.3f
+            fun drawAligned(line: String, align: Int, baseline: Float) {
+                val w = small.measureText(line)
+                val x = when (align) { 0 -> mL; 2 -> pageW - mL - w; else -> (pageW - w) / 2f }
+                c.drawText(line, x, baseline, small)
+            }
+            val headLines = com.docscan.app.core.word.HeaderFooter.lines(com.docscan.app.core.word.HeaderFooter.fill(headerText, pageNo, totalPages))
+            val footLines = com.docscan.app.core.word.HeaderFooter.lines(com.docscan.app.core.word.HeaderFooter.fill(footerText, pageNo, totalPages))
+            val hy = mT / 2f + 3f - (headLines.size - 1) * lineH / 2f
+            headLines.forEachIndexed { i, line -> drawAligned(line, page.headerAlign, hy + i * lineH) }
             val fy = pageH - mB / 2f + 3f
-            if (footerText.isNotEmpty()) c.drawText(footerText, mL, fy, small)
+            footLines.forEachIndexed { i, line -> drawAligned(line, page.footerAlign, fy - (footLines.size - 1 - i) * lineH) }
             if (numbers) {
                 val label = pageNo.toString()
                 c.drawText(label, pageW - mL - small.measureText(label), fy, small)

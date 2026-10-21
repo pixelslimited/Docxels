@@ -261,6 +261,9 @@ data class PageSetup(
     val footerImages: List<PageImage> = emptyList(),
     val firstHeaderImages: List<PageImage> = emptyList(),
     val firstFooterImages: List<PageImage> = emptyList(),
+    /** Where header and footer text sits: 0 left, 1 centre, 2 right. */
+    val headerAlign: Int = 1,
+    val footerAlign: Int = 1,
 ) {
     /** Page size as laid out on the sheet, with orientation applied. */
     val sheetWidthTwips: Int get() = if (landscape) maxOf(widthTwips, heightTwips) else minOf(widthTwips, heightTwips)

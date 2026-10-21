@@ -298,10 +298,10 @@ Compared from this tracker and the editor's ribbon labels; not every item was re
 | Item | Why |
 |---|---|
 | Offline spelling check (Android spell checker, red underlines, tap for suggestions) | Works without an account; Assistant grammar needs the server |
-| Selection mini-bar (cut, copy, paste, select all, share) and Paste as plain text | Basic editing should be one tap |
+| ~~Selection mini-bar~~ | Correction: Android's own selection bar already has cut, copy, paste, select all and paste as plain text. A Clipboard group was added to Home instead (see batch 1). |
 | Command search ("what do you want to do?") in the ribbon | Biggest simplicity win; finds any tool by name |
 | Header and footer editor (several lines, page X of Y, different odd/even, logo) | Today: one line; tracker "beyond one line NOT STARTED" |
-| Table of contents from headings, with update | Navigation pane exists; TOC does not |
+| Table of contents with page numbers and an Update button | Insert → Contents already inserts a plain list of headings (no page numbers, no update) |
 | Real styles: Title, Heading 1–3, Normal gallery, change a style once for the whole document | "My styles" exist; custom styles not true Word styles |
 | Table tools: delete column, add column left, row above, cell shading, borders, vertical merge/split, column width, repeat header row, sort | Merge/split horizontal only today |
 | Find and replace options (match case, whole word, replace all, go to page) | Confirm what exists |
@@ -332,3 +332,11 @@ Outline view, focus mode, side-by-side documents, thesaurus, language setting, c
 
 **D. Not applicable on a phone**
 Visual Basic, macros, XML mapping pane, COM add-ins, Get Add-ins, 3D models, SmartArt, screenshots (use the picture picker), online video, Table of Authorities (legal), Block Authors, New Window / Arrange All / Switch Windows / Split, Envelopes and Labels (printing on stationery), Office Account, Contact Support, Copilot (we have our own Assistant).
+
+## Batch 1 from the gap list (21 Oct)
+| Item | Status | Where | Notes |
+|---|---|---|---|
+| Command search ("What do you want to do?") | IMPLEMENTED — NOT VERIFIED | ui/write/CommandSearch, Ribbon search icon (open tool panel header) | About 80 commands (formatting, paragraph, styles, clipboard, insert, page setup, review, view) found by name, tab or other words ("margins", "sign", "photo"). Tools that sit in dropdown menus are listed one by one. Matching logic is plain code; not unit-tested yet. |
+| Check spelling (Review → Proofing) | IMPLEMENTED — NOT VERIFIED | ui/write/Spelling, EditorController.markSpelling | Uses the phone's own spell checker (SpellCheckerSession), text stays on the phone. Red underlines; tap a word for the checker's suggestions. Skips numbers, codes, addresses and ALL-CAPS. Names will be flagged. If no spell checker is switched on in Android, it says so. |
+| Clipboard group on Home (Paste, Paste as plain text, Cut, Copy, Select all) | IMPLEMENTED — NOT VERIFIED | Ribbon, EditorController.clipboard | Calls the editor's own clipboard handling (same as the long-press bar). |
+| Header and footer: several lines, left / centre / right, Page X of Y | IMPLEMENTED — NOT VERIFIED | core/word/HeaderFooter, DocxWriter, DocxReader, WordPdf, EditorController.onDraw, EditorDialogs | {page} and {pages} become real PAGE and NUMPAGES fields in the .docx and are read back; the PDF counts pages first when {pages} is used. Alignment is one setting for all headers and one for all footers. Round trip covered by HeaderFooterTest. Old documents now draw header/footer centred (as Word does when no alignment is set in Docxels files); Word files keep their own alignment. |

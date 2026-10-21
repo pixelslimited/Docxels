@@ -514,13 +514,13 @@ object DocxReader {
                 }
             }
             headerRef?.attr("id")?.let { id ->
-                rels[id]?.let { path -> xml(path)?.let { setup = setup.copy(headerText = partText(it).first, headerImages = partImages(path, it, false, setup)) } }
+                rels[id]?.let { path -> xml(path)?.let { val info = partText(it); setup = setup.copy(headerText = info.first, headerAlign = info.align, headerImages = partImages(path, it, false, setup)) } }
             }
             footerRef?.attr("id")?.let { id ->
                 rels[id]?.let { path ->
                     xml(path)?.let {
                         val (text, hasPage) = partText(it)
-                        setup = setup.copy(footerText = text, pageNumbers = hasPage, footerImages = partImages(path, it, true, setup))
+                        setup = setup.copy(footerText = text, pageNumbers = hasPage, footerAlign = partText(it).align, footerImages = partImages(path, it, true, setup))
                     }
                 }
             }
@@ -632,21 +632,51 @@ object DocxReader {
             return out
         }
 
-        /** Text of a header/footer, and whether it has a page-number field. Paragraphs with a page field contribute no text. */
-        fun partText(root: XNode): Pair<String, Boolean> {
+        /** What a header/footer part holds: its text (placeholders for page fields), whether it has a lone page number, and alignment. */
+        data class PartInfo(val first: String, val second: Boolean, val align: Int)
+
+        /** Text of one paragraph in reading order; PAGE and NUMPAGES fields become {page} and {pages}. */
+        fun paragraphWithFields(p: XNode): String {
+            val sb = StringBuilder()
+            var state = 0 // 0 plain text, 1 inside a field's code, 2 inside a field's shown result
+            val code = StringBuilder()
+            fun token(instr: String): String? = when {
+                instr.contains("NUMPAGES") -> HeaderFooter.PAGES
+                instr.contains("PAGE") -> HeaderFooter.PAGE
+                else -> null
+            }
+            fun walk(n: XNode) {
+                for (c in n.children) {
+                    when (c.local) {
+                        "pPr", "rPr" -> {}
+                        "t" -> if (state != 2) sb.append(c.text)
+                        "instrText" -> if (state == 1) code.append(c.text)
+                        "fldChar" -> when (c.attr("fldCharType")) {
+                            "begin" -> { state = 1; code.setLength(0) }
+                            "separate" -> { token(code.toString())?.let { sb.append(it) }; state = 2 }
+                            "end" -> { if (state == 1) token(code.toString())?.let { sb.append(it) }; state = 0 }
+                        }
+                        "fldSimple" -> token(c.attr("instr").orEmpty())?.let { sb.append(it) } ?: walk(c)
+                        else -> walk(c)
+                    }
+                }
+            }
+            walk(p)
+            return sb.toString()
+        }
+
+        fun partText(root: XNode): PartInfo {
             val lines = ArrayList<String>()
             var hasPage = false
+            var align: Int? = null
             for (p in root.findAll("p")) {
-                val instr = p.findAll("instrText").joinToString(" ") { it.text.toString() } + " " +
-                    p.findAll("fldSimple").joinToString(" ") { it.attr("instr").orEmpty() }
-                if (instr.contains("PAGE")) {
-                    hasPage = true
-                    continue
-                }
-                val text = p.findAll("t").joinToString("") { it.text.toString() }
-                if (text.isNotBlank()) lines += text.trim()
+                val text = paragraphWithFields(p).trim()
+                if (text == HeaderFooter.PAGE) { hasPage = true; continue }
+                if (text.isEmpty()) continue
+                if (align == null) align = when (p.child("pPr")?.child("jc")?.attr("val")) { "center" -> 1; "right", "end" -> 2; else -> 0 }
+                lines += text
             }
-            return lines.joinToString("\n") to hasPage
+            return PartInfo(lines.joinToString("\n"), hasPage, align ?: 1)
         }
 
         // ---- blocks -----------------------------------------------------------------------------------------
