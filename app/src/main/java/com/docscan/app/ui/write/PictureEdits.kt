@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
 
 /** The size in twips left after cutting the given fractions (0 to 1) off each side. */
 fun cropTwips(widthTwips: Int, heightTwips: Int, left: Float, top: Float, right: Float, bottom: Float): Pair<Int, Int> =
-    (widthTwips * (1f - left - right)).toInt().coerceAtLeast(120) to (heightTwips * (1f - top - bottom)).toInt().coerceAtLeast(120)
+    Math.round(widthTwips * (1f - left - right)).coerceAtLeast(120) to Math.round(heightTwips * (1f - top - bottom)).coerceAtLeast(120)
 
 private fun decodeLimited(bytes: ByteArray, maxSide: Int): Bitmap? {
     val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }

@@ -105,3 +105,4 @@
 226|The floating quick tools slide up to show and slide down to hide.
 227|Tap a picture or shape: the floating tools switch to picture tools (options, turn 90 degrees, smaller, larger, delete). Tap the page to go back to the text tools.
 228|Picture tools on the floating bar now also have text wrap, crop (with sliders and a shaded preview) and remove background.
+229|Remove background is smarter: it learns the background colours from the picture's edge, follows soft shadows and gradients, keeps the main subject and fills pinholes, and uses the phone's person outline on photos of people. The old method is the fallback.
