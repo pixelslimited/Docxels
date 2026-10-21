@@ -720,6 +720,10 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT), keep = true)
             },
             onDismiss = { signPad = false },
+            onSave = { bytes ->
+                val store = com.docscan.app.store.SavedAssets(context, "signatures")
+                store.add("Signature ${store.list().size + 1}", bytes)
+            },
         )
     }
 

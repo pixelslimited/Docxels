@@ -122,3 +122,4 @@ Insert → Letterhead and Signature: "My letterheads" and "My signatures" now ha
 Fixed: a page before a manual page break is now a whole sheet. Before, page 1 stopped right at the page break, so it looked short and its letterhead footer sat in the wrong place.
 The signature pad now writes like a blue ball-point pen on paper: a heavy dark blob where the pen lands, thicker and darker when you go slowly, thinner and paler when you flick, wavering ink flow and a lighter tail as the pen lifts. A stylus presses wider with more pressure. Taps make a dot, and there is Undo. The saved signature looks exactly like the pad.
 Signature pad: "Use signature" and Undo now switch on as soon as you have drawn something, and the pad is much bigger (wider dialog, taller drawing area).
+Signature pad (in the editor): a Save button keeps the signature in My signatures for every document, and you can still insert it straight away. Undo and Clear moved under the pad.

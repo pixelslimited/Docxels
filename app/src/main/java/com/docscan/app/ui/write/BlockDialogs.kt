@@ -787,7 +787,7 @@ fun SignatureImportDialog(source: Bitmap, onInsert: (ByteArray, Int, Int) -> Uni
  */
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @androidx.compose.runtime.Composable
-fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> Unit) {
+fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> Unit, onSave: ((ByteArray) -> Unit)? = null) {
     val unit = androidx.compose.ui.platform.LocalDensity.current.density
     val strokes = androidx.compose.runtime.remember { ArrayList<List<InkPt>>() }
     val live = androidx.compose.runtime.remember { ArrayList<InkPt>() }
@@ -797,7 +797,24 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
     var size by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
     var layer by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
 
+    var saved by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    /** The ink alone, cropped, as a PNG: bytes, width, height. */
+    fun export(): Triple<ByteArray, Int, Int>? {
+        val src = layer ?: return null
+        val w = src.width
+        val h = src.height
+        val px = IntArray(w * h)
+        src.getPixels(px, 0, w, 0, 0, w, h)
+        val b = com.docscan.app.core.SignatureInk.inkBounds(px, w, h) ?: return null
+        val cropped = android.graphics.Bitmap.createBitmap(src, b[0], b[1], b[2] - b[0], b[3] - b[1])
+        val out = java.io.ByteArrayOutputStream()
+        cropped.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+        return Triple(out.toByteArray(), cropped.width, cropped.height)
+    }
+
     fun redraw() {
+        saved = false
         val bmp = layer ?: return
         bmp.eraseColor(0)
         val cv = android.graphics.Canvas(bmp)
@@ -811,6 +828,7 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
         title = { androidx.compose.material3.Text("Sign here") },
         text = {
+          androidx.compose.foundation.layout.Column {
             androidx.compose.foundation.Canvas(
                 androidx.compose.ui.Modifier
                     .fillMaxWidth()
@@ -861,36 +879,28 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
                     if (live.isNotEmpty()) BallpointInk.render(nc, live, unit)
                 }
             }
+        
+            androidx.compose.foundation.layout.Row {
+                androidx.compose.material3.TextButton(enabled = count > 0, onClick = { strokes.removeAt(strokes.lastIndex); redraw() }) { androidx.compose.material3.Text("Undo") }
+                androidx.compose.material3.TextButton(enabled = count > 0, onClick = { strokes.clear(); live.clear(); redraw() }) { androidx.compose.material3.Text("Clear") }
+            }
+          }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(
-                enabled = count > 0,
-                onClick = {
-                    val src = layer ?: return@TextButton
-                    val w = src.width
-                    val h = src.height
-                    val px = IntArray(w * h)
-                    src.getPixels(px, 0, w, 0, 0, w, h)
-                    val b = com.docscan.app.core.SignatureInk.inkBounds(px, w, h)
-                    if (b != null) {
-                        val cropped = android.graphics.Bitmap.createBitmap(src, b[0], b[1], b[2] - b[0], b[3] - b[1])
-                        val out = java.io.ByteArrayOutputStream()
-                        cropped.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                        onDone(out.toByteArray(), cropped.width, cropped.height)
-                    } else onDismiss()
-                },
-            ) { androidx.compose.material3.Text("Use signature") }
-        },
-        dismissButton = {
             androidx.compose.foundation.layout.Row {
+                if (onSave != null) {
+                    androidx.compose.material3.TextButton(
+                        enabled = count > 0 && !saved,
+                        onClick = { export()?.let { onSave(it.first); saved = true } },
+                    ) { androidx.compose.material3.Text(if (saved) "Saved \u2713" else "Save") }
+                }
                 androidx.compose.material3.TextButton(
                     enabled = count > 0,
-                    onClick = { strokes.removeAt(strokes.lastIndex); redraw() },
-                ) { androidx.compose.material3.Text("Undo") }
-                androidx.compose.material3.TextButton(onClick = { strokes.clear(); live.clear(); redraw() }) { androidx.compose.material3.Text("Clear") }
-                androidx.compose.material3.TextButton(onClick = onDismiss) { androidx.compose.material3.Text("Cancel") }
+                    onClick = { export()?.let { onDone(it.first, it.second, it.third) } ?: onDismiss() },
+                ) { androidx.compose.material3.Text("Use signature") }
             }
         },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { androidx.compose.material3.Text("Cancel") } },
     )
 }
 
