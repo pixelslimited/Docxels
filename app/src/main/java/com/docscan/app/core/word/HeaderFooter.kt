@@ -10,7 +10,7 @@ object HeaderFooter {
 
     fun fill(text: String, pageNo: Int, total: Int): String = text.replace(PAGE, pageNo.toString()).replace(PAGES, total.toString())
 
-    fun lines(text: String): List<String> = text.split('\n').map { it.trimEnd() }.filter { it.isNotEmpty() }
+    fun lines(text: String): List<String> = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
 
     /** Splits a line into plain text and placeholder pieces, keeping the order: "Page {page} of {pages}" -> Page , {page},  of , {pages}. */
     fun pieces(line: String): List<String> {
