@@ -336,7 +336,7 @@ private object CardThumbs {
 
 /** Real pictures of the document's first pages: scans, PDFs and Word documents alike. [publish] hears about each page as it is ready. */
 private suspend fun loadPages(
-    container: com.docscan.app.AppContainer, item: LibraryItem, publish: (List<android.graphics.Bitmap>) -> Unit,
+    context: android.content.Context, container: com.docscan.app.AppContainer, item: LibraryItem, publish: (List<android.graphics.Bitmap>) -> Unit,
 ): List<android.graphics.Bitmap> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
     val out = ArrayList<android.graphics.Bitmap>()
     fun add(b: android.graphics.Bitmap?) { if (b != null) { out += b; publish(out.toList()) } }
@@ -356,7 +356,7 @@ private suspend fun loadPages(
                     // Only the start of the document is needed for its first pages.
                     val tmp = java.io.File.createTempFile("thumb", ".pdf", container.thumbDir())
                     try {
-                        tmp.outputStream().use { com.docscan.app.export.WordPdf.write(doc.copy(blocks = doc.blocks.take(80)), it) }
+                        tmp.outputStream().use { com.docscan.app.export.PdfExport.write(context, doc.copy(blocks = doc.blocks.take(80)), it) }
                         com.docscan.app.pdf.PdfPreview(tmp).use { pv -> for (i in 0 until minOf(pv.pageCount, CardThumbs.MAX)) add(pv.render(i, 360)) }
                     } finally { tmp.delete() }
                 }
@@ -370,10 +370,11 @@ private suspend fun loadPages(
 @Composable
 private fun CardThumb(item: LibraryItem) {
     val container = com.docscan.app.LocalContainer.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val key = "${item.kind}:${item.id}:${item.modified}"
     val pages by androidx.compose.runtime.produceState(CardThumbs.get(key) ?: emptyList(), key) {
         if (value.isNotEmpty()) return@produceState
-        val all = loadPages(container, item) { value = it }
+        val all = loadPages(context, container, item) { value = it }
         if (all.isNotEmpty()) CardThumbs.put(key, all)
     }
     PageDeck(pages, "First page of ${item.title}")

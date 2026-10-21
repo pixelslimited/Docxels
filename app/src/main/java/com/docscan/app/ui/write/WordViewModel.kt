@@ -69,9 +69,11 @@ class WordViewModel(private val container: AppContainer, val id: String) : ViewM
         java.io.File(dir, "${safeName(doc)}.rtf").also { it.writeText(com.docscan.app.core.word.PlainExport.toRtf(doc), Charsets.US_ASCII) }
     }
 
-    suspend fun pdfFile(doc: WordDoc, context: android.content.Context): java.io.File = withContext(Dispatchers.Default) {
+    suspend fun pdfFile(doc: WordDoc, context: android.content.Context): java.io.File {
         val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
         val name = doc.title.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifEmpty { "Document" }
-        java.io.File(dir, "$name.pdf").also { f -> f.outputStream().use { com.docscan.app.export.WordPdf.write(doc, it) } }
+        val f = java.io.File(dir, "$name.pdf")
+        f.outputStream().use { com.docscan.app.export.PdfExport.write(context, doc, it) }
+        return f
     }
 }

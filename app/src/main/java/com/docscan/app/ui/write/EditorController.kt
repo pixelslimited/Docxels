@@ -78,6 +78,8 @@ class RichEditText(context: Context) : EditText(context) {
 
     init {
         filters = arrayOf(android.text.InputFilter { _, _, _, dest, dstart, dend -> if (readOnly) dest.subSequence(dstart, dend) else null })
+        // Letter widths that scale exactly with the text size, so lines break in the same places at every zoom and in the PDF.
+        paintFlags = paintFlags or android.graphics.Paint.SUBPIXEL_TEXT_FLAG or android.graphics.Paint.LINEAR_TEXT_FLAG
     }
 
     /** Set in the page views; null in the mobile view. */
@@ -261,6 +263,15 @@ class RichEditText(context: Context) : EditText(context) {
             val dst = android.graphics.RectF(x, y, x + p.image.widthTwips * d.pxPerTwip, y + p.image.heightTwips * d.pxPerTwip)
             canvas.drawBitmap(p.bitmap, null, dst, picPaint)
         }
+    }
+
+    /** Where each printed sheet sits in this view: its top (px) and its height (px). Used to cut the page view into PDF pages. */
+    fun sheetBands(): List<Pair<Float, Float>> {
+        val d = decor ?: return emptyList()
+        val ys = pageStarts()
+        val topPad = totalPaddingTop.toFloat()
+        val sheetH = d.sheetHeightTwips * d.pxPerTwip
+        return List(ys.size) { k -> (if (k == 0) 0f else topPad + ys[k] + d.bottomMarginPx + d.deskGapPx) to sheetH }
     }
 
     /** Letterhead pictures on every sheet, each placed against its own sheet's top or bottom edge. */

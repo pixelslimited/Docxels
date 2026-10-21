@@ -26,3 +26,4 @@
 *|FREE|Form fields|Insert, Form fields: check box, text field, date picker and drop-down. Tap to tick, type, pick a date or choose. They print and open in Word as plain text.
 *|FREE|My text|Insert, My text: save an address, bank details or a closing line once, then insert it in any document with a tap.
 *|FREE|Dictate and Read aloud|Review, Speech: speak and the words are typed at the cursor; or have the selection (or the whole document) read out loud with the phone's own voice.
+*|FIX|Preview now matches the editor|Page preview, PDF, print and share are drawn by the editor's own page layout, so tables, pictures, headers and page breaks come out exactly as you see them while editing.

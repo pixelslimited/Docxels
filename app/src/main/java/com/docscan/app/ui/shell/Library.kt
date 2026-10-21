@@ -373,7 +373,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
                         DocKind.DOCX ->
                             if (asPdf) {
                                 val doc = container.words.load(item.id) ?: error("missing")
-                                File(dir, safeName(item.title) + ".pdf").also { f -> f.outputStream().use { com.docscan.app.export.WordPdf.write(doc, it) { p -> container.exportStatus.progress(p) } } }
+                                File(dir, safeName(item.title) + ".pdf").also { f -> f.outputStream().use { com.docscan.app.export.PdfExport.write(context, doc, it) { p -> container.exportStatus.progress(p) } } }
                             } else {
                                 val bytes = container.words.docxBytes(item.id) ?: error("missing")
                                 File(dir, safeName(item.title) + ".docx").also { it.writeBytes(bytes) }
