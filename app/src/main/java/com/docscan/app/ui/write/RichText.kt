@@ -718,6 +718,8 @@ const val CHIP_CHAR = '\uFFFC'
 /** Widest a picture or table may be drawn, in pixels; set by the editor in the mobile view. */
 object ChipLimits {
     @Volatile var maxWidthPx: Float = Float.MAX_VALUE
+    /** True while the editor's view is drawn into a PDF/preview: editor-only marks (the grey "Page break" pill) are left out. */
+    @Volatile var exporting: Boolean = false
 }
 
 class BlockChipSpan(
@@ -920,6 +922,7 @@ class BlockChipSpan(
     }
 
     private fun drawLabel(c: Canvas, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
+        if (ChipLimits.exporting) return
         val saved = paint.color
         val pad = paint.textSize * 0.3f
         val w = paint.measureText(label) + 4 * pad

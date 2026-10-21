@@ -103,6 +103,30 @@ class RichEditText(context: Context) : EditText(context) {
     var deskColor: Int = 0xFFE4E6EC.toInt()
     private val bandPaint = android.graphics.Paint().apply { style = android.graphics.Paint.Style.FILL }
 
+    /** Dark paper (see [NightPaper]): screen only. The desk strips between pages are drawn after the filter so they keep the desk colour. */
+    var nightPaper = false
+        set(v) { if (field != v) { field = v; invalidate() } }
+    private val nightPaint by lazy { android.graphics.Paint().apply { colorFilter = NightPaper.androidFilter() } }
+
+    override fun draw(canvas: android.graphics.Canvas) {
+        if (!nightPaper) { super.draw(canvas); return }
+        val n = canvas.saveLayer(null, nightPaint)
+        super.draw(canvas)
+        canvas.restoreToCount(n)
+        drawDeskGaps(canvas)
+    }
+
+    private fun drawDeskGaps(canvas: android.graphics.Canvas) {
+        val d = decor ?: return
+        val ys = pageStarts()
+        val topPad = totalPaddingTop.toFloat()
+        bandPaint.color = deskColor
+        for (k in 1 until ys.size) {
+            val y = topPad + ys[k] + d.bottomMarginPx
+            canvas.drawRect(0f, y, width.toFloat(), y + d.deskGapPx, bandPaint)
+        }
+    }
+
     private fun syncGap() {
         val d = decor
         val want = d?.pageGapPx?.toInt() ?: 0
@@ -313,7 +337,7 @@ class RichEditText(context: Context) : EditText(context) {
         val n = ys.size
         bandPaint.color = deskColor
         for (k in 0 until n) {
-            if (k > 0) {
+            if (k > 0 && !nightPaper) {
                 val y = topPad + ys[k] + d.bottomMarginPx
                 canvas.drawRect(0f, y, width.toFloat(), y + d.deskGapPx, bandPaint)
             }
@@ -858,6 +882,8 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
     }
 
     // -- view layout --
+
+    fun setNightPaper(on: Boolean) { view?.nightPaper = on }
 
     fun setViewConfig(mode: ViewMode, page: com.docscan.app.core.word.PageSetup) {
         if (mode == this.mode && page == pageSetup) return

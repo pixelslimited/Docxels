@@ -105,6 +105,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -192,6 +193,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var navOpen by remember { mutableStateOf(false) }
     var statsOpen by remember { mutableStateOf(false) }
     var propsOpen by remember { mutableStateOf(false) }
+    var paperOpen by remember { mutableStateOf(false) }
+    var darkPaper by remember { mutableStateOf(NightPaper.load(context)) }
     var linkOpen by remember { mutableStateOf<Triple<String, String, IntArray?>?>(null) }
     var mergeOpen by remember { mutableStateOf(false) }
     var linkActions by remember { mutableStateOf<Triple<Int, Int, String>?>(null) }
@@ -433,6 +436,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
+                            DropdownMenuItem(text = { Text("Paper: " + if (darkPaper) "dark" else "light") }, onClick = { menu = false; paperOpen = true })
                             DropdownMenuItem(text = { Text("Document properties") }, onClick = { menu = false; propsOpen = true })
                             DropdownMenuItem(text = { Text("Page preview") }, onClick = { menu = false; previewDoc = controller.toDoc(title, page) })
                             DropdownMenuItem(
@@ -577,6 +581,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                     controller.setZoom(z)
                     controller.setViewConfig(viewMode, page)
                     controller.setReadOnly(reading)
+                    controller.setNightPaper(darkPaper)
                 },
                 modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                     awaitEachGesture {
@@ -758,7 +763,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         }
     }
 
-    previewDoc?.let { d -> PagePreview(vm, d) { previewDoc = null } }
+    previewDoc?.let { d -> PagePreview(vm, d, dark = darkPaper) { previewDoc = null } }
     savedPicker?.let { isSignature ->
         com.docscan.app.ui.settings.SavedAssetsDialog(
             signature = isSignature,
@@ -997,6 +1002,25 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     }
     if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
     if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
+    if (paperOpen) AlertDialog(
+        onDismissRequest = { paperOpen = false },
+        title = { Text("Paper") },
+        text = {
+            Column {
+                listOf(false to "Light paper", true to "Dark paper (night mode)").forEach { (dark, label) ->
+                    Row(Modifier.fillMaxWidth().clickable { darkPaper = dark; NightPaper.save(context, dark); paperOpen = false }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = darkPaper == dark, onClick = null)
+                        Text(label, Modifier.padding(start = 12.dp))
+                    }
+                }
+                Text(
+                    "Dark paper shows white pages as black with light text, and keeps colours. It changes only how the page looks on this screen; the file, PDFs and prints are unchanged. Pictures look different too.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { paperOpen = false }) { Text("Close") } },
+    )
     if (propsOpen) DocumentPropertiesDialog(
         title = title, author = controller.author, subject = controller.subject, keywords = controller.keywords,
         onSave = { t, a, s, k ->

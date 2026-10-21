@@ -31,3 +31,5 @@
 *|FIX|No blank page after a page break|A page break that lands at the top of an already full page no longer adds an empty page.
 *|FREE|PDF night mode and Go to page|In the PDF reader, tap Night to invert the pages for dark rooms, or tap the page counter to jump to a page.
 *|FREE|Document properties|More, Document properties: set title, author, subject and keywords, or remove your name before sharing.
+*|FREE|Dark paper (night mode)|More, Paper: choose light or dark paper. Dark shows white pages as black with light text, in the editor and Page preview; files and PDFs are unchanged.
+*|FIX|No more editor marks in the preview|The grey Page break label that showed in the editor no longer appears in Page preview, PDF, print or share.

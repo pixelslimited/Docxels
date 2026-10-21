@@ -309,6 +309,8 @@ Compared from this tracker and the editor's ribbon labels; not every item was re
 | Saved snippets ("My text": address, bank details, closing lines) like My signatures | Fast letters and proposals |
 | Dictate (speech to text) and Read aloud | Android has both built in |
 | Document properties (title, author "Kelvin Codes") and Inspect/remove personal data | Needed before sharing |
+| Dark paper / night mode in the Word editor and Page preview | IMPLEMENTED — NOT VERIFIED | ui/write/NightPaper, EditorController (RichEditText.draw saveLayer + colour matrix), PagePreview, WordEditorScreen (More → Paper) | Screen-only filter: invert lightness + hue rotate 180 (white→#121212, black→#E6E6E6, colours kept). Pictures are filtered too, so they look different on screen. Desk strips between pages drawn after the filter. Setting remembered. Saved file, PDF, print and share never use it. Risk: saveLayer on a very long page could be slow on old phones. |
+| Editor-only marks hidden in preview/PDF (grey Page break pill) | IMPLEMENTED — NOT VERIFIED | ui/write/RichText (ChipLimits.exporting), export/EditorPdf | Found by reading the code against the user's screenshot: PdfExport draws the editor view, so the label chip leaked into the preview. Other differences are not known without side-by-side screenshots. |
 | Version history from the autosaves (restore an earlier copy) | Safety net |
 
 **B. Next**

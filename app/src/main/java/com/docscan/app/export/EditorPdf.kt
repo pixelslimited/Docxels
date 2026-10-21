@@ -67,7 +67,8 @@ object PdfExport {
                     c.scale(scale, scale)
                     c.translate(0f, -top)
                     c.clipRect(0f, top, w.toFloat(), top + h)
-                    view.draw(c)
+                    ChipLimits.exporting = true
+                    try { view.draw(c) } finally { ChipLimits.exporting = false }
                     c.restore()
                     pdf.finishPage(p)
                 }

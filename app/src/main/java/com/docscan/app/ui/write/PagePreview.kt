@@ -42,7 +42,7 @@ import androidx.compose.runtime.setValue
  * page. It renders through the same PDF engine as "Share as PDF", so what you see here is what the PDF will contain.
  */
 @Composable
-fun PagePreview(vm: WordViewModel, doc: WordDoc, onClose: () -> Unit) {
+fun PagePreview(vm: WordViewModel, doc: WordDoc, dark: Boolean = false, onClose: () -> Unit) {
     val context = LocalContext.current
     var failed by remember { mutableStateOf(false) }
     val file by produceState<File?>(null, doc) {
@@ -68,7 +68,7 @@ fun PagePreview(vm: WordViewModel, doc: WordDoc, onClose: () -> Unit) {
                             if (b == null) {
                                 Box(Modifier.fillMaxWidth().padding(vertical = 80.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                             } else {
-                                Image(b.asImageBitmap(), contentDescription = "Page ${i + 1}", modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth)
+                                Image(b.asImageBitmap(), contentDescription = "Page ${i + 1}", modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth, colorFilter = if (dark) NightPaper.composeFilter() else null)
                             }
                         }
                     }
