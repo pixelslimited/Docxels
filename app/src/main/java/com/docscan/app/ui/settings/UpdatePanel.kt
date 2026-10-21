@@ -1,6 +1,14 @@
 package com.docscan.app.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import com.docscan.app.update.Note
+import com.docscan.app.update.NoteTier
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
@@ -66,15 +74,13 @@ fun UpdatePanel() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         val installed = updater.installedCode()
-        val prefs = remember { context.getSharedPreferences("docxels_updates", android.content.Context.MODE_PRIVATE) }
         Text("Installed: build $installed (version 0.2.$installed)", style = MaterialTheme.typography.titleSmall)
-        // Right after updating, show which build this is and what it brought.
-        val savedFor = prefs.getLong("notes_for", -1L)
-        val savedNotes = prefs.getString("notes", "").orEmpty().lines().filter { it.isNotBlank() }
-        if (savedFor == installed && savedNotes.isNotEmpty()) {
-            Text("You are now on build $installed. New in this update — try these:", style = MaterialTheme.typography.titleSmall)
-            savedNotes.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
-        }
+        // What this build brought, and what the one before it brought, from the list that ships inside the app.
+        val mine = remember { Note.parse(runCatching { context.assets.open("whatsnew.txt").bufferedReader().use { it.readText() } }.getOrDefault("")) }
+        val builds = mine.map { it.code }.distinct().sortedDescending()
+        val updating = s is UpdateState.Available || s is UpdateState.Downloading || s is UpdateState.Ready
+        if (!updating) builds.getOrNull(0)?.let { c -> NotesCard("New in this update · build $c", mine.filter { it.code == c }) }
+        if (!updating) builds.getOrNull(1)?.let { c -> NotesCard("Before that · build $c", mine.filter { it.code == c }) }
         when (s) {
             UpdateState.Idle -> OutlinedButton(onClick = ::check) { Text("Check for updates") }
             UpdateState.Checking -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Checking…") }
@@ -86,12 +92,7 @@ fun UpdatePanel() {
                 val small = s.info.patchFor(updater.installedCode())
                 val sizeText = if (small != null) "download about ${fmtSize(small.size)}, only the changes" else "download ${fmtSize(s.info.size)}"
                 Text("Build ${s.info.versionCode} (version ${s.info.versionName}) is available ($sizeText).", style = MaterialTheme.typography.titleSmall)
-                val fresh = s.info.whatsNew(updater.installedCode())
-                prefs.edit().putLong("notes_for", s.info.versionCode).putString("notes", fresh.joinToString("\n")).apply()
-                if (fresh.isNotEmpty()) {
-                    Text("New in this update — try these:", style = MaterialTheme.typography.titleSmall)
-                    fresh.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
-                }
+                s.info.whatsNew(updater.installedCode()).let { if (it.isNotEmpty()) NotesCard("Coming in this update", it) }
                 Button(onClick = { download(s.info) }) { Text("Download and install") }
             }
             is UpdateState.Downloading -> {
@@ -99,11 +100,7 @@ fun UpdatePanel() {
                 Text("Downloading… ${(s.progress * 100).toInt()}%")
             }
             is UpdateState.Ready -> {
-                val fresh = s.info.whatsNew(updater.installedCode())
-                if (fresh.isNotEmpty()) {
-                    Text("New in this update — try these:", style = MaterialTheme.typography.titleSmall)
-                    fresh.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
-                }
+                s.info.whatsNew(updater.installedCode()).let { if (it.isNotEmpty()) NotesCard("Coming in this update", it) }
                 Text(if (updater.lastUsedPatch) "Downloaded only the changes and verified." else "Downloaded and verified.")
                 if (!updater.lastUsedPatch && updater.lastPatchNote.isNotBlank()) {
                     Text(updater.lastPatchNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -125,3 +122,32 @@ fun UpdatePanel() {
 
 private fun fmtSize(bytes: Long): String =
     if (bytes >= 1_048_576) "%.1f MB".format(bytes / 1_048_576.0) else "${(bytes / 1024).coerceAtLeast(1)} KB"
+
+/** A card of features grouped by who gets them: everyone (Free), members (Pro) and fixes. */
+@Composable
+private fun NotesCard(heading: String, notes: List<Note>) {
+    if (notes.isEmpty()) return
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(heading, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        NoteTier.entries.forEach { tier ->
+            val rows = notes.filter { it.tier == tier }
+            if (rows.isEmpty()) return@forEach
+            Text(
+                tier.label.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+                color = if (tier == NoteTier.PRO) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(top = 6.dp).clip(CircleShape)
+                    .background(if (tier == NoteTier.PRO) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = 10.dp, vertical = 3.dp),
+            )
+            rows.forEach { n ->
+                Column(Modifier.padding(top = 2.dp)) {
+                    Text(n.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    if (n.detail.isNotEmpty()) Text(n.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}

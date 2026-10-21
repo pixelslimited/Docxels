@@ -1,137 +1,25 @@
-65|PDF to Word: convert a PDF into an editable document from Home or Tools (scanned pages are read with OCR).
-65|Home screen redesigned with a featured PDF to Word card and quick tiles.
-65|Screenshots are allowed in the app by default (you can turn protection on in Settings).
-65|Update downloads: only the changed parts are fetched, from any of the last few builds.
-66|Tools in the editor sit behind an icon; tap a tab to open a grid of functions.
-66|Word files with a letterhead in the header or footer now show it, and keep it when saved.
-67|Insert letterhead: pick a picture, it is sized to the page (A4 by default) and repeated on every page.
-67|Insert signature: draw one or add a picture; it goes in front of the text.
-68|Pictures, shapes and signatures can be dragged anywhere on the page (set wrapping to In front of text).
-68|Insert table: tap the grid to pick rows and columns in one step.
-69|Update installer fixed: Install now opens Android's own installer screen.
-70|Merge, split, rotate and reorder PDFs show a preview before saving or sharing; tap a file to view it.
-71|Zoom in the page view: View tab > Zoom (100, 150, 200, 300%).
-72|Line spacing menu: Add / Remove space before and after a paragraph.
-73|New app icon, including the single-colour version for Android themed icons.
-74|Real fonts built in (Calibri-, Cambria-, Arial-, Times-, Courier-compatible plus Lora, Poppins, DejaVu), so choosing a font changes the text.
-74|Picture and shape settings are a panel at the bottom: changes show on the page live, no Save needed.
-74|Bigger tools icon, and the tools bar sits higher above the screen edge.
-75|Pages in print layout are separated by real space, with header, footer and page number on every page.
-76|The tools toggle is now the Docxels icon, at the right edge of the editor.
-76|This list: every update now shows everything new since your version, so you know what to try.
-78|Letterhead pictures now show on every page in the editor, not just the first and last.
-79|Letterhead menu: First page only, a separate Continuous letterhead for the pages after the first, or the same on every page; each can be removed on its own.
-80|Fixed: text in the editor ran on one long line off the right edge (introduced with the zoom control in build 74). Lines wrap to the page again.
-81|Home: floating 3D paper sheets in the top card (they stay still if you turn animations off on your phone).
-82|Letterhead and signature can now come from a picture, a PDF page or a Word file. Signature import has a preview with a Remove background switch.
-83|Home: removed the duplicate PDF to Word card (it is in the Convert and scan row).
-84|Every new or converted document is A4 (a PDF to Word result no longer takes the odd page size of the PDF).
-85|Signature is resized for a signature and placed automatically on the signing line (a dotted or underscore line, or a Signature / Director line) at or after your cursor.
-94|Home: touch the floating sheets. Drag to turn them, flick to spin them, tap to flip them over.
-94|Settings: new Letterheads and Signatures sections. Add them from a picture, a PDF or a Word file (signature backgrounds are removed) and keep them on your phone.
-94|Editor: Letterhead and Signature menus now have "My saved letterheads" (first page, continuous or every page) and "My saved signatures" (placed on the signing line).
-94|Editor tools grid is now divided into labelled groups on every tab (Home: Styles, Font, Paragraph, Clear; Insert: Illustrations, Letterhead and signature, Text and page; Layout, Review and View groups too).
-94|Opening a Word file with footnotes or endnotes no longer loses them: each note is numbered [n] in the text and its words are listed under Notes at the end.
-98|Build number now shows in Settings: 'Installed: build N' at the top of App updates, 'Build N is available', and after updating it lists what is new in your build.
-98|PDF to Word keeps more of the original: bold, italic, font sizes and common font names, and pictures are carried over in reading order (text does not wrap around them yet).
-100|Theme colour choice in Settings (Word blue, Grey, Black, Green, Teal, Orange, Rose and the Docxels violet); the floating sheets and the tools icon now change colour smoothly; tool groups open only when you tap their name; B3 and B4 paper sizes; update check fixed (the release was left hidden).
-100|PDF to Word also keeps text colours, and pictures repeated on every page (letterhead and footer artwork) become the document's letterhead with the margins cleared for it.
-100|Picture and signature wrap options now start with 'In front of text' (the last option first).
-109|Adding a letterhead from a PDF or Word file now picks out only the artwork (logo, address block, background) and leaves the letter's text out; signatures are found inside the document and saved with the background removed.
-109|PDF to Word keeps page-sized letterheads and page artwork, drawn lines and boxes, paragraph gaps and line spacing, and shows 'Page N of M' progress text while it works.
-117|Tools icon floats with no background and changes colour; tool groups are now an icon row (Home: Font, Paragraph, Style, Clear) with the picked group's tools shown as icon tiles.
-117|Pictures, signatures and shapes: width and height sliders with a Keep proportions switch, and drag handles on the page (corner keeps proportions, edge handles change one side). Letterheads always stretch to fill the page.
-117|Tables: a live properties panel (rows, columns, cell text and shading, merge, widths, position, borders), and drag a table sideways to place it or up and down to move it between paragraphs.
-117|PDF to Word keeps the letterhead on every letter's first page, not only page 1.
-118|Progress card ("Page N of M…") fixed: readable text in dark theme, themed card colour, and a sensible width.
-118|Page view: text now wraps at the right margin in converted and opened documents (the page was being laid out as one endless line).
-118|Pinch the page to zoom from 100% to 300%.
-118|Converted documents: line spacing no longer grows line by line, so letters stay on the same number of pages as the PDF.
-118|Justify now works in the editor: wrapped lines of a justified paragraph reach the right margin; the last line stays left-aligned.
-118|PDF export now justifies paragraphs the same way the workspace does.
-134|Templates: Tools > Templates starts a letter, report, CV, invoice, memo or meeting minutes with placeholders to fill in.
-134|Compress PDF: Tools > Compress makes a PDF with big pictures smaller (three levels) and shows how much was saved.
-134|Sign & fill PDF: Tools > Sign a PDF (or Fill form). Pick your saved signature, type text, add today's date or a tick, tap the page to place it, drag to adjust, then save a copy.
-134|Print: Print from the editor's menu or the PDF viewer.
-134|Settings: choose the export format and A4 fit that the scan export sheet starts with.
-134|Library: favourites, folders, tags, grid view; search also finds tags. Deleting now moves a document to Trash for 30 days (restore, delete for good, or empty Trash).
-134|Scan to Excel: Tools > Scan to Excel finds ruled tables on every page of a scan and shares one Excel file with a sheet per page.
-134|Searchable PDF: in the scan export sheet, PDF now has a Searchable text switch (slower) so the PDF can be searched and copied from.
-134|Save and Save as everywhere: Word documents (menu: Save, Save a copy, Save as .docx/PDF/text/RTF, Save PDF in Docxels), PDF tool results and the PDF viewer (Save in Docxels, Save as), scan exports and table exports (Save as: you choose the folder and file name), and your saved signatures and letterheads (save to the phone).
-134|PDFs can now live in Documents: they show under the new PDF filter, open in the viewer, and can be renamed, favourited, tagged, shared, saved as or moved to Trash.
-134|Letterheads and signatures can now be named: you are asked for a name when you add one, and the pencil button renames it (in Settings, and in the editor's My signatures / My letterheads lists).
-134|Insert > Contents puts a contents list of your headings into the document.
-134|Annotate PDFs: in Sign a PDF, use Highlight to mark text and Draw to write freehand, with Undo last.
-134|Search inside documents: Settings > Search inside documents (off by default) lets Documents search find words inside scans and Word files. The index is encrypted.
-134|Signatures you draw or import in the editor are also kept in My signatures, and letterheads you add are also kept in My letterheads, so you can reuse them anywhere.
-134|Documents menu: Make a copy (Word), Save as .docx / PDF for any document.
-134|Open with Docxels: PDFs, Word (.docx), text files and pictures from other apps (file manager, WhatsApp, e-mail, Share) are copied into Documents so they stay saved.
-134|ID card: Tools > ID card scans the front and back; export as PDF with ID card layout puts both sides at true size on one A4 page.
-134|Fonts: Word files now open in the fonts they were written in, including the default font, theme fonts and heading fonts that were being ignored (the font name is kept when you save). PDFs converted to Word keep the PDF's own font names instead of only a short list.
-134|The editor's tool bar no longer has a bar behind the Docxels mark when it is closed; the mark just floats in the corner.
-134|Home: tap the paper sheets and some papers are flung away and fade out.
-134|Fonts built into a Word file (embedded fonts) are now used when you open it, so such text shows in its real font.
-134|Comments: Word comments are now kept when you open a file. In Review you can add a comment to selected words (New comment), see all comments (Comments: Go to, Edit, Delete), and they are saved back into the .docx so Word shows them.
-203|Word files with different headers and footers on odd and even pages now keep both (Page setup > Different odd and even pages), in the editor, in PDF export and when saved back to .docx.
-204|Settings > Storage > Delete all my data: erases every document, letterhead, signature and setting after you type DELETE (asks for your lock first if App lock is on).
-204|A short three-step welcome on a fresh install.
-204|Housekeeping: removed unused code, merged duplicate helpers, and added a code-quality scan to every build.
-205|Home redesigned around documents: New doc, Invoice, Templates, Import (PDF, Word, photos and Scan paper now live there), business documents, convert tools.
-205|Floating scan button removed. New floating bottom bar with a sliding bead; Back from any tab returns to Home.
-205|Document actions now appear only after you tap a document. Deleting for good asks for fingerprint, face or screen lock when your phone has one.
-205|Invoices: pick Printed, Online or Minimal, fill in the form, and get an editable document with totals and the amount in words.
-205|Renaming a document no longer accepts an empty name.
-206|Quotations, proforma invoices and receipts, in the same three styles as invoices.
-206|Page view now breaks tables between rows like the page preview, repeats the header row, and tables or pictures at the top of a page no longer draw into the gap above.
-207|Tables: set row height and choose borders for each cell side; kept when saving to and opening from Word.
-208|Text boxes: insert a text box (Insert → Shapes → Text box), type inside it, set size/bold; kept when saved to Word and reopened.
-209|Right-to-left paragraph direction is kept when opening and saving Word files, and can be set from the editor.
-210|Style menu previews each style; the page column setting of Word files is kept when saving; draft notice removed from the site's privacy and terms pages.
-211|Scan to Word now shows a check screen: the scanned page above the recognised text, so you can fix mistakes before opening the editor.
-212|Word files with tracked changes now ask how to open them (accept, reject or show). Pictures can be rotated 90° in the picture dialog.
-213|New Docxels logo and icon; redesigned Home with a greeting and a Continue card; the editor's tools open from the logo as a side menu, then groups, then tools, in a higher and larger pane.
-214|Home is simpler: the Convert row scrolls, Business documents moved under Templates. Sheets dim the page more. Scan to Word's check screen can be skipped.
-215|Editor: tools button is now the bare pixel D on the left with the page and word count on the right. Home: the animated pages are back on the Continue card.
-216|The editor's tools button changes colour again, more slowly.
-217|The bottom bar has three tabs (Home, Documents, Tools); Settings is the button at the top of Home.
-218|Fixes: Receipt button no longer wraps in the invoice maker; the Continue card no longer repeats the document type; no stale warning after choosing how to open tracked changes.
-219|Editor: with the tools closed, a quick bar (insert, bold, italic, underline, highlight, text colour, bullets, numbering, more) sits beside the pixel D. Tapping the page hides the tools. The D is smaller.
-220|Tables: tap a cell and type straight into it on the page; "Table options" opens the full table panel.
-221|Settings: letterheads and signatures show only their picture and name; tap one for Rename, Save to the phone and Delete.
-222|Invoices: type straight onto the invoice page; amounts, subtotal, discount, tax, total and the amount in words are worked out as you type.
-223|The quick tools now float over the page like a floating button: only the pixel D shows while you read or scroll down; scroll up a little, tap the page or select text and the tools appear. Inside a table cell they become table tools (options, add row, add column, delete row, delete table).
-224|Fonts: text with no font named (Calibri by default) now shows in Carlito, the Calibri look-alike built into Docxels, in the editor, page preview, PDF and table cells, with real bold and italic. Before, it showed in the phone's own font.
-225|My styles: save the formatting at the cursor (font, size, bold, italic, colours) under a name, then apply it to selected text or a whole paragraph (Home, Style).
-226|The floating quick tools slide up to show and slide down to hide.
-227|Tap a picture or shape: the floating tools switch to picture tools (options, turn 90 degrees, smaller, larger, delete). Tap the page to go back to the text tools.
-228|Picture tools on the floating bar now also have text wrap, crop (with sliders and a shaded preview) and remove background.
-229|Remove background is smarter: it learns the background colours from the picture's edge, follows soft shadows and gradients, keeps the main subject and fills pinholes, and uses the phone's person outline on photos of people. The old method is the fallback.
-230|Remove background now uses a small bundled subject model (U2-Net-P, runs on the phone, no internet) to find the main object whatever the background, then refines the edge. The app grows by about 10 MB for it.
-The PDF viewer now shows Edit PDF first (sign, fill, highlight, draw), then a menu with Convert to Word, Print, Save, Save as, Share and Choose another PDF. Convert to Word turns the PDF into a Word document and opens the editor.
-Pinch to zoom in the PDF viewer (up to 4 times), drag sideways when zoomed, double-tap to zoom in or reset. Pages re-draw sharper when zoomed.
-Remove background now offers a Subject only button after it finishes, for posters and artwork with no plain background: it cuts tighter around just the main subject (for example a baby on a designed card). It starts again from the original picture.
-Insert → Columns adds two or three text columns side by side that you type in directly (a borderless table, so they also open in Word and print as columns). They do not flow from one column into the next.
-New: sign in with an email and password (Settings → Account, or the editor's Review → Assistant).
-New: writing assistant in the editor (Review → Assistant): check writing (underlines with tap-to-fix), fix spelling and grammar, improve, shorten, lengthen, translate (English, Hausa, Yoruba, Igbo, French, Arabic), clean scanned text, summarise, and ask about the document. It works on the selection, or the whole document. Text is sent only when you tap an action.
-New: Pro upgrade through Paystack (opens the payment page in your browser). Prices are not set yet, so the button says payments are not open yet until the price is switched on.
-Your documents are NOT uploaded: cloud backup and sync are not in this version yet.
-Remove background → Subject only is stricter: in a test it keeps the baby and the bottom text plate and drops the title and teddy. The privacy text now says the app also goes online for the signed-in assistant and payments.
-Home: the Free / Pro badge now shows your real plan and opens your account. The Continue card shows where you stopped ("Page 2 of 6") for Word documents and PDFs, and opening it takes you back to that spot. It shows a live "Exporting PDF" chip while that document is being exported (with a percentage for Word documents), and a real picture of the first page for scans and PDFs.
-The Continue card now always shows the real first page of the document (Word documents too). The floating-pages animation stays on Home for people with no documents yet.
-Insert → Letterhead and Signature: "My letterheads" and "My signatures" now have Upload (picture, PDF or Word file) and, for signatures, Draw, right in the list. Name it, and it stays in your saved list for every document.
-Fixed: a page before a manual page break is now a whole sheet. Before, page 1 stopped right at the page break, so it looked short and its letterhead footer sat in the wrong place.
-The signature pad now writes like a blue ball-point pen on paper: a heavy dark blob where the pen lands, thicker and darker when you go slowly, thinner and paler when you flick, wavering ink flow and a lighter tail as the pen lifts. A stylus presses wider with more pressure. Taps make a dot, and there is Undo. The saved signature looks exactly like the pad.
-Signature pad: "Use signature" and Undo now switch on as soon as you have drawn something, and the pad is much bigger (wider dialog, taller drawing area).
-Signature pad (in the editor): a Save button keeps the signature in My signatures for every document, and you can still insert it straight away. Undo and Clear moved under the pad.
-Double-tap a phone number (in text or in a table cell, such as a list of imams) to open the phone dialer with that number ready; press call. Works with 0803 123 4567, 08031234567 and +234 803 123 4567.
-PDF viewer: phone numbers in a PDF that has real text are underlined; tap one to open the phone dialer with it ready. (A scanned PDF with no text has none to find; convert it to Word first if you need that.)
-Editor: a search icon in the tools panel finds any tool by name (try "table", "spelling", "page number", "margins").
-Review → Check spelling underlines misspelled words using your phone's spell checker; tap a word for suggestions. Turn on a spell checker in Android settings if it says none answered.
-Home now has a Clipboard group: Paste, Paste as plain text, Cut, Copy, Select all.
-Page setup: headers and footers can have several lines, be left, centred or right, and show "Page X of Y". They carry through to PDF and Word.
-The quick tool bar above the keyboard now has Paste and a Clipboard menu (Copy, Cut, Paste as plain text, Select all). The bar scrolls sideways to fit them.
-The quick tool bar no longer has the Insert button (Insert is still in the tools menu); Paste comes first.
-Review → Mail merge: type fields such as {{Name}} in a letter, choose a list (a table in the document, or an Excel or CSV file), and get one new document with a page for every recipient. Tip: in Excel, format phone numbers as text so the leading 0 stays.
-On Home, the "Continue where you stopped" page now comes alive: it fans in on top of two pages behind it, floats and sways gently, and leans toward your finger in 3D when you touch it, then springs back. Scrolling and tapping the card still work. It stays still if your phone has animations switched off.
-The Continue card now shows a progress bar and percentage under "Edited … · Page X of Y", showing how far through the document you got.
-Search on Home now opens Documents with the keyboard ready. As you type, documents on your phone (PDF, Word, text) are listed under "ON THIS PHONE"; tap one to import a copy into Docxels and open it. This needs the "All files access" switch: Docxels shows a row that takes you to the setting. Also fixed importing Word and text files on Android 12 and older.
+# What's new, shown in Settings > App updates as cards. One line per feature:  build|TIER|Title|One short sentence
+# TIER is FREE, PRO (membership) or FIX. Write * instead of the build number for new lines: the build stamps it.
+# Keep each sentence short; only the newest two builds are shown to people.
+265|FREE|Edit PDF|Sign, fill, highlight and draw on a PDF. Its menu has Convert to Word, Print, Save, Share.
+265|FREE|PDF zoom|Pinch up to 4 times, drag sideways, double-tap to reset. Pages redraw sharper.
+265|FREE|Remove background|Keeps just the main subject and cuts tighter for posters and artwork.
+265|FREE|Columns|Two or three text columns side by side that print and open in Word.
+265|FREE|Letterheads and signatures|Upload or draw them once, then reuse them in every document.
+265|FREE|Continue card|Shows the real first page of your last document and live export progress.
+265|FREE|Account|Sign in with email and password in Settings, Account.
+265|PRO|Writing assistant|Check writing, fix spelling, improve, translate, summarise. A few actions a day are free.
+265|PRO|Upgrade to Pro|Pay with Paystack in your browser. Pro turns on within a minute.
+265|FIX|Manual page break|The page before a break is now a whole sheet.
+266|FREE|Ball-point signature pad|Signs like blue ink on paper. Save it to My signatures.
+266|FREE|Tap to call|Double-tap a phone number in text or a table. In PDFs numbers are underlined.
+266|FREE|Mail merge|Type {{Name}} fields, pick a table, Excel or CSV list, get a page per person.
+266|FREE|Spelling check|Underlines misspelled words and offers suggestions.
+266|FREE|Find any tool|Search icon in the tools panel.
+266|FREE|Clipboard|Paste, plain paste, cut, copy, select all on Home and on the quick bar.
+266|FREE|Headers and footers|Several lines, left, centre or right, with Page X of Y.
+266|FIX|Quick bar|Insert button removed. Paste comes first.
+*|FREE|Live Continue card|The first page floats, leans toward your finger and springs back.
+*|FREE|Reading progress|A bar and percentage show how far through the document you got.
+*|FREE|Search your phone|Type a name to list PDF, Word and text files on the phone. Tap one to import it. Needs All files access.
+*|FIX|Older phones|Importing Word and text files works again on Android 12 and older.

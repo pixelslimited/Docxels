@@ -9,9 +9,11 @@ SITE="${SITE_REPO:-iCode010101/docxels-site}"
 BASE="https://github.com/$SITE/releases/latest/download"
 SHA=$(sha256sum "$APK" | cut -d' ' -f1)
 SIZE=$(stat -c %s "$APK")
-# What's new: the whole RELEASE_NOTES.txt (lines "build|text"); the app shows the lines newer than the installed build.
-NOTES_FILE="$(dirname "$0")/../RELEASE_NOTES.txt"
-if [ -f "$NOTES_FILE" ]; then NOTES_JSON=$(tail -n 40 "$NOTES_FILE" | jq -Rs .); else NOTES_JSON='"Improvements and fixes."'; fi
+# What's new: the stamped list the build already put inside the app (lines "build|TIER|Title|Sentence"). The app shows
+# the lines newer than the installed build as cards. Falls back to stamping RELEASE_NOTES.txt here if it is missing.
+STAMPED="$(dirname "$0")/../app/src/main/assets/whatsnew.txt"
+if [ ! -f "$STAMPED" ]; then python3 "$(dirname "$0")/stamp-notes.py" "$(dirname "$0")/../RELEASE_NOTES.txt" "$CODE" "$STAMPED" "$BASE/update.json" || true; fi
+if [ -f "$STAMPED" ]; then NOTES_JSON=$(jq -Rs . < "$STAMPED"); else NOTES_JSON='"Improvements and fixes."'; fi
 
 # Patches: one from each of the last few builds, so a phone that skipped a build still gets a small download.
 KEEP=5

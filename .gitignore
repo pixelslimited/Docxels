@@ -13,3 +13,4 @@
 
 # Fixed key for sideloaded builds (private repo). Use a different, secret key for Play Store releases.
 !app/sideload.jks
+/app/src/main/assets/whatsnew.txt

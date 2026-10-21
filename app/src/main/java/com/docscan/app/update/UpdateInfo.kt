@@ -2,6 +2,23 @@ package com.docscan.app.update
 
 import org.json.JSONObject
 
+/** Where a feature sits: for everyone, only for Pro members, or a fix. */
+enum class NoteTier(val label: String) { FREE("Free"), PRO("Pro"), FIX("Fixes") }
+
+/** One line of what's new, written "build|TIER|Title|Sentence". */
+data class Note(val code: Long, val tier: NoteTier, val title: String, val detail: String) {
+    companion object {
+        /** Lines that are not in that form are ignored, so a bad notes text can only ever show fewer cards. */
+        fun parse(raw: String): List<Note> = raw.lines().mapNotNull { line ->
+            val p = line.trim().split('|', limit = 4)
+            val code = p.getOrNull(0)?.trim()?.toLongOrNull() ?: return@mapNotNull null
+            val tier = NoteTier.entries.firstOrNull { it.name == p.getOrNull(1)?.trim()?.uppercase() } ?: return@mapNotNull null
+            val title = p.getOrNull(2)?.trim().orEmpty().ifEmpty { return@mapNotNull null }
+            Note(code, tier, title, p.getOrNull(3)?.trim().orEmpty())
+        }
+    }
+}
+
 /** What the update file on the server says about the newest build. */
 data class UpdateInfo(
     val versionCode: Long,
@@ -19,18 +36,8 @@ data class UpdateInfo(
     fun patchFor(installed: Long): Patch? =
         (patches + listOfNotNull(patch)).firstOrNull { it.fromVersionCode == installed && it.size * 10 < size * 8 }
 
-    /** The notes newer than [installed]: lines written "build|text". Notes without that form are returned whole. */
-    fun whatsNew(installed: Long): List<String> {
-        val out = ArrayList<String>()
-        for (raw in notes.lines()) {
-            val line = raw.trim()
-            if (line.isEmpty()) continue
-            val bar = line.indexOf('|')
-            val code = if (bar > 0) line.substring(0, bar).trim().toLongOrNull() else null
-            if (code == null) out += line else if (code > installed) out += line.substring(bar + 1).trim()
-        }
-        return out
-    }
+    /** The what's-new lines of builds newer than [installed]. */
+    fun whatsNew(installed: Long): List<Note> = Note.parse(notes).filter { it.code > installed }
 
     data class Patch(val fromVersionCode: Long, val url: String, val sha256: String, val size: Long)
 

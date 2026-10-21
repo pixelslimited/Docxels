@@ -40,6 +40,13 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
+      # Writes the "What's new" cards' text into the app itself (so they show offline, right after installing).
+      - name: Stamp what's new
+        run: |
+          mkdir -p app/src/main/assets
+          python3 scripts/stamp-notes.py RELEASE_NOTES.txt "$(( GITHUB_RUN_NUMBER + 200 ))" app/src/main/assets/whatsnew.txt \
+            "https://github.com/iCode010101/docxels-site/releases/latest/download/update.json"
+
       - name: Unit tests
         run: |
           set -o pipefail
