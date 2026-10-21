@@ -1221,15 +1221,6 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
         view?.onFormTap = l
     }
 
-    /** Swaps the text between [start] and [end] for [s] (a ticked box, a chosen option, a picked date). */
-    fun replaceRange(start: Int, end: Int, s: String) {
-        val v = view ?: return
-        if (start < 0 || end > v.text.length || start > end) return
-        v.text.replace(start, end, s)
-        v.setSelection((start + s.length).coerceAtMost(v.text.length))
-        changed()
-    }
-
     /** Selects the words between [start] and [end], so typing replaces them (a text field's hint). */
     fun selectRange(start: Int, end: Int) {
         val v = view ?: return
