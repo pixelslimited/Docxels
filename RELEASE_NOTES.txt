@@ -108,3 +108,4 @@
 229|Remove background is smarter: it learns the background colours from the picture's edge, follows soft shadows and gradients, keeps the main subject and fills pinholes, and uses the phone's person outline on photos of people. The old method is the fallback.
 230|Remove background now uses a small bundled subject model (U2-Net-P, runs on the phone, no internet) to find the main object whatever the background, then refines the edge. The app grows by about 10 MB for it.
 The PDF viewer now shows Edit PDF first (sign, fill, highlight, draw), then a menu with Convert to Word, Print, Save, Save as, Share and Choose another PDF. Convert to Word turns the PDF into a Word document and opens the editor.
+Pinch to zoom in the PDF viewer (up to 4 times), drag sideways when zoomed, double-tap to zoom in or reset. Pages re-draw sharper when zoomed.

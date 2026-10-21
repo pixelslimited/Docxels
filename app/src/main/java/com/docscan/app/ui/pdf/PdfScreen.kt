@@ -10,6 +10,16 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -453,13 +463,49 @@ private fun PdfPages(file: File) {
     val state = rememberLazyListState()
     val count = preview.pageCount
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
             val widthPx = with(LocalDensity.current) { maxWidth.toPx() }.toInt()
-            LazyColumn(state = state, contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Pinch to zoom: pages are laid out wider (real layout zoom) so vertical scrolling keeps working.
+            var zoom by remember { mutableStateOf(1f) }
+            var panX by remember { mutableStateOf(0f) }
+            val renderScale = if (zoom > 2f) 3 else 2
+            val maxPan = { z: Float -> (z - 1f) * widthPx / 2f }
+            LazyColumn(
+                state = state,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = { if (zoom > 1.01f) { zoom = 1f; panX = 0f } else zoom = 2.5f })
+                    }
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            do {
+                                val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                val down = ev.changes.filter { it.pressed }
+                                if (down.size >= 2) {
+                                    val z = ev.calculateZoom()
+                                    val pan = ev.calculatePan()
+                                    zoom = (zoom * z).coerceIn(1f, 4f)
+                                    panX = (panX + pan.x).coerceIn(-maxPan(zoom), maxPan(zoom))
+                                    ev.changes.forEach { it.consume() }
+                                } else if (zoom > 1f && down.size == 1) {
+                                    val dx = ev.calculatePan().x
+                                    panX = (panX + dx).coerceIn(-maxPan(zoom), maxPan(zoom))
+                                }
+                            } while (ev.changes.any { it.pressed })
+                        }
+                    },
+            ) {
                 items(count) { i ->
-                    val bmp by produceState<Bitmap?>(null, preview, i) { value = runCatching { preview.render(i, widthPx * 2) }.getOrNull() }
+                    val bmp by produceState<Bitmap?>(null, preview, i, renderScale) { value = runCatching { preview.render(i, widthPx * renderScale) }.getOrNull() }
                     val ratio by produceState(0.707f, preview, i) { value = runCatching { preview.pageSize(i).let { it.first.toFloat() / it.second } }.getOrDefault(0.707f) }
-                    Box(Modifier.fillMaxWidth().aspectRatio(ratio).background(Color.White), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.requiredWidth(maxWidth * zoom - 24.dp * zoom).offset { androidx.compose.ui.unit.IntOffset(panX.toInt(), 0) }
+                            .aspectRatio(ratio).background(Color.White),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         bmp?.let { Image(it.asImageBitmap(), "Page ${i + 1}", contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxSize()) }
                     }
                 }
