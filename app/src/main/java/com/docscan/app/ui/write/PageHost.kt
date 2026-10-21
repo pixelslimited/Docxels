@@ -110,6 +110,9 @@ class PageHost(context: Context) : ScrollView(context) {
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(ed, 0)
     }
 
+    /** Removes the cell box without handing anything back. */
+    fun discardCellEditor() { cellDone = null; closeCellEditor() }
+
     /** Ends cell typing and hands the text back. */
     fun closeCellEditor() {
         val ed = cellEditor ?: return
@@ -120,6 +123,14 @@ class PageHost(context: Context) : ScrollView(context) {
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(ed.windowToken, 0)
         sheet.removeView(ed)
         done?.invoke(t)
+    }
+
+    /** Called with how far the page just scrolled (positive = moving down the document). */
+    var onScrollDelta: ((Int) -> Unit)? = null
+
+    override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
+        super.onScrollChanged(l, t, oldl, oldt)
+        if (t != oldt) onScrollDelta?.invoke(t - oldt)
     }
 
     fun setDesk(color: Int, gutterPx: Int, verticalGutterPx: Int) {

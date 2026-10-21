@@ -337,6 +337,7 @@ class RichEditText(context: Context) : EditText(context) {
     var onLinkTap: ((Int, Int, String) -> Unit)? = null
     private val taps = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
         override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
+            onUserTouch?.invoke()
             val t = text
             val off = getOffsetForPosition(e.x, e.y)
             val chip = t.getSpans(maxOf(0, off - 1), minOf(t.length, off + 1), BlockChipSpan::class.java)
@@ -585,8 +586,12 @@ class RichEditText(context: Context) : EditText(context) {
         return super.onTouchEvent(event)
     }
 
+    /** Called when the person taps the page or selects text, so the quick tools can appear. */
+    var onUserTouch: (() -> Unit)? = null
+
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
         super.onSelectionChanged(selStart, selEnd)
+        if (selStart != selEnd) onUserTouch?.invoke()
         onSelection?.invoke()
     }
 }
@@ -660,7 +665,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
         v.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         v.imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING or EditorInfo.IME_FLAG_NO_EXTRACT_UI
         v.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
-        v.typeface = android.graphics.Typeface.SANS_SERIF
+        v.typeface = com.docscan.app.ui.write.WordFonts.body()
         v.setLineSpacing(0f, 1f)
         v.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}

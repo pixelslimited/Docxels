@@ -70,6 +70,31 @@ object WordFonts {
 
     private val suffix = arrayOf("Regular", "Bold", "Italic", "BoldItalic")
 
+    /**
+     * The whole family (regular, bold, italic, bold italic) as one typeface, so bold and italic text uses the real
+     * bold and italic faces. Used as the base font of the page; null when the font is not built in.
+     */
+    fun family(name: String): Typeface? {
+        val fam = find(name) ?: return null
+        val am = assets ?: return null
+        return synchronized(cache) {
+            cache.getOrPut("family:" + fam.base) {
+                runCatching {
+                    fun font(st: Int): android.graphics.fonts.Font = android.graphics.fonts.Font.Builder(am, "fonts/${fam.base}-${suffix[st]}.ttf")
+                        .setWeight(if (st and 1 != 0) 700 else 400)
+                        .setSlant(if (st and 2 != 0) android.graphics.fonts.FontStyle.FONT_SLANT_ITALIC else android.graphics.fonts.FontStyle.FONT_SLANT_UPRIGHT)
+                        .build()
+                    val b = android.graphics.fonts.FontFamily.Builder(font(0))
+                    for (st in 1..3) if (st in fam.styles) b.addFont(font(st))
+                    Typeface.CustomFallbackBuilder(b.build()).setSystemFallback("sans-serif").build()
+                }.getOrNull()
+            }
+        }
+    }
+
+    /** The font text shows in when the document names none: Calibri, drawn with its metric twin Carlito. */
+    fun body(): Typeface = family(com.docscan.app.core.word.StyleDefaults.BODY_FONT) ?: Typeface.SANS_SERIF
+
     /** The typeface for a font name and a [Typeface] style (0 normal, 1 bold, 2 italic, 3 both), or null if not built in. */
     fun typeface(name: String, style: Int): Typeface? {
         custom(name, style)?.let { return it }

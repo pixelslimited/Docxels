@@ -54,7 +54,7 @@ object WordPdf {
         val body = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             density = 1f
             textSize = StyleDefaults.BODY_SIZE_PT * ZOOM
-            typeface = Typeface.SANS_SERIF
+            typeface = com.docscan.app.ui.write.WordFonts.body()
             color = Color.rgb(0x1B, 0x1B, 0x1F)
         }
 
@@ -110,7 +110,7 @@ object WordPdf {
         fun finishPage() {
             val p = current ?: return
             val c = canvas!!
-            val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f; color = Color.GRAY; typeface = Typeface.SANS_SERIF }
+            val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f; color = Color.GRAY; typeface = com.docscan.app.ui.write.WordFonts.body() }
             val firstPage = page.differentFirstPage && pageNo == 1
             val headerText = page.headerFor(pageNo)
             val footerText = page.footerFor(pageNo)

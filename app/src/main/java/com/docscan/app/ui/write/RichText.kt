@@ -829,7 +829,7 @@ class BlockChipSpan(
         val body = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             this.density = density
             textSize = StyleDefaults.BODY_SIZE_PT * ZOOM * density
-            typeface = Typeface.SANS_SERIF
+            typeface = com.docscan.app.ui.write.WordFonts.body()
             color = 0xFF1B1B1F.toInt()
         }
         val pad = 57f * k

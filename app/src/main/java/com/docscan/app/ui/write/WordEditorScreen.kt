@@ -8,8 +8,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.layout.width
@@ -192,9 +196,21 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var ribbonTab by remember { mutableIntStateOf(0) }
     val ribbonOpen = remember { mutableStateOf(false) }
     var pageHost by remember { mutableStateOf<PageHost?>(null) }
-    var cellEditing by remember { mutableStateOf<Int?>(null) }
-    val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
+    // The floating quick tools: shown after scrolling up a little, a tap on the page or a selection; hidden when scrolling down.
     val snackbar = remember { SnackbarHostState() }
+    var quick by remember { mutableStateOf(false) }
+    // The table (block, row, column) being typed in, so the floating tools offer table actions.
+    var tableCtx by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
+    var ribbonPx by remember { mutableIntStateOf(0) }
+    fun tableEdit(f: (com.docscan.app.core.word.TableBlock, Int, Int) -> com.docscan.app.core.word.TableBlock?) {
+        val ctx = tableCtx ?: return
+        pageHost?.closeCellEditor()
+        val t = (controller.blockAt(ctx.first) as? Block.Table)?.table ?: return
+        val n = f(t, ctx.second, ctx.third)
+        if (n == null) scope.launch { snackbar.showSnackbar("That can't be done on this table (merged cells, or only one row left).") }
+        else controller.replaceBlock(ctx.first, Block.Table(n))
+    }
+    val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     var tableOpen by remember { mutableStateOf(false) }
     var tableCustom by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Int?>(null) }
@@ -430,27 +446,23 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             // A tap on the page hides the tool pane (the touch is only observed, the page still gets it).
-            Box(Modifier.weight(1f).fillMaxWidth().pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                    if (ribbonOpen.value) ribbonOpen.value = false
-                }
-            }) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
             AndroidView(
                 factory = { ctx ->
                     PageHost(ctx).also { host ->
                         controller.attach(host.edit)
                         pageHost = host
+                        host.onScrollDelta = { dy -> if (dy > 8) quick = false else if (dy < -8) quick = true }
+                        host.edit.onUserTouch = { tableCtx = null; quick = true }
                         controller.setChipTapListener { i -> if (!controller.isReadOnly()) editing = i }
                         host.edit.onCellTap = { idx, row, col, rect, pad ->
                             val tb = (controller.blockAt(idx) as? Block.Table)?.table
                             val cell = tb?.rows?.getOrNull(row)?.getOrNull(col)
                             if (tb != null && cell != null && !controller.isReadOnly() && editing == null) {
-                                cellEditing = idx
+                                tableCtx = Triple(idx, row, col)
                                 val d = host.resources.displayMetrics.density
                                 host.showCellEditor(rect, pad, cell.plain(), com.docscan.app.core.word.StyleDefaults.BODY_SIZE_PT * ZOOM * d,
                                     0xFF000000.toInt() or (cell.shading ?: 0xFFFFFF)) { typed ->
-                                    cellEditing = null
                                     val now = (controller.blockAt(idx) as? Block.Table)?.table
                                     val old = now?.rows?.getOrNull(row)?.getOrNull(col)
                                     if (now != null && old != null && old.plain() != typed) {
@@ -476,14 +488,95 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     controller.setViewConfig(viewMode, page)
                     controller.setReadOnly(reading)
                 },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                        if (ribbonOpen.value) ribbonOpen.value = false
+                    }
+                }.padding(bottom = if (ribbonOpen.value) with(androidx.compose.ui.platform.LocalDensity.current) { ribbonPx.toDp() } else 0.dp),
             )
-            cellEditing?.let { idx ->
-                androidx.compose.material3.FilledTonalButton(
-                    onClick = { pageHost?.closeCellEditor(); editing = idx },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                ) { Text("Table options") }
-            }
+            if (!reading) Ribbon(
+                    modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { ribbonPx = it.height },
+                    quick = quick,
+                    tableTools = tableCtx?.let { ctx ->
+                        val idx = ctx.first
+                        TableToolActions(
+                            options = { pageHost?.closeCellEditor(); editing = idx },
+                            addRow = { tableEdit { t, r, _ -> TableOps.rowBelow(t, r) } },
+                            addColumn = { tableEdit { t, _, c -> TableOps.columnRight(t, c) } },
+                            deleteRow = { tableEdit { t, r, _ -> TableOps.deleteRow(t, r) } },
+                            deleteTable = { pageHost?.discardCellEditor(); tableCtx = null; controller.removeBlock(idx) },
+                        )
+                    },
+                    openState = ribbonOpen,
+                    c = controller,
+                    s = state,
+                    status = status,
+                    onStatus = { statsOpen = true },
+                    tab = ribbonTab,
+                    onTab = { ribbonTab = it },
+                    viewMode = viewMode,
+                    onViewMode = { viewMode = it; container.ui.editorView = it.name },
+                    zoom = zoom,
+                    onZoom = { zoom = when { zoom < 1.25f -> 1.5f; zoom < 1.75f -> 2f; zoom < 2.5f -> 3f; else -> 1f } },
+                    onRead = { reading = true },
+                    onPreview = { previewDoc = controller.toDoc(title, page) },
+                    onLetterhead = { mode ->
+                        if (mode == "saved") savedPicker = false
+                        else if (mode.startsWith("remove")) {
+                            page = when (mode) {
+                                "remove_first" -> page.copy(firstHeaderImages = emptyList())
+                                "remove_rest" -> page.copy(headerImages = emptyList())
+                                else -> page.copy(headerImages = emptyList(), firstHeaderImages = emptyList())
+                            }
+                        } else {
+                            letterheadMode = mode
+                            letterheadPicker.launch(PageSources.MIMES)
+                        }
+                    },
+                    onSignature = { mode ->
+                        if (mode == "draw") signPad = true
+                        else if (mode == "saved") savedPicker = true
+                        else signaturePicker.launch(PageSources.MIMES)
+                    },
+                    onTable = { tableOpen = true },
+                    onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    onShape = { preset ->
+                        val w = (page.contentWidthTwips * 0.45f).toInt()
+                        controller.insertBlock(Block.Shape(
+                            if (preset == "textbox") com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = w / 3, fill = 0xFFFFFF, lineColor = 0x808080, lineWidthPt = 0.75f,
+                                wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT, text = "Type here")
+                            else com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = if (preset == "line") 0 else w / 2, wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT),
+                        ))
+                    },
+                    onPageBreak = { controller.insertPageBreak() },
+                    onPageSetup = { pageOpen = true },
+                    onFind = { findOpen = true },
+                    onCount = { statsOpen = true },
+                    onFont = { fontOpen = true },
+                    onSize = { sizeOpen = true },
+                    onParagraph = { paraOpen = true },
+                    onSymbol = { symbolOpen = true },
+                    onDate = { dateOpen = true },
+                    onNewComment = {
+                        if (controller.selectedText().isBlank()) scope.launch { snackbar.showSnackbar("Select the words you want to comment on first.") } else commentNew = true
+                    },
+                    onComments = { commentsOpen = true },
+                    onToc = {
+                        val t = com.docscan.app.core.word.TableOfContents.text(controller.outline())
+                        if (t.isEmpty()) scope.launch { snackbar.showSnackbar("Give some lines a Heading style first, then insert the contents.") }
+                        else controller.insertText("Contents\n$t\n")
+                    },
+                    onLink = { linkOpen = Triple(controller.selectedText(), "", null) },
+                    onNav = { navOpen = true },
+                    caseMenu = caseMenu,
+                    onCaseMenu = { caseMenu = it },
+                    painting = painter != null,
+                    onPainter = {
+                        val held = painter
+                        if (held == null) painter = controller.captureFormat() else { controller.applyFormat(held); painter = null }
+                    },
+                )
             }
             if (reading) Text(
                 status,
@@ -499,76 +592,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     Text("Read mode", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                     androidx.compose.material3.FilledTonalButton(onClick = { reading = false }) { Text("Edit") }
                 }
-            } else Ribbon(
-                openState = ribbonOpen,
-                c = controller,
-                s = state,
-                status = status,
-                onStatus = { statsOpen = true },
-                tab = ribbonTab,
-                onTab = { ribbonTab = it },
-                viewMode = viewMode,
-                onViewMode = { viewMode = it; container.ui.editorView = it.name },
-                zoom = zoom,
-                onZoom = { zoom = when { zoom < 1.25f -> 1.5f; zoom < 1.75f -> 2f; zoom < 2.5f -> 3f; else -> 1f } },
-                onRead = { reading = true },
-                onPreview = { previewDoc = controller.toDoc(title, page) },
-                onLetterhead = { mode ->
-                    if (mode == "saved") savedPicker = false
-                    else if (mode.startsWith("remove")) {
-                        page = when (mode) {
-                            "remove_first" -> page.copy(firstHeaderImages = emptyList())
-                            "remove_rest" -> page.copy(headerImages = emptyList())
-                            else -> page.copy(headerImages = emptyList(), firstHeaderImages = emptyList())
-                        }
-                    } else {
-                        letterheadMode = mode
-                        letterheadPicker.launch(PageSources.MIMES)
-                    }
-                },
-                onSignature = { mode ->
-                    if (mode == "draw") signPad = true
-                    else if (mode == "saved") savedPicker = true
-                    else signaturePicker.launch(PageSources.MIMES)
-                },
-                onTable = { tableOpen = true },
-                onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                onShape = { preset ->
-                    val w = (page.contentWidthTwips * 0.45f).toInt()
-                    controller.insertBlock(Block.Shape(
-                        if (preset == "textbox") com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = w / 3, fill = 0xFFFFFF, lineColor = 0x808080, lineWidthPt = 0.75f,
-                            wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT, text = "Type here")
-                        else com.docscan.app.core.word.ShapeBlock(preset = preset, widthTwips = w, heightTwips = if (preset == "line") 0 else w / 2, wrap = com.docscan.app.core.word.ImageWrap.IN_FRONT),
-                    ))
-                },
-                onPageBreak = { controller.insertPageBreak() },
-                onPageSetup = { pageOpen = true },
-                onFind = { findOpen = true },
-                onCount = { statsOpen = true },
-                onFont = { fontOpen = true },
-                onSize = { sizeOpen = true },
-                onParagraph = { paraOpen = true },
-                onSymbol = { symbolOpen = true },
-                onDate = { dateOpen = true },
-                onNewComment = {
-                    if (controller.selectedText().isBlank()) scope.launch { snackbar.showSnackbar("Select the words you want to comment on first.") } else commentNew = true
-                },
-                onComments = { commentsOpen = true },
-                onToc = {
-                    val t = com.docscan.app.core.word.TableOfContents.text(controller.outline())
-                    if (t.isEmpty()) scope.launch { snackbar.showSnackbar("Give some lines a Heading style first, then insert the contents.") }
-                    else controller.insertText("Contents\n$t\n")
-                },
-                onLink = { linkOpen = Triple(controller.selectedText(), "", null) },
-                onNav = { navOpen = true },
-                caseMenu = caseMenu,
-                onCaseMenu = { caseMenu = it },
-                painting = painter != null,
-                onPainter = {
-                    val held = painter
-                    if (held == null) painter = controller.captureFormat() else { controller.applyFormat(held); painter = null }
-                },
-            )
+            }
         }
     }
 
@@ -750,6 +774,9 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
 }
 
+/** What the floating tools do while a table cell is being typed in. */
+class TableToolActions(val options: () -> Unit, val addRow: () -> Unit, val addColumn: () -> Unit, val deleteRow: () -> Unit, val deleteTable: () -> Unit)
+
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun Ribbon(
@@ -789,6 +816,9 @@ private fun Ribbon(
     painting: Boolean,
     onPainter: () -> Unit,
     openState: androidx.compose.runtime.MutableState<Boolean>,
+    modifier: Modifier = Modifier,
+    quick: Boolean = true,
+    tableTools: TableToolActions? = null,
 ) {
     var customFor by remember { mutableStateOf(0) }
     var styleMenu by remember { mutableStateOf(false) }
@@ -850,17 +880,19 @@ private fun Ribbon(
     Surface(
         tonalElevation = if (open) 3.dp else 0.dp,
         color = if (open) MaterialTheme.colorScheme.surface else Color.Transparent,
-        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = if (open) 40.dp else 12.dp),
+        modifier = modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = if (open) 40.dp else 12.dp),
     ) {
         Column {
             if (!open) {
                 // Closed: the quick bar (frequent tools) with the pixel D beside it; the page and word count sit above.
-                Text(
+                if (quick || tableTools != null) Text(
                     status,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White,
                     maxLines = 1,
-                    modifier = Modifier.align(Alignment.End).clickable(onClick = onStatus).padding(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier.align(Alignment.End).padding(end = 16.dp, bottom = 4.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(Color(0xB3000000))
+                        .clickable(onClick = onStatus).padding(horizontal = 8.dp, vertical = 3.dp),
                 )
                 Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box {
@@ -882,7 +914,16 @@ private fun Ribbon(
                             contentAlignment = Alignment.Center,
                         ) { Icon(icon, contentDescription = label, tint = ink, modifier = Modifier.size(22.dp)) }
                     }
-                    Row(
+                    if (tableTools != null) Row(
+                        Modifier.weight(1f).height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Q(Icons.Default.TableChart, "Table options") { tableTools.options() }
+                        Q(Icons.Default.Add, "Add a row below") { tableTools.addRow() }
+                        Q(Icons.Default.ViewColumn, "Add a column to the right") { tableTools.addColumn() }
+                        Q(Icons.Default.Remove, "Delete this row") { tableTools.deleteRow() }
+                        Q(Icons.Default.Delete, "Delete the table") { tableTools.deleteTable() }
+                    } else if (quick) Row(
                         Modifier.weight(1f).height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
