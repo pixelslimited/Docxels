@@ -1,6 +1,12 @@
 package com.docscan.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.animateFloat
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.filled.TextSnippet
@@ -349,10 +355,98 @@ private fun CardThumb(item: LibraryItem) {
         }?.also { CardThumbs.put(key, it) }
     }
     val b = bmp
-    Box(Modifier.size(width = 84.dp, height = 112.dp).clip(RoundedCornerShape(10.dp)).background(Color.White)) {
-        if (b != null) Image(
-            b.asImageBitmap(), contentDescription = "First page of ${item.title}", contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-            alignment = Alignment.TopCenter, modifier = Modifier.fillMaxSize(),
-        )
+    LivePage(b, "First page of ${item.title}")
+}
+
+/**
+ * The first page, alive: it fans in on top of two pages behind it, then floats and sways gently. Touch it and it
+ * leans toward your finger in 3D, then springs back when you let go. It never consumes touches, so scrolling and
+ * tapping the card still work. Stays still when the phone has animations switched off.
+ */
+@Composable
+private fun LivePage(b: android.graphics.Bitmap?, description: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val still = remember {
+        runCatching { android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
+    }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val tx = remember { androidx.compose.animation.core.Animatable(0f) }
+    val ty = remember { androidx.compose.animation.core.Animatable(0f) }
+    val fan = remember { androidx.compose.animation.core.Animatable(if (still) 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        fan.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = androidx.compose.animation.core.Spring.StiffnessLow))
+    }
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "livePage")
+    val sway by t.animateFloat(
+        -7f, 7f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(3600, easing = androidx.compose.animation.core.EaseInOutSine), androidx.compose.animation.core.RepeatMode.Reverse), label = "sway",
+    )
+    val bob by t.animateFloat(
+        -3f, 3f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(2500, easing = androidx.compose.animation.core.EaseInOutSine), androidx.compose.animation.core.RepeatMode.Reverse), label = "bob",
+    )
+    Box(
+        Modifier
+            .size(width = 100.dp, height = 124.dp)
+            .pointerInput(Unit) {
+                if (still) return@pointerInput
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val ev = awaitPointerEvent()
+                        val c = ev.changes.firstOrNull() ?: break
+                        if (c.pressed) {
+                            val nx = (c.position.x / size.width - 0.5f).coerceIn(-0.8f, 0.8f)
+                            val ny = (c.position.y / size.height - 0.5f).coerceIn(-0.8f, 0.8f)
+                            scope.launch { ty.snapTo(nx * 70f); tx.snapTo(-ny * 70f) }
+                        }
+                    } while (ev.changes.any { it.pressed })
+                    scope.launch { ty.animateTo(0f, androidx.compose.animation.core.spring(0.35f, androidx.compose.animation.core.Spring.StiffnessLow)) }
+                    scope.launch { tx.animateTo(0f, androidx.compose.animation.core.spring(0.35f, androidx.compose.animation.core.Spring.StiffnessLow)) }
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        // Two pages behind, fanned out to either side.
+        for (i in 0 until 2) {
+            val dir = if (i == 0) -1f else 1f
+            Box(
+                Modifier
+                    .size(width = 78.dp, height = 104.dp)
+                    .graphicsLayer {
+                        cameraDistance = 14f * density
+                        rotationZ = dir * 9f * fan.value
+                        translationX = dir * 10.dp.toPx() * fan.value
+                        rotationY = ty.value * 0.6f + (if (still) 0f else sway * 0.5f * -dir)
+                        rotationX = tx.value * 0.6f
+                        alpha = 0.55f + 0.1f * i
+                    }
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Color.White.copy(alpha = 0.9f)),
+            )
+        }
+        // The real first page.
+        Box(
+            Modifier
+                .size(width = 84.dp, height = 112.dp)
+                .graphicsLayer {
+                    cameraDistance = 14f * density
+                    rotationY = ty.value + (if (still) 0f else sway)
+                    rotationX = tx.value
+                    translationY = if (still) 0f else bob.dp.toPx()
+                    val pop = 0.6f + 0.4f * fan.value
+                    scaleX = pop; scaleY = pop
+                    shadowElevation = 10.dp.toPx()
+                    shape = RoundedCornerShape(10.dp)
+                    clip = true
+                }
+                .background(Color.White),
+        ) {
+            if (b != null) Image(
+                b.asImageBitmap(), contentDescription = description, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                alignment = Alignment.TopCenter, modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
