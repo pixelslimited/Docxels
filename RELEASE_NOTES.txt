@@ -109,3 +109,4 @@
 230|Remove background now uses a small bundled subject model (U2-Net-P, runs on the phone, no internet) to find the main object whatever the background, then refines the edge. The app grows by about 10 MB for it.
 The PDF viewer now shows Edit PDF first (sign, fill, highlight, draw), then a menu with Convert to Word, Print, Save, Save as, Share and Choose another PDF. Convert to Word turns the PDF into a Word document and opens the editor.
 Pinch to zoom in the PDF viewer (up to 4 times), drag sideways when zoomed, double-tap to zoom in or reset. Pages re-draw sharper when zoomed.
+Remove background now offers a Subject only button after it finishes, for posters and artwork with no plain background: it cuts tighter around just the main subject (for example a baby on a designed card). It starts again from the original picture.

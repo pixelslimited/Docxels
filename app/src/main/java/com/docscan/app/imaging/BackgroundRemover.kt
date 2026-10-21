@@ -87,7 +87,7 @@ object BackgroundRemover {
      * Returns null when the result is not believable (nothing, or nearly everything, was cut), so the caller can
      * fall back to [removeWithRect].
      */
-    fun removeSmart(src: Bitmap): Bitmap? {
+    fun removeSmart(src: Bitmap, strict: Boolean = false): Bitmap? {
         val full = src.toRgbMat()
         try {
             val scale = min(1.0, SMART_SIDE / max(full.cols(), full.rows()))
@@ -181,15 +181,15 @@ object BackgroundRemover {
             val prior = subjectPrior(small, w, h)
             if (prior != null) {
                 val salient = Mat(h, w, CvType.CV_8UC1)
-                salient.put(0, 0, ByteArray(n) { if (prior[it] > 0.08f) 1 else 0 })
+                salient.put(0, 0, ByteArray(n) { if (prior[it] > (if (strict) 0.5f else 0.08f)) 1 else 0 })
                 val nearSubject = Mat()
-                Imgproc.dilate(salient, nearSubject, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(61.0, 61.0)))
+                Imgproc.dilate(salient, nearSubject, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(if (strict) 41.0 else 61.0, if (strict) 41.0 else 61.0)))
                 val nearBytes = ByteArray(n)
                 nearSubject.get(0, 0, nearBytes)
                 for (i in 0 until n) {
                     m[i] = when {
-                        prior[i] > 0.5f -> Imgproc.GC_FGD.toByte()
-                        prior[i] > 0.08f -> Imgproc.GC_PR_FGD.toByte()
+                        prior[i] > (if (strict) 0.85f else 0.5f) -> Imgproc.GC_FGD.toByte()
+                        prior[i] > (if (strict) 0.5f else 0.08f) -> Imgproc.GC_PR_FGD.toByte()
                         nearBytes[i].toInt() == 0 -> Imgproc.GC_BGD.toByte()
                         else -> Imgproc.GC_PR_BGD.toByte()
                     }
@@ -223,7 +223,7 @@ object BackgroundRemover {
     }
 
     /** The smart method, falling back to the rectangle method when it finds nothing believable. */
-    fun remove(src: Bitmap): Bitmap = runCatching { removeSmart(src) }.getOrNull() ?: removeWithRect(src)
+    fun remove(src: Bitmap, strict: Boolean = false): Bitmap = runCatching { removeSmart(src, strict) }.getOrNull() ?: removeWithRect(src)
 
     private fun applyAlpha(src: Bitmap, alpha: Mat): Bitmap {
         val pixels = IntArray(src.width * src.height)

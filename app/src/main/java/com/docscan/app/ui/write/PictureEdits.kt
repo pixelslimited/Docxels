@@ -61,9 +61,9 @@ fun cropImage(img: ImageBlock, left: Float, top: Float, right: Float, bottom: Fl
 }
 
 /** Makes the plain background transparent (works best on a clear subject against a plain background). Null on failure. */
-fun removePictureBackground(img: ImageBlock): ImageBlock? = runCatching {
+fun removePictureBackground(img: ImageBlock, strict: Boolean = false): ImageBlock? = runCatching {
     val bmp = decodeLimited(img.bytes, 1600) ?: error("decode")
-    val cut = com.docscan.app.imaging.BackgroundRemover.remove(bmp)
+    val cut = com.docscan.app.imaging.BackgroundRemover.remove(bmp, strict)
     val out = java.io.ByteArrayOutputStream()
     cut.compress(Bitmap.CompressFormat.PNG, 100, out)
     img.copy(bytes = out.toByteArray(), extension = "png")

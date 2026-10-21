@@ -555,7 +555,14 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                                         val note = launch { snackbar.showSnackbar("Removing the background…", duration = androidx.compose.material3.SnackbarDuration.Indefinite) }
                                         val cut = withContext(Dispatchers.Default) { removePictureBackground(img) }
                                         note.cancel()
-                                        if (cut != null) controller.replaceBlock(idx, Block.Image(cut)) else snackbar.showSnackbar("Couldn't remove the background from this picture.")
+                                        if (cut == null) { snackbar.showSnackbar("Couldn't remove the background from this picture."); return@launch }
+                                        controller.replaceBlock(idx, Block.Image(cut))
+                                        // Posters and artwork have no plain background: offer a tighter cut around just the main subject.
+                                        val again = snackbar.showSnackbar("Background removed.", actionLabel = "Subject only", duration = androidx.compose.material3.SnackbarDuration.Long)
+                                        if (again == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                            val tight = withContext(Dispatchers.Default) { removePictureBackground(img, strict = true) }
+                                            if (tight != null) controller.replaceBlock(idx, Block.Image(tight)) else snackbar.showSnackbar("Couldn't isolate just the subject.")
+                                        }
                                     }
                                 })
                                 add(ToolAction(Icons.Default.RotateRight, "Turn 90 degrees") {
