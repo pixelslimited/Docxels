@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -202,7 +205,25 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var quick by remember { mutableStateOf(false) }
     // The table (block, row, column) being typed in, so the floating tools offer table actions.
     var tableCtx by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
+    // The picture or shape (block index) whose tools the floating bar shows.
+    var pictureCtx by remember { mutableStateOf<Int?>(null) }
     var ribbonPx by remember { mutableIntStateOf(0) }
+    fun resizePicture(idx: Int, factor: Float) {
+        val maxW = page.contentWidthTwips
+        when (val b = controller.blockAt(idx)) {
+            is Block.Image -> {
+                val w = (b.image.widthTwips * factor).toInt().coerceIn(240, maxW)
+                val h = (b.image.heightTwips.toLong() * w / b.image.widthTwips.coerceAtLeast(1)).toInt().coerceAtLeast(120)
+                controller.replaceBlock(idx, Block.Image(b.image.copy(widthTwips = w, heightTwips = h)))
+            }
+            is Block.Shape -> {
+                val w = (b.shape.widthTwips * factor).toInt().coerceIn(240, maxW)
+                val h = if (com.docscan.app.core.word.ShapePresets.isLine(b.shape.preset)) b.shape.heightTwips else (b.shape.heightTwips * factor).toInt().coerceAtLeast(120)
+                controller.replaceBlock(idx, Block.Shape(b.shape.copy(widthTwips = w, heightTwips = h)))
+            }
+            else -> {}
+        }
+    }
     fun tableEdit(f: (com.docscan.app.core.word.TableBlock, Int, Int) -> com.docscan.app.core.word.TableBlock?) {
         val ctx = tableCtx ?: return
         pageHost?.closeCellEditor()
@@ -454,8 +475,17 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                         controller.attach(host.edit)
                         pageHost = host
                         host.onScrollDelta = { dy -> if (dy > 8) quick = false else if (dy < -8) quick = true }
-                        host.edit.onUserTouch = { tableCtx = null; quick = true }
-                        controller.setChipTapListener { i -> if (!controller.isReadOnly()) editing = i }
+                        host.edit.onUserTouch = { tableCtx = null; if (pictureCtx != null) { pictureCtx = null; controller.select(-1) }; quick = true }
+                        controller.setChipTapListener { i ->
+                            if (controller.isReadOnly()) return@setChipTapListener
+                            val b = controller.blockAt(i)
+                            if (b is Block.Image || b is Block.Shape) {
+                                // A picture or shape is selected and the floating tools offer its actions; "options" opens the full panel.
+                                pictureCtx = i
+                                controller.select(i)
+                                quick = true
+                            } else editing = i
+                        }
                         host.edit.onCellTap = { idx, row, col, rect, pad ->
                             val tb = (controller.blockAt(idx) as? Block.Table)?.table
                             val cell = tb?.rows?.getOrNull(row)?.getOrNull(col)
@@ -501,13 +531,23 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     quick = quick,
                     tableTools = tableCtx?.let { ctx ->
                         val idx = ctx.first
-                        TableToolActions(
-                            options = { pageHost?.closeCellEditor(); editing = idx },
-                            addRow = { tableEdit { t, r, _ -> TableOps.rowBelow(t, r) } },
-                            addColumn = { tableEdit { t, _, c -> TableOps.columnRight(t, c) } },
-                            deleteRow = { tableEdit { t, r, _ -> TableOps.deleteRow(t, r) } },
-                            deleteTable = { pageHost?.discardCellEditor(); tableCtx = null; controller.removeBlock(idx) },
+                        listOf(
+                            ToolAction(Icons.Default.TableChart, "Table options") { pageHost?.closeCellEditor(); editing = idx },
+                            ToolAction(Icons.Default.Add, "Add a row below") { tableEdit { t, r, _ -> TableOps.rowBelow(t, r) } },
+                            ToolAction(Icons.Default.ViewColumn, "Add a column to the right") { tableEdit { t, _, c -> TableOps.columnRight(t, c) } },
+                            ToolAction(Icons.Default.Remove, "Delete this row") { tableEdit { t, r, _ -> TableOps.deleteRow(t, r) } },
+                            ToolAction(Icons.Default.Delete, "Delete the table") { pageHost?.discardCellEditor(); tableCtx = null; controller.removeBlock(idx) },
                         )
+                    } ?: pictureCtx?.let { idx ->
+                        buildList {
+                            add(ToolAction(Icons.Default.Image, "Picture options") { pictureCtx = null; editing = idx })
+                            if (controller.blockAt(idx) is Block.Image) add(ToolAction(Icons.Default.RotateRight, "Turn 90 degrees") {
+                                (controller.blockAt(idx) as? Block.Image)?.let { b -> rotateQuarterTurn(b.image)?.let { controller.replaceBlock(idx, Block.Image(it)) } }
+                            })
+                            add(ToolAction(Icons.Default.ZoomOut, "Smaller") { resizePicture(idx, 0.85f) })
+                            add(ToolAction(Icons.Default.ZoomIn, "Larger") { resizePicture(idx, 1.18f) })
+                            add(ToolAction(Icons.Default.Delete, "Delete") { pictureCtx = null; controller.select(-1); controller.removeBlock(idx) })
+                        }
                     },
                     openState = ribbonOpen,
                     c = controller,
@@ -777,8 +817,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
 }
 
-/** What the floating tools do while a table cell is being typed in. */
-class TableToolActions(val options: () -> Unit, val addRow: () -> Unit, val addColumn: () -> Unit, val deleteRow: () -> Unit, val deleteTable: () -> Unit)
+/** One button of the floating tools when something (a table, a picture) is selected. */
+class ToolAction(val icon: androidx.compose.ui.graphics.vector.ImageVector, val label: String, val run: () -> Unit)
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -822,7 +862,7 @@ private fun Ribbon(
     openState: androidx.compose.runtime.MutableState<Boolean>,
     modifier: Modifier = Modifier,
     quick: Boolean = true,
-    tableTools: TableToolActions? = null,
+    tableTools: List<ToolAction>? = null,
 ) {
     var customFor by remember { mutableStateOf(0) }
     var styleMenu by remember { mutableStateOf(false) }
@@ -933,11 +973,7 @@ private fun Ribbon(
                         Modifier.fillMaxWidth().height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Q(Icons.Default.TableChart, "Table options") { tableTools.options() }
-                        Q(Icons.Default.Add, "Add a row below") { tableTools.addRow() }
-                        Q(Icons.Default.ViewColumn, "Add a column to the right") { tableTools.addColumn() }
-                        Q(Icons.Default.Remove, "Delete this row") { tableTools.deleteRow() }
-                        Q(Icons.Default.Delete, "Delete the table") { tableTools.deleteTable() }
+                        tableTools.forEach { t -> Q(t.icon, t.label) { t.run() } }
                     } else Row(
                         Modifier.fillMaxWidth().height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,

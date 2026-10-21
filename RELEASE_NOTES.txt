@@ -103,3 +103,4 @@
 224|Fonts: text with no font named (Calibri by default) now shows in Carlito, the Calibri look-alike built into Docxels, in the editor, page preview, PDF and table cells, with real bold and italic. Before, it showed in the phone's own font.
 225|My styles: save the formatting at the cursor (font, size, bold, italic, colours) under a name, then apply it to selected text or a whole paragraph (Home, Style).
 226|The floating quick tools slide up to show and slide down to hide.
+227|Tap a picture or shape: the floating tools switch to picture tools (options, turn 90 degrees, smaller, larger, delete). Tap the page to go back to the text tools.
