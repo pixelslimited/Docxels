@@ -19,7 +19,7 @@
 266|FREE|Clipboard|Paste, plain paste, cut, copy, select all on Home and on the quick bar.
 266|FREE|Headers and footers|Several lines, left, centre or right, with Page X of Y.
 266|FIX|Quick bar|Insert button removed. Paste comes first.
-*|FREE|Live Continue card|The first page floats, leans toward your finger and springs back.
+*|FREE|Live Continue card|Its pages keep turning over to show the next ones. Drag to revolve it, even upside down. Tap to send the real pages flying.
 *|FREE|Reading progress|A bar and percentage show how far through the document you got.
 *|FREE|Search your phone|Type a name to list PDF, Word and text files on the phone. Tap one to import it. Needs All files access.
 *|FIX|Older phones|Importing Word and text files works again on Android 12 and older.
