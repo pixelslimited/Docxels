@@ -129,3 +129,4 @@ Editor: a search icon in the tools panel finds any tool by name (try "table", "s
 Review → Check spelling underlines misspelled words using your phone's spell checker; tap a word for suggestions. Turn on a spell checker in Android settings if it says none answered.
 Home now has a Clipboard group: Paste, Paste as plain text, Cut, Copy, Select all.
 Page setup: headers and footers can have several lines, be left, centred or right, and show "Page X of Y". They carry through to PDF and Word.
+The quick tool bar above the keyboard now has Paste and a Clipboard menu (Copy, Cut, Paste as plain text, Select all). The bar scrolls sideways to fit them.

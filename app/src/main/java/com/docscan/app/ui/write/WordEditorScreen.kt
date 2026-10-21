@@ -983,6 +983,7 @@ private fun Ribbon(
     var grid by remember { mutableStateOf(true) }
     var tabMenu by remember { mutableStateOf(false) }
     var searching by remember { mutableStateOf(false) }
+    var clipMenu by remember { mutableStateOf(false) }
     if (searching) {
         val list = ArrayList<Command>()
         fun cmd(label: String, where: String, words: String = "", run: () -> Unit) { list += Command(label, where, words) { open = false; run() } }
@@ -1128,9 +1129,9 @@ private fun Ribbon(
                     val pill = Color(0xFF2A2A2A)
                     val ink = Color.White
                     @Composable
-                    fun Q(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, on: Boolean = false, onClick: () -> Unit) {
+                    fun Q(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, on: Boolean = false, fixed: Boolean = false, onClick: () -> Unit) {
                         Box(
-                            Modifier.weight(1f).height(44.dp).padding(vertical = 3.dp, horizontal = 1.dp)
+                            (if (fixed) Modifier.width(40.dp) else Modifier.weight(1f)).height(44.dp).padding(vertical = 3.dp, horizontal = 1.dp)
                                 .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
                                 .background(if (on) Color(0xFF555555) else Color.Transparent)
                                 .clickable(onClick = onClick),
@@ -1149,30 +1150,41 @@ private fun Ribbon(
                     ) {
                         tableTools.forEach { t -> Q(t.icon, t.label) { t.run() } }
                     } else Row(
-                        Modifier.fillMaxWidth().height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
+                        Modifier.fillMaxWidth().height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill)
+                            .horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Q(Icons.Default.Add, "Insert") { onTab(1); open = true; grid = true }
-                        Q(Icons.Default.FormatBold, "Bold", s.bold) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
-                        Q(Icons.Default.FormatItalic, "Italic", s.italic) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
-                        Q(Icons.Default.FormatUnderlined, "Underline", s.underline) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
-                        Box(Modifier.weight(1f)) {
-                            Row(Modifier.fillMaxWidth()) { Q(Icons.Default.FormatColorFill, "Highlight") { fillMenu = true } }
+                        Q(Icons.Default.Add, "Insert", fixed = true) { onTab(1); open = true; grid = true }
+                        Q(Icons.Default.ContentPaste, "Paste", fixed = true) { c.clipboard(android.R.id.paste) }
+                        Box(Modifier.width(40.dp)) {
+                            Row(Modifier.fillMaxWidth()) { Q(Icons.Default.ContentCopy, "Clipboard", fixed = true) { clipMenu = true } }
+                            DropdownMenu(expanded = clipMenu, onDismissRequest = { clipMenu = false }) {
+                                DropdownMenuItem(text = { Text("Copy") }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) }, onClick = { clipMenu = false; c.clipboard(android.R.id.copy) })
+                                DropdownMenuItem(text = { Text("Cut") }, leadingIcon = { Icon(Icons.Default.ContentCut, null) }, onClick = { clipMenu = false; c.clipboard(android.R.id.cut) })
+                                DropdownMenuItem(text = { Text("Paste as plain text") }, leadingIcon = { Icon(Icons.Default.ContentPaste, null) }, onClick = { clipMenu = false; c.clipboard(android.R.id.pasteAsPlainText) })
+                                DropdownMenuItem(text = { Text("Select all") }, leadingIcon = { Icon(Icons.Default.SelectAll, null) }, onClick = { clipMenu = false; c.clipboard(android.R.id.selectAll) })
+                            }
+                        }
+                        Q(Icons.Default.FormatBold, "Bold", s.bold, fixed = true) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
+                        Q(Icons.Default.FormatItalic, "Italic", s.italic, fixed = true) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
+                        Q(Icons.Default.FormatUnderlined, "Underline", s.underline, fixed = true) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
+                        Box(Modifier.width(40.dp)) {
+                            Row(Modifier.fillMaxWidth()) { Q(Icons.Default.FormatColorFill, "Highlight", fixed = true) { fillMenu = true } }
                             DropdownMenu(expanded = fillMenu, onDismissRequest = { fillMenu = false }) {
                                 Swatches(HIGHLIGHTS, "No highlight", { fillMenu = false; c.remove(CharKind.HIGHLIGHT) }) { fillMenu = false; c.apply(CharAttr.Highlight(it)) }
                                 TextButton(onClick = { fillMenu = false; customFor = 2 }) { Text("More colours…") }
                             }
                         }
-                        Box(Modifier.weight(1f)) {
-                            Row(Modifier.fillMaxWidth()) { Q(Icons.Default.FormatColorText, "Text colour") { colorMenu = true } }
+                        Box(Modifier.width(40.dp)) {
+                            Row(Modifier.fillMaxWidth()) { Q(Icons.Default.FormatColorText, "Text colour", fixed = true) { colorMenu = true } }
                             DropdownMenu(expanded = colorMenu, onDismissRequest = { colorMenu = false }) {
                                 Swatches(TEXT_COLORS, "Automatic", { colorMenu = false; c.remove(CharKind.COLOR) }) { colorMenu = false; c.apply(CharAttr.Color(it)) }
                                 TextButton(onClick = { colorMenu = false; customFor = 1 }) { Text("More colours…") }
                             }
                         }
-                        Q(Icons.AutoMirrored.Filled.FormatListBulleted, "Bullets", s.list == ListKind.BULLET) { c.toggleList(ListKind.BULLET) }
-                        Q(Icons.Default.FormatListNumbered, "Numbering", s.list == ListKind.NUMBER) { c.toggleList(ListKind.NUMBER) }
-                        Q(Icons.Default.MoreVert, "More tools") { onTab(0); open = true; grid = true }
+                        Q(Icons.AutoMirrored.Filled.FormatListBulleted, "Bullets", s.list == ListKind.BULLET, fixed = true) { c.toggleList(ListKind.BULLET) }
+                        Q(Icons.Default.FormatListNumbered, "Numbering", s.list == ListKind.NUMBER, fixed = true) { c.toggleList(ListKind.NUMBER) }
+                        Q(Icons.Default.MoreVert, "More tools", fixed = true) { onTab(0); open = true; grid = true }
                     }
                     }
                 }
