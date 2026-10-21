@@ -791,6 +791,8 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
     val unit = androidx.compose.ui.platform.LocalDensity.current.density
     val strokes = androidx.compose.runtime.remember { ArrayList<List<InkPt>>() }
     val live = androidx.compose.runtime.remember { ArrayList<InkPt>() }
+    // strokes is a plain list, so the buttons watch this counter to know when it changed.
+    var count by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var tick by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var size by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
     var layer by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -801,15 +803,18 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
         val cv = android.graphics.Canvas(bmp)
         for (st in strokes) BallpointInk.render(cv, st, unit)
         tick++
+        count = strokes.size
     }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = androidx.compose.ui.Modifier.fillMaxWidth(0.97f),
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
         title = { androidx.compose.material3.Text("Sign here") },
         text = {
             androidx.compose.foundation.Canvas(
                 androidx.compose.ui.Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
+                    .height(340.dp)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
                     .background(androidx.compose.ui.graphics.Color(0xFFFDFCF8))
                     .onSizeChanged {
@@ -859,7 +864,7 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
         },
         confirmButton = {
             androidx.compose.material3.TextButton(
-                enabled = strokes.isNotEmpty(),
+                enabled = count > 0,
                 onClick = {
                     val src = layer ?: return@TextButton
                     val w = src.width
@@ -879,7 +884,7 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
         dismissButton = {
             androidx.compose.foundation.layout.Row {
                 androidx.compose.material3.TextButton(
-                    enabled = strokes.isNotEmpty(),
+                    enabled = count > 0,
                     onClick = { strokes.removeAt(strokes.lastIndex); redraw() },
                 ) { androidx.compose.material3.Text("Undo") }
                 androidx.compose.material3.TextButton(onClick = { strokes.clear(); live.clear(); redraw() }) { androidx.compose.material3.Text("Clear") }
