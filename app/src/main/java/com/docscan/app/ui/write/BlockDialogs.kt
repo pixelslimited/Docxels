@@ -2,6 +2,9 @@ package com.docscan.app.ui.write
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
@@ -777,12 +780,26 @@ fun SignatureImportDialog(source: Bitmap, onInsert: (ByteArray, Int, Int) -> Uni
     )
 }
 
-/** A pad to sign with a finger. Returns a transparent PNG of just the ink. */
+/**
+ * A pad to sign on like paper with a blue ball-point pen (see [BallpointInk]).
+ * Returns a transparent PNG of just the ink.
+ */
 @androidx.compose.runtime.Composable
 fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> Unit) {
-    val strokes = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateListOf<List<androidx.compose.ui.geometry.Offset>>() }
-    var current by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<List<androidx.compose.ui.geometry.Offset>>(emptyList()) }
+    val unit = androidx.compose.ui.platform.LocalDensity.current.density
+    val strokes = androidx.compose.runtime.remember { ArrayList<List<InkPt>>() }
+    val live = androidx.compose.runtime.remember { ArrayList<InkPt>() }
+    var tick by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var size by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
+    var layer by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    fun redraw() {
+        val bmp = layer ?: return
+        bmp.eraseColor(0)
+        val cv = android.graphics.Canvas(bmp)
+        for (st in strokes) BallpointInk.render(cv, st, unit)
+        tick++
+    }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { androidx.compose.material3.Text("Sign here") },
@@ -790,23 +807,51 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
             androidx.compose.foundation.Canvas(
                 androidx.compose.ui.Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(220.dp)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                    .background(androidx.compose.ui.graphics.Color.White)
-                    .onSizeChanged { size = it }
+                    .background(androidx.compose.ui.graphics.Color(0xFFFDFCF8))
+                    .onSizeChanged {
+                        size = it
+                        if (it.width > 0 && it.height > 0 && (layer?.width != it.width || layer?.height != it.height)) {
+                            layer = android.graphics.Bitmap.createBitmap(it.width, it.height, android.graphics.Bitmap.Config.ARGB_8888)
+                            redraw()
+                        }
+                    }
                     .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { current = listOf(it) },
-                            onDrag = { change, _ -> change.consume(); current = current + change.position },
-                            onDragEnd = { if (current.size > 1) strokes.add(current); current = emptyList() },
-                            onDragCancel = { current = emptyList() },
-                        )
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            val stylus = down.type == androidx.compose.ui.input.pointer.PointerType.Stylus
+                            fun pressure(c: androidx.compose.ui.input.pointer.PointerInputChange) =
+                                if (stylus) c.pressure.coerceIn(0.2f, 1f) else 1f
+                            live.clear()
+                            live.add(InkPt(down.position.x, down.position.y, down.uptimeMillis, pressure(down)))
+                            tick++
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                for (h in ch.historical) live.add(InkPt(h.position.x, h.position.y, h.uptimeMillis, pressure(ch)))
+                                live.add(InkPt(ch.position.x, ch.position.y, ch.uptimeMillis, pressure(ch)))
+                                ch.consume()
+                                tick++
+                                if (!ch.pressed) break
+                            }
+                            if (live.isNotEmpty()) {
+                                strokes.add(live.toList())
+                                live.clear()
+                                redraw()
+                            }
+                        }
                     },
             ) {
-                for (st in strokes + listOf(current)) {
-                    for (i in 1 until st.size) {
-                        drawLine(androidx.compose.ui.graphics.Color(0xFF14213D), st[i - 1], st[i], strokeWidth = 5f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                    }
+                tick // read so the canvas redraws while signing
+                drawIntoCanvas { c ->
+                    val nc = c.nativeCanvas
+                    // A faint signing line, like a form.
+                    val line = android.graphics.Paint().apply { color = 0x33000000; strokeWidth = unit }
+                    nc.drawLine(size.width * 0.06f, size.height * 0.72f, size.width * 0.94f, size.height * 0.72f, line)
+                    layer?.let { nc.drawBitmap(it, 0f, 0f, null) }
+                    if (live.isNotEmpty()) BallpointInk.render(nc, live, unit)
                 }
             }
         },
@@ -814,19 +859,14 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
             androidx.compose.material3.TextButton(
                 enabled = strokes.isNotEmpty(),
                 onClick = {
-                    val w = size.width.coerceAtLeast(1)
-                    val h = size.height.coerceAtLeast(1)
-                    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
-                    val cv = android.graphics.Canvas(bmp)
-                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                        color = 0xFF14213D.toInt(); strokeWidth = 5f; strokeCap = android.graphics.Paint.Cap.ROUND; style = android.graphics.Paint.Style.STROKE
-                    }
-                    for (st in strokes) for (i in 1 until st.size) cv.drawLine(st[i - 1].x, st[i - 1].y, st[i].x, st[i].y, paint)
+                    val src = layer ?: return@TextButton
+                    val w = src.width
+                    val h = src.height
                     val px = IntArray(w * h)
-                    bmp.getPixels(px, 0, w, 0, 0, w, h)
+                    src.getPixels(px, 0, w, 0, 0, w, h)
                     val b = com.docscan.app.core.SignatureInk.inkBounds(px, w, h)
                     if (b != null) {
-                        val cropped = android.graphics.Bitmap.createBitmap(bmp, b[0], b[1], b[2] - b[0], b[3] - b[1])
+                        val cropped = android.graphics.Bitmap.createBitmap(src, b[0], b[1], b[2] - b[0], b[3] - b[1])
                         val out = java.io.ByteArrayOutputStream()
                         cropped.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
                         onDone(out.toByteArray(), cropped.width, cropped.height)
@@ -836,7 +876,11 @@ fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> U
         },
         dismissButton = {
             androidx.compose.foundation.layout.Row {
-                androidx.compose.material3.TextButton(onClick = { strokes.clear(); current = emptyList() }) { androidx.compose.material3.Text("Clear") }
+                androidx.compose.material3.TextButton(
+                    enabled = strokes.isNotEmpty(),
+                    onClick = { strokes.removeAt(strokes.lastIndex); redraw() },
+                ) { androidx.compose.material3.Text("Undo") }
+                androidx.compose.material3.TextButton(onClick = { strokes.clear(); live.clear(); redraw() }) { androidx.compose.material3.Text("Clear") }
                 androidx.compose.material3.TextButton(onClick = onDismiss) { androidx.compose.material3.Text("Cancel") }
             }
         },
