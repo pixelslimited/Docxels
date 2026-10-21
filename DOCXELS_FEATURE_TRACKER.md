@@ -290,3 +290,45 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Double-tap a phone number to dial | IMPLEMENTED — NOT VERIFIED | core/PhoneNumbers, PageHost cell editor, EditorController.onDoubleTap | Opens the dialer with the number filled (ACTION_DIAL, no permission, so a stray double tap cannot place a call). Table cells: the second tap lands on the cell box that the first tap opened, so the box counts its opening as the first tap. If a cell holds several numbers, the one under the finger is used. PhoneNumbersTest covers the matching. Direct calling would need the CALL_PHONE permission; not done on purpose. |
 
 | PDF: underlined phone numbers, tap to dial | IMPLEMENTED — NOT VERIFIED | pdf/PdfPhones, ui/pdf/PdfScreen, ui/Dial | Reads positioned text with PDFBox per visible page (cached, off the main thread), finds numbers with PhoneNumbers, overlays an underlined tap target on each. Lines where the font merged letters (ligatures) are skipped. Scanned PDFs have no text layer, so nothing is underlined. Box positions are approximate (font size based); check alignment on a real PDF. |
+
+## Gap list against Microsoft Word's ribbon (21 Oct, from Microsoft_Word_Functions_Ribbon_Groups_Guide.docx)
+Compared from this tracker and the editor's ribbon labels; not every item was re-checked on a phone. Order is by usefulness and ease. All NOT STARTED unless marked.
+
+**A. Do first (high value, simple)**
+| Item | Why |
+|---|---|
+| Offline spelling check (Android spell checker, red underlines, tap for suggestions) | Works without an account; Assistant grammar needs the server |
+| Selection mini-bar (cut, copy, paste, select all, share) and Paste as plain text | Basic editing should be one tap |
+| Command search ("what do you want to do?") in the ribbon | Biggest simplicity win; finds any tool by name |
+| Header and footer editor (several lines, page X of Y, different odd/even, logo) | Today: one line; tracker "beyond one line NOT STARTED" |
+| Table of contents from headings, with update | Navigation pane exists; TOC does not |
+| Real styles: Title, Heading 1–3, Normal gallery, change a style once for the whole document | "My styles" exist; custom styles not true Word styles |
+| Table tools: delete column, add column left, row above, cell shading, borders, vertical merge/split, column width, repeat header row, sort | Merge/split horizontal only today |
+| Find and replace options (match case, whole word, replace all, go to page) | Confirm what exists |
+| Watermark (DRAFT, CONFIDENTIAL, picture) and page colour/border | Common on business documents |
+| Saved snippets ("My text": address, bank details, closing lines) like My signatures | Fast letters and proposals |
+| Dictate (speech to text) and Read aloud | Android has both built in |
+| Document properties (title, author "Kelvin Codes") and Inspect/remove personal data | Needed before sharing |
+| Version history from the autosaves (restore an earlier copy) | Safety net |
+
+**B. Next**
+| Item | Why |
+|---|---|
+| Mail merge from a table, Excel or CSV (fields, preview, one PDF per recipient or one combined) | Lists of imams, clients, invoices |
+| Form controls: check box, drop-down, date picker, text field; fill-in mode | Forms and receipts |
+| Draw tab: pen/highlighter/eraser on Word pages and PDFs, reusing the new ball-point engine | Annotating |
+| True columns that flow, section breaks, line numbers, hyphenation | Layout |
+| Text box, text inside shapes, group/align, bring forward / send backward, selection list | Objects |
+| Picture tools: brightness/contrast, compress, replace picture, flip, border, alt text, reset | Picture Format |
+| Footnotes and endnotes (real, not a notes list), captions and table of figures, bookmarks, cross-references | Long documents |
+| QR code and barcode insert; signature line placeholder; drop cap; equations | Insert |
+| Tab stops and ruler (leaders for dotted lines) | Forms, price lists |
+| Track changes, accept/reject, compare two versions, reply/resolve comments | Review |
+| PDF viewer: text search, select and copy text, page thumbnails, jump to page, night mode | Reader gaps |
+| Edit existing PDF text | Already on the backlog |
+
+**C. Later / optional**
+Outline view, focus mode, side-by-side documents, thesaurus, language setting, charts, icons, citations and bibliography, index, restrict editing, Immersive Reader, text effects/WordArt.
+
+**D. Not applicable on a phone**
+Visual Basic, macros, XML mapping pane, COM add-ins, Get Add-ins, 3D models, SmartArt, screenshots (use the picture picker), online video, Table of Authorities (legal), Block Authors, New Window / Arrange All / Switch Windows / Split, Envelopes and Labels (printing on stationery), Office Account, Contact Support, Copilot (we have our own Assistant).
