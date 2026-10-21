@@ -195,6 +195,19 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var pageOpen by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val container = com.docscan.app.LocalContainer.current
+    // Remember where the person stopped so Home's Continue card can say "Page 2 of 6" and reopen there.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val at = container.libraryMeta.get(com.docscan.app.data.DocKind.DOCX, vm.id).lastOffset
+        if (at > 0) { delay(600); controller.goTo(at) }
+    }
+    androidx.compose.runtime.LaunchedEffect(state) {
+        delay(2000)
+        val pg = controller.pageInfo() ?: return@LaunchedEffect
+        val off = controller.caretOffset()
+        val m = container.libraryMeta.get(com.docscan.app.data.DocKind.DOCX, vm.id)
+        if (m.lastPage != pg.first || m.pageTotal != pg.second || m.lastOffset != off)
+            container.libraryMeta.update(com.docscan.app.data.DocKind.DOCX, vm.id) { it.copy(lastPage = pg.first, pageTotal = pg.second, lastOffset = off) }
+    }
     var zoom by remember { mutableStateOf(1f) }
     var viewMode by remember { mutableStateOf(runCatching { ViewMode.valueOf(container.ui.editorView) }.getOrDefault(ViewMode.PAGE)) }
     var reading by remember { mutableStateOf(false) }

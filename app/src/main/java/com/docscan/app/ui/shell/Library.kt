@@ -363,6 +363,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
     fun withFile(context: Context, item: LibraryItem, asPdf: Boolean, then: (File) -> Unit) {
         viewModelScope.launch {
             _busy.value = if (asPdf) "Preparing PDF…" else "Preparing file…"
+            container.exportStatus.begin(LibraryMeta.key(item.kind, item.id), if (asPdf) "Exporting PDF" else "Preparing file")
             runCatching {
                 val dir = File(context.cacheDir, "exports").apply { mkdirs() }
                 withContext(Dispatchers.Default) {
@@ -370,7 +371,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
                         DocKind.DOCX ->
                             if (asPdf) {
                                 val doc = container.words.load(item.id) ?: error("missing")
-                                File(dir, safeName(item.title) + ".pdf").also { f -> f.outputStream().use { com.docscan.app.export.WordPdf.write(doc, it) } }
+                                File(dir, safeName(item.title) + ".pdf").also { f -> f.outputStream().use { com.docscan.app.export.WordPdf.write(doc, it) { p -> container.exportStatus.progress(p) } } }
                             } else {
                                 val bytes = container.words.docxBytes(item.id) ?: error("missing")
                                 File(dir, safeName(item.title) + ".docx").also { it.writeBytes(bytes) }
@@ -386,6 +387,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
                     }
                 }
             }.onSuccess(then).onFailure { _message.value = "Could not create the file." }
+            container.exportStatus.end()
             _busy.value = null
         }
     }

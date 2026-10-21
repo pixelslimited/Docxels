@@ -13,8 +13,12 @@ data class ItemMeta(
     val tags: Set<String> = emptySet(),
     /** Time it was moved to Trash, or 0 when it is not in Trash. */
     val trashedAt: Long = 0L,
+    /** Where the person stopped: page (1-based), pages in all, and the caret position in a Word document. 0 = unknown. */
+    val lastPage: Int = 0,
+    val pageTotal: Int = 0,
+    val lastOffset: Int = 0,
 ) {
-    val isDefault: Boolean get() = !favourite && folder.isEmpty() && tags.isEmpty() && trashedAt == 0L
+    val isDefault: Boolean get() = !favourite && folder.isEmpty() && tags.isEmpty() && trashedAt == 0L && lastPage == 0 && lastOffset == 0
 }
 
 /**
@@ -51,7 +55,7 @@ class LibraryMeta(context: Context) {
         fun cleanName(s: String) = clean(s).take(40)
 
         fun serialize(map: Map<String, ItemMeta>): String = map.entries.joinToString("\n") { (k, m) ->
-            listOf(k, if (m.favourite) "1" else "0", clean(m.folder), m.tags.joinToString(",") { clean(it) }, m.trashedAt.toString()).joinToString("\t")
+            listOf(k, if (m.favourite) "1" else "0", clean(m.folder), m.tags.joinToString(",") { clean(it) }, m.trashedAt.toString(), m.lastPage.toString(), m.pageTotal.toString(), m.lastOffset.toString()).joinToString("\t")
         }
 
         fun parse(text: String): Map<String, ItemMeta> = text.lines().mapNotNull { line ->
@@ -62,6 +66,9 @@ class LibraryMeta(context: Context) {
                 folder = p[2],
                 tags = p[3].split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
                 trashedAt = p[4].toLongOrNull() ?: 0L,
+                lastPage = p.getOrNull(5)?.toIntOrNull() ?: 0,
+                pageTotal = p.getOrNull(6)?.toIntOrNull() ?: 0,
+                lastOffset = p.getOrNull(7)?.toIntOrNull() ?: 0,
             )
         }.toMap()
     }

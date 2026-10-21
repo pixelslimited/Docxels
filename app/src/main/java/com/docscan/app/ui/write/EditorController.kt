@@ -1422,6 +1422,9 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
         return com.docscan.app.core.word.Outline.build(lines.map { it.replace(CHIP_CHAR.toString(), "") }, styles)
     }
 
+    /** Caret position, to come back to later. */
+    fun caretOffset(): Int = view?.selectionStart?.coerceAtLeast(0) ?: 0
+
     fun goTo(offset: Int) {
         val v = view ?: return
         val o = offset.coerceIn(0, v.text.length)

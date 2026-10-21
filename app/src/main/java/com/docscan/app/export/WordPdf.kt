@@ -31,11 +31,12 @@ import java.io.OutputStream
  * Known limits: merged table cells are drawn unmerged.
  */
 object WordPdf {
-    fun write(doc: WordDoc, out: OutputStream) {
-        Writer(doc).run(out)
+    /** [onProgress] gets 0..1 as the document's blocks are drawn. */
+    fun write(doc: WordDoc, out: OutputStream, onProgress: (Float) -> Unit = {}) {
+        Writer(doc, onProgress).run(out)
     }
 
-    private class Writer(val doc: WordDoc) {
+    private class Writer(val doc: WordDoc, val onProgress: (Float) -> Unit = {}) {
         val page = doc.page
         val pageW = page.sheetWidthTwips / 20f
         val pageH = page.sheetHeightTwips / 20f
@@ -68,7 +69,8 @@ object WordPdf {
                         pending = ArrayList()
                     }
                 }
-                for (b in doc.blocks) {
+                for ((bi, b) in doc.blocks.withIndex()) {
+                    onProgress(bi / doc.blocks.size.toFloat())
                     when (b) {
                         is Block.Para -> pending += b.paragraph
                         is Block.Table -> { flush(); table(b.table) }

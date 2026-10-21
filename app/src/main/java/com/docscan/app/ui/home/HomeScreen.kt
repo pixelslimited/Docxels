@@ -9,6 +9,9 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -78,6 +81,13 @@ fun HomeScreen(
     onSettings: () -> Unit,
 ) {
     val t = DocxelsTheme.tints
+    val container = com.docscan.app.LocalContainer.current
+    val session by container.cloud.session.collectAsState()
+    val plan by container.cloud.planState.collectAsState()
+    val exporting by container.exportStatus.state.collectAsState()
+    var accountOpen by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(session?.email, accountOpen) { container.cloud.refreshPlan() }
+    if (accountOpen) com.docscan.app.ui.cloud.AccountDialog(container.cloud) { accountOpen = false }
     var editingName by remember { mutableStateOf(false) }
     if (editingName) {
         TextInputDialog("Your name", name, "Save", { onName(it); editingName = false }, { editingName = false }, allowBlank = true, maxLength = 30)
@@ -100,8 +110,14 @@ fun HomeScreen(
                     modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClickLabel = "Change your name") { editingName = true },
                 )
             }
-            Box(Modifier.height(48.dp).clip(CircleShape).background(Color(0xFFFFF0C2)).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
-                Text("Free", fontWeight = FontWeight.Bold, color = Color(0xFF6B4E00))
+            Row(
+                Modifier.height(48.dp).clip(CircleShape).background(Color(0xFFFFF0C2))
+                    .clickable(role = Role.Button, onClickLabel = "Account and plan") { accountOpen = true }
+                    .padding(horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (plan?.pro == true) Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF6B4E00), modifier = Modifier.size(18.dp).padding(end = 4.dp))
+                Text(if (plan?.pro == true) "Pro" else "Free", fontWeight = FontWeight.Bold, color = Color(0xFF6B4E00))
             }
             Box(
                 Modifier.padding(start = 10.dp).size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerLowest)
@@ -129,7 +145,7 @@ fun HomeScreen(
 
         // The latest document, big, with one tap to carry on.
         items.firstOrNull()?.let { last ->
-            ContinueCard(last, onClick = { onOpen(last) })
+            ContinueCard(last, exporting?.takeIf { it.key == com.docscan.app.data.LibraryMeta.key(last.kind, last.id) }, onClick = { onOpen(last) })
             Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 QuickAction(Icons.Default.NoteAdd, "New doc", Modifier.weight(1f), actions.newDoc)
                 QuickAction(Icons.Default.ReceiptLong, "Invoice", Modifier.weight(1f), actions.newInvoice)
@@ -244,20 +260,32 @@ private fun greeting(): String {
 
 /** The most recent document as a large card: a little page, its title and details, and a button to carry on. */
 @Composable
-private fun ContinueCard(item: LibraryItem, onClick: () -> Unit) {
+private fun ContinueCard(item: LibraryItem, export: com.docscan.app.export.ExportStatus.State?, onClick: () -> Unit) {
     val sheets = rememberSheetsState()
     Column(
         Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(DocxelsTheme.brand.gradient).sheetsTouch(sheets).padding(20.dp),
     ) {
         Text("CONTINUE WHERE YOU STOPPED", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelLarge, letterSpacing = 1.sp)
         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            FloatingSheets(sheets)
+            CardThumb(item, sheets)
             Column(Modifier.padding(start = 16.dp).weight(1f)) {
                 Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 2)
                 Text(
-                    "Edited ${friendlyDate(item.modified).replaceFirstChar { it.lowercase() }} · ${item.detail}",
+                    "Edited ${friendlyDate(item.modified).replaceFirstChar { it.lowercase() }} · " +
+                        (if (item.meta.lastPage > 0 && item.meta.pageTotal > 0) "Page ${item.meta.lastPage.coerceAtMost(item.meta.pageTotal)} of ${item.meta.pageTotal}" else item.detail),
                     color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, modifier = Modifier.padding(top = 4.dp),
                 )
+                if (export != null) Row(
+                    Modifier.padding(top = 10.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)).padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (export.fraction == null) androidx.compose.material3.CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                    else androidx.compose.material3.CircularProgressIndicator(progress = { export.fraction }, modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                    Text(
+                        export.label + (export.fraction?.let { " · ${(it * 100).toInt()}%" } ?: "…"),
+                        color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
             }
         }
         Row(
@@ -282,4 +310,28 @@ private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier, on
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
         Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
+}
+
+/** A real picture of the document's first page for scans and PDFs; Word documents keep the little animated page. */
+@Composable
+private fun CardThumb(item: LibraryItem, sheets: com.docscan.app.ui.home.SheetsState) {
+    val container = com.docscan.app.LocalContainer.current
+    val bmp by androidx.compose.runtime.produceState<android.graphics.Bitmap?>(null, item.id, item.modified) {
+        value = when (item.kind) {
+            com.docscan.app.data.DocKind.SCAN -> item.cover?.let { runCatching { container.renderer.thumbnail(it) }.getOrNull() }
+            com.docscan.app.data.DocKind.PDF -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val f = container.pdfs.open(item.id) ?: return@runCatching null
+                    try { com.docscan.app.pdf.PdfPreview(f).use { it.render(0, 360) } } finally { f.delete() }
+                }.getOrNull()
+            }
+            else -> null
+        }
+    }
+    val b = bmp
+    if (b == null) FloatingSheets(sheets)
+    else Image(
+        b.asImageBitmap(), contentDescription = "First page of ${item.title}", contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        modifier = Modifier.size(width = 84.dp, height = 112.dp).clip(RoundedCornerShape(10.dp)).background(Color.White),
+    )
 }

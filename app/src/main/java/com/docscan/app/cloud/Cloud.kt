@@ -36,7 +36,16 @@ class Cloud(context: Context) {
     private val _session = MutableStateFlow<Session?>(null)
     val session: StateFlow<Session?> = _session
 
+    private val _plan = MutableStateFlow<Plan?>(null)
+    /** Last known plan of the signed-in person (null when signed out or not yet checked). */
+    val planState: StateFlow<Plan?> = _plan
+
     init { _session.value = load() }
+
+    suspend fun refreshPlan() {
+        if (_session.value == null) { _plan.value = null; return }
+        runCatching { plan() }.onSuccess { _plan.value = it }
+    }
 
     private fun load(): Session? = runCatching {
         val j = JSONObject(SecureFiles.read(file)!!.toString(Charsets.UTF_8))

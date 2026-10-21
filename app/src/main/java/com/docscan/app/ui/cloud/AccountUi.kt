@@ -42,7 +42,7 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
 
     LaunchedEffect(session?.email) {
         plan = null
-        if (session != null) runCatching { cloud.plan() }.onSuccess { plan = it }
+        if (session != null) runCatching { cloud.plan() }.onSuccess { plan = it; cloud.refreshPlan() }
     }
 
     fun run(block: suspend () -> Unit) {

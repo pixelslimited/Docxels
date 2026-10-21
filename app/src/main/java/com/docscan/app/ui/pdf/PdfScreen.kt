@@ -94,6 +94,7 @@ import com.docscan.app.ui.kit.docCard
 import com.docscan.app.ui.theme.DocxelsTheme
 import java.io.File
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.setValue
 
 enum class PdfMode(val route: String, val title: String, val hint: String, val many: Boolean) {
@@ -180,7 +181,13 @@ fun PdfScreen(vm: PdfViewModel, startMode: PdfMode, onBack: () -> Unit, autoPick
         Box(Modifier.padding(padding).fillMaxSize()) {
             if (mode == PdfMode.VIEW) {
                 val src = sources.firstOrNull()
-                if (src == null) EmptyPick(mode, pick) else PdfPages(src.file)
+                if (src == null) EmptyPick(mode, pick) else {
+                    val container = com.docscan.app.LocalContainer.current
+                    val start = remember(storedId) { storedId?.let { container.libraryMeta.get(com.docscan.app.data.DocKind.PDF, it).lastPage } ?: 0 }
+                    PdfPages(src.file, (start - 1).coerceAtLeast(0)) { page, total ->
+                        storedId?.let { id -> container.libraryMeta.update(com.docscan.app.data.DocKind.PDF, id) { it.copy(lastPage = page, pageTotal = total) } }
+                    }
+                }
             } else {
                 Column(Modifier.fillMaxSize()) {
                     Text(mode.hint, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
@@ -453,15 +460,18 @@ private fun PageThumbnail(preview: PdfPreview, index: Int, modifier: Modifier) {
 
 /** Scrollable reader: pages are drawn as the user reaches them and dropped when far away. */
 @Composable
-private fun PdfPages(file: File) {
+private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total: Int) -> Unit = { _, _ -> }) {
     val preview = remember(file.path) { runCatching { PdfPreview(file) }.getOrNull() }
     DisposableEffect(preview) { onDispose { preview?.close() } }
     if (preview == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("This PDF could not be displayed.") }
         return
     }
-    val state = rememberLazyListState()
     val count = preview.pageCount
+    val state = rememberLazyListState(initialFirstVisibleItemIndex = startIndex.coerceIn(0, (count - 1).coerceAtLeast(0)))
+    androidx.compose.runtime.LaunchedEffect(state, count) {
+        androidx.compose.runtime.snapshotFlow { state.firstVisibleItemIndex }.collectLatest { i -> kotlinx.coroutines.delay(800); onPage(i + 1, count) }
+    }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
         BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
             val widthPx = with(LocalDensity.current) { maxWidth.toPx() }.toInt()
