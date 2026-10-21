@@ -130,3 +130,4 @@ Review → Check spelling underlines misspelled words using your phone's spell c
 Home now has a Clipboard group: Paste, Paste as plain text, Cut, Copy, Select all.
 Page setup: headers and footers can have several lines, be left, centred or right, and show "Page X of Y". They carry through to PDF and Word.
 The quick tool bar above the keyboard now has Paste and a Clipboard menu (Copy, Cut, Paste as plain text, Select all). The bar scrolls sideways to fit them.
+The quick tool bar no longer has the Insert button (Insert is still in the tools menu); Paste comes first.

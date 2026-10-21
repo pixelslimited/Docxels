@@ -1154,7 +1154,6 @@ private fun Ribbon(
                             .horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Q(Icons.Default.Add, "Insert", fixed = true) { onTab(1); open = true; grid = true }
                         Q(Icons.Default.ContentPaste, "Paste", fixed = true) { c.clipboard(android.R.id.paste) }
                         Box(Modifier.width(40.dp)) {
                             Row(Modifier.fillMaxWidth()) { Q(Icons.Default.ContentCopy, "Clipboard", fixed = true) { clipMenu = true } }
