@@ -198,6 +198,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var pageHost by remember { mutableStateOf<PageHost?>(null) }
     // The floating quick tools: shown after scrolling up a little, a tap on the page or a selection; hidden when scrolling down.
     val snackbar = remember { SnackbarHostState() }
+    var myStylesOpen by remember { mutableStateOf(false) }
     var quick by remember { mutableStateOf(false) }
     // The table (block, row, column) being typed in, so the floating tools offer table actions.
     var tableCtx by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
@@ -572,7 +573,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     caseMenu = caseMenu,
                     onCaseMenu = { caseMenu = it },
                     painting = painter != null,
-                    onPainter = {
+                    onMyStyles = { myStylesOpen = true },
+                onPainter = {
                         val held = painter
                         if (held == null) painter = controller.captureFormat() else { controller.applyFormat(held); painter = null }
                     },
@@ -708,6 +710,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         )
     }
     if (findOpen) FindDialog(controller, onClose = { findOpen = false })
+    if (myStylesOpen) MyStylesDialog(controller, onClose = { myStylesOpen = false })
     if (pageOpen) PageSetupDialog(page, onApply = { page = it; pageOpen = false }, onDismiss = { pageOpen = false })
     if (fontOpen) FontPickerDialog(
         current = state.font, recent = recentFonts.toList(),
@@ -815,6 +818,7 @@ private fun Ribbon(
     onCaseMenu: (Boolean) -> Unit,
     painting: Boolean,
     onPainter: () -> Unit,
+    onMyStyles: () -> Unit,
     openState: androidx.compose.runtime.MutableState<Boolean>,
     modifier: Modifier = Modifier,
     quick: Boolean = true,
@@ -1094,6 +1098,7 @@ private fun Ribbon(
                             }
                         }
                         ParaStyle.entries.forEach { st -> Btn(st.label, glyph = "Aa", on = s.style == st, main = false) { c.setStyle(st) } }
+                        Btn("My styles", Icons.Default.Title, close = true, main = false) { onMyStyles() }
                         Group("Clear")
                         Btn("Clear formatting", Icons.Default.FormatClear, main = false) { c.clearFormatting() }
                         Btn("Clear colour", Icons.Default.FormatColorText, main = false) { c.remove(CharKind.COLOR) }

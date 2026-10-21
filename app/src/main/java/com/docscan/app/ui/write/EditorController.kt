@@ -1285,6 +1285,22 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
         changed()
     }
 
+    /** Applies saved formatting to the selection, or to the whole paragraph when nothing is selected. */
+    fun applySaved(f: List<CharAttr>) {
+        if (view == null) return
+        val t = text
+        var (a, b) = selection
+        if (a == b) {
+            val r = RichOps.paragraphAt(t, a)
+            a = r.start
+            b = r.end
+        }
+        if (a >= b) return
+        RichOps.clearAll(t, a, b)
+        f.forEach { RichOps.set(t, a, b, it) }
+        changed()
+    }
+
     // -- Phase 1 additions: font, size, case, paragraph dialog, insert text, navigation, statistics --
 
     fun setFont(name: String?) {

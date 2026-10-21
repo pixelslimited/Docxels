@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -224,5 +225,50 @@ internal fun CommentsDialog(controller: EditorController, onDismiss: () -> Unit)
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
+}
+
+
+/** Save the formatting at the cursor under a name, and apply saved formatting to the selection or paragraph. */
+@Composable
+internal fun MyStylesDialog(c: EditorController, onClose: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var styles by remember { mutableStateOf(MyStyles.load(context)) }
+    var naming by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    fun store(list: List<MyStyles.Style>) { styles = list; MyStyles.save(context, list) }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("My styles") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "Format some text the way you like, put the cursor in it, then save that look under a name. Apply it to selected text or the paragraph the cursor is in.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (styles.isEmpty()) Text("Nothing saved yet.", style = MaterialTheme.typography.bodyMedium)
+                styles.forEach { st ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { c.applySaved(st.attrs); onClose() }, modifier = Modifier.weight(1f)) {
+                            Text(st.name, modifier = Modifier.fillMaxWidth())
+                        }
+                        TextButton(onClick = { store(styles - st) }) { Text("Delete") }
+                    }
+                }
+                if (naming) {
+                    OutlinedTextField(name, { name = it.take(40) }, singleLine = true, label = { Text("Name for this look") })
+                    TextButton(
+                        enabled = name.isNotBlank(),
+                        onClick = {
+                            val look = c.captureFormat()
+                            store(styles.filter { it.name != name.trim() } + MyStyles.Style(name.trim(), look))
+                            naming = false
+                            name = ""
+                        },
+                    ) { Text("Save") }
+                } else TextButton(onClick = { naming = true }) { Text("Save the formatting at the cursor…") }
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text("Close") } },
     )
 }

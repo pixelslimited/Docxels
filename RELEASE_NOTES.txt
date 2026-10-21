@@ -101,3 +101,4 @@
 222|Invoices: type straight onto the invoice page; amounts, subtotal, discount, tax, total and the amount in words are worked out as you type.
 223|The quick tools now float over the page like a floating button: only the pixel D shows while you read or scroll down; scroll up a little, tap the page or select text and the tools appear. Inside a table cell they become table tools (options, add row, add column, delete row, delete table).
 224|Fonts: text with no font named (Calibri by default) now shows in Carlito, the Calibri look-alike built into Docxels, in the editor, page preview, PDF and table cells, with real bold and italic. Before, it showed in the phone's own font.
+225|My styles: save the formatting at the cursor (font, size, bold, italic, colours) under a name, then apply it to selected text or a whole paragraph (Home, Style).
