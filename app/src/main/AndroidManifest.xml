@@ -4,6 +4,10 @@
 
     <!-- Only permission needed: live camera. Gallery import uses the system photo picker (no permission),
          and saving uses MediaStore (no storage permission on Android 10+). -->
+    <!-- Lets Read aloud find the phone's speech engine (Android 11+ hides other apps unless asked for). -->
+    <queries>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+    </queries>
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Optional "All files access": lets Documents search list PDF/Word/text files anywhere on the phone while typing.
          The person turns it on themselves in Settings; everything else works without it. -->

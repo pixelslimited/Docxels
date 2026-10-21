@@ -41,6 +41,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.material.icons.filled.ArrowDropDownCircle
 import androidx.compose.material.icons.filled.CheckBox
@@ -232,6 +235,14 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var pageHost by remember { mutableStateOf<PageHost?>(null) }
     // The floating quick tools: shown after scrolling up a little, a tap on the page or a selection; hidden when scrolling down.
     val snackbar = remember { SnackbarHostState() }
+    // Dictate: the phone's own speech recogniser types what is said at the cursor. Read aloud: its own voice speaks the text.
+    val speech = remember { ReadAloud(context) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { speech.shutdown() } }
+    androidx.compose.runtime.LaunchedEffect(speech) { speech.onProblem = { m -> scope.launch { snackbar.showSnackbar(m) } } }
+    val dictate = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.takeIf { it.isNotBlank() }
+            ?.let { controller.insertText(it.trim() + " ") }
+    }
     var myStylesOpen by remember { mutableStateOf(false) }
     var quick by remember { mutableStateOf(false) }
     // The table (block, row, column) being typed in, so the floating tools offer table actions.
@@ -663,6 +674,19 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                     onAssistant = { assistantOpen = true },
                     onCount = { statsOpen = true },
                     onMailMerge = { mergeOpen = true },
+                    onDictate = {
+                        val i = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak now")
+                        runCatching { dictate.launch(i) }.onFailure { scope.launch { snackbar.showSnackbar("This phone has no speech recogniser. Install or enable Google voice typing in Android settings.") } }
+                    },
+                    onReadAloud = {
+                        if (speech.speaking) speech.stop() else {
+                            val t = controller.assistantScope().text
+                            if (t.isBlank()) scope.launch { snackbar.showSnackbar("There is nothing to read yet.") } else speech.speak(t)
+                        }
+                    },
+                    readingAloud = speech.speaking,
                     onSpelling = {
                         scope.launch {
                             val sc = controller.assistantScope()
@@ -1013,6 +1037,9 @@ private fun Ribbon(
     onCount: () -> Unit,
     onMailMerge: () -> Unit,
     onSpelling: () -> Unit,
+    onDictate: () -> Unit,
+    onReadAloud: () -> Unit,
+    readingAloud: Boolean,
     onFont: () -> Unit,
     onSize: () -> Unit,
     onParagraph: () -> Unit,
@@ -1116,6 +1143,8 @@ private fun Ribbon(
         cmd("Mail merge", "Review", "letters recipients list fields excel csv personalised") { onMailMerge() }
         cmd("Find and replace", "Review", "search") { onFind() }
         cmd("Check spelling", "Review · Proofing", "spell mistakes typo") { onSpelling() }
+        cmd("Dictate", "Review · Speech", "speak voice type microphone") { onDictate() }
+        cmd(if (readingAloud) "Stop reading aloud" else "Read aloud", "Review · Speech", "listen speak voice") { onReadAloud() }
         cmd("Assistant", "Review", "ai rewrite summarise grammar translate") { onAssistant() }
         cmd("Word count", "Review · Proofing", "statistics characters pages") { onCount() }
         cmd("Comments", "Review", "notes") { onComments() }
@@ -1487,6 +1516,9 @@ private fun Ribbon(
                         Group("Proofing")
                         Btn("Check spelling", Icons.Default.Spellcheck, close = true) { onSpelling() }
                         Btn("Word count", Icons.Default.Numbers, close = true) { onCount() }
+                        Group("Speech")
+                        Btn("Dictate", Icons.Default.Mic, close = true) { onDictate() }
+                        Btn(if (readingAloud) "Stop reading" else "Read aloud", if (readingAloud) Icons.Default.Stop else Icons.Default.RecordVoiceOver, close = true) { onReadAloud() }
                         Group("Comments")
                         Btn("New comment", Icons.Default.Add, close = true) { onNewComment() }
                         Btn("Comments", Icons.Default.Menu, close = true) { onComments() }
