@@ -49,7 +49,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Page size, orientation, margins, header / footer, page numbers | 3 | IMPLEMENTED — NOT VERIFIED | ui/write | Dialog; shown live in the Print layout view |
 | Page breaks, print-layout (page) view, pagination | 3 | IMPLEMENTED — NOT VERIFIED | ui/write/PageHost, EditorController, RichEditText | Three views: Print layout (whole sheet fits the screen width, true margins), Text width, Mobile. Page ends are drawn as dashed guides using the same line-by-line rule as the PDF export. Header shown once at the top and footer / last page number once at the bottom (the PDF prints them on every page). Pictures and tables are drawn inline from an estimate of their size; the real size is known only after export. Not verified on a phone; scale-by-density relies on TextPaint.density |
 | Ribbon toolbar (Home / Insert / Layout / Review / View) | 2 | IMPLEMENTED — NOT VERIFIED | ui/write/WordEditorScreen | |
-| Hyperlinks, footnotes, columns, shapes, text boxes, table of contents | 3 | PARTIAL | | Hyperlinks (TESTED, LinkTest), shapes and footnote text (kept as a Notes list) exist. Columns, text boxes, TOC not started. |
+| Hyperlinks, footnotes, columns, shapes, text boxes, table of contents | 3 | PARTIAL | | Hyperlinks (TESTED, LinkTest), shapes and footnote text (kept as a Notes list) exist. Text boxes, columns (saved and read, not laid out on screen) and the table of contents exist; see the later rows. |
 | Find & replace, word / character count, undo / redo | 3 | IMPLEMENTED — NOT VERIFIED | ui/write | |
 | Templates (letter, report, CV, invoice, memo, minutes) | 4 | IMPLEMENTED — NOT VERIFIED | core/word/Templates, Tools > Templates | Round-trip through .docx tested (TemplatesTest). |
 | Export to PDF / TXT / RTF from editor | 3 | IMPLEMENTED — NOT VERIFIED | export/WordPdf | Justified text is justified in the PDF (not yet compared on a device). Left-signature position differs from the workspace in one user document — cause not found yet; needs that .docx. |
@@ -133,7 +133,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Feature | Status | Notes |
 |---|---|---|
 | Settings > App updates: check, download, verify SHA-256, install | IMPLEMENTED — NOT VERIFIED | `update/Updater.kt`. Parsing and host allow-list tested (`UpdateInfoTest`). Install flow needs a phone. Adds INTERNET + REQUEST_INSTALL_PACKAGES; CI now only checks networking code stays inside `update/`. Privacy policy updated. |
-| Automatic publishing of each build to the update feed | BLOCKED | Needs repo secret `SITE_TOKEN`; until then `scripts/publish-update.sh` is run manually. |
+| Automatic publishing of each build to the update feed | IMPLEMENTED — TESTED IN CI | The publish step runs after each green build using the SITE_TOKEN secret; builds appear in Settings → App updates. |
 
 ## Security hardening (added)
 | Feature | Status | Notes |
@@ -237,7 +237,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Ribbon: status on the closed row, all paragraph tools under Home > Paragraph, group labels styled apart | IMPLEMENTED — NOT VERIFIED | Not seen on a device. |
 | Settings in three tabs (Resources / App settings / About with Pixels logo and sites) | IMPLEMENTED — NOT VERIFIED | Company site pixelslimited.ng is an assumption; please confirm. |
 | New table editor dialog (sections, cell picker, merge/split, rows/columns, styles) | IMPLEMENTED — NOT VERIFIED | Compiles in CI only; not used on a device. |
-| Invoice engine: Printed, Online, Minimal styles, amount in words | PARTIAL | Engine and unit tests exist; the form to fill it in and the template entry are NOT built yet. |
+| Invoice engine: Printed, Online, Minimal styles, amount in words | IMPLEMENTED — NOT VERIFIED | Engine has unit tests; the form is now a page you type onto with live totals and amount in words (see the row below). |
 | Floating dock bottom navigation (sliding bead, drag to switch) | IMPLEMENTED — NOT VERIFIED | Modelled on the reel you linked. Not seen on a device. |
 | Code quality scan on every build (scripts/code-review.py, CODE_REVIEW.md) | DONE | Runs in CI and prints into the run summary. |
 | Document-first Home, no floating scan button, Back returns to Home | IMPLEMENTED — NOT VERIFIED | Not seen on a device. |
