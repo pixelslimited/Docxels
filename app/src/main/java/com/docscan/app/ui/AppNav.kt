@@ -71,7 +71,7 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 key = "pdf-${mode.route}",
                 factory = viewModelFactory { initializer { PdfViewModel(container, context.applicationContext) } },
             )
-            PdfScreen(vm = vm, mode = mode, onBack = { nav.popBackStack() })
+            PdfScreen(vm = vm, mode = mode, onBack = { nav.popBackStack() }, onOpenWord = { id -> nav.navigate("write/$id") })
         }
         composable(PDFDOC) { entry ->
             val id = entry.arguments?.getString("id") ?: return@composable
@@ -81,7 +81,7 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 factory = viewModelFactory { initializer { PdfViewModel(container, context.applicationContext) } },
             )
             androidx.compose.runtime.LaunchedEffect(id) { vm.openStored(id) }
-            PdfScreen(vm = vm, mode = PdfMode.VIEW, onBack = { nav.popBackStack() }, autoPick = false, storedId = id)
+            PdfScreen(vm = vm, mode = PdfMode.VIEW, onBack = { nav.popBackStack() }, autoPick = false, storedId = id, onOpenWord = { wid -> nav.navigate("write/$wid") })
         }
         composable(REVIEW) {
             val review = container.pendingReview

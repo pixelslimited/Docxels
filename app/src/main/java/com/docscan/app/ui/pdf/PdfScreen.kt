@@ -35,6 +35,9 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Save
@@ -100,7 +103,11 @@ enum class PdfMode(val route: String, val title: String, val hint: String, val m
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit, autoPick: Boolean = true, storedId: String? = null) {
+fun PdfScreen(vm: PdfViewModel, mode startMode: PdfMode, onBack: () -> Unit, autoPick: Boolean = true, storedId: String? = null, onOpenWord: (String) -> Unit = {}) {
+    var editing by remember { mutableStateOf(false) }
+    val mode = if (editing) PdfMode.SIGN else startMode
+    androidx.activity.compose.BackHandler(enabled = editing) { editing = false }
+    var menuOpen by remember { mutableStateOf(false) }
     val sources by vm.sources.collectAsState()
     val results by vm.results.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -130,20 +137,32 @@ fun PdfScreen(vm: PdfViewModel, mode: PdfMode, onBack: () -> Unit, autoPick: Boo
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text(mode.title) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                title = { Text(if (editing) "Edit PDF" else mode.title) },
+                navigationIcon = { IconButton(onClick = { if (editing) editing = false else onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
-                    if (mode == PdfMode.VIEW && sources.isNotEmpty()) {
+                    if (startMode == PdfMode.VIEW && !editing && sources.isNotEmpty()) {
                         val ctx = androidx.compose.ui.platform.LocalContext.current
-                        IconButton(onClick = { com.docscan.app.export.PrintHelper.printPdf(ctx, sources[0].file, sources[0].name) }) { Icon(Icons.Default.Print, "Print") }
-                        if (storedId == null) {
-                            IconButton(onClick = { vm.saveToLibrary(sources[0].file, sources[0].name) }) { Icon(Icons.Default.Save, "Save in Docxels") }
-                        }
                         val viewSaveAs = com.docscan.app.export.SaveAs.rememberSaveAs { vm.say(it) }
-                        IconButton(onClick = { viewSaveAs(listOf(sources[0].file)) }) { Icon(Icons.Default.SaveAlt, "Save as") }
-                        IconButton(onClick = { vm.share(listOf(sources[0].file)) }) { Icon(Icons.Default.Share, "Share") }
+                        val src0 = sources[0]
+                        androidx.compose.material3.FilledTonalButton(onClick = { editing = true }) {
+                            Icon(Icons.Default.Edit, null, Modifier.size(18.dp)); Text("Edit PDF", Modifier.padding(start = 6.dp))
+                        }
+                        Box {
+                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "File actions") }
+                            androidx.compose.material3.DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                @Composable fun item(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, run: () -> Unit) =
+                                    androidx.compose.material3.DropdownMenuItem(text = { Text(label) }, leadingIcon = { Icon(icon, null) }, onClick = { menuOpen = false; run() })
+                                item("Convert to Word", Icons.Default.Description) { vm.convertToWord(src0.file, src0.name, onOpenWord) }
+                                item("Print", Icons.Default.Print) { com.docscan.app.export.PrintHelper.printPdf(ctx, src0.file, src0.name) }
+                                if (storedId == null) item("Save in Docxels", Icons.Default.Save) { vm.saveToLibrary(src0.file, src0.name) }
+                                item("Save as…", Icons.Default.SaveAlt) { viewSaveAs(listOf(src0.file)) }
+                                item("Share", Icons.Default.Share) { vm.share(listOf(src0.file)) }
+                                item("Choose another PDF", Icons.Default.FolderOpen) { pick() }
+                            }
+                        }
+                    } else if (!editing) {
+                        IconButton(onClick = pick) { Icon(Icons.Default.FolderOpen, "Choose PDF") }
                     }
-                    IconButton(onClick = pick) { Icon(Icons.Default.FolderOpen, "Choose PDF") }
                 },
             )
         },

@@ -46,6 +46,27 @@ class PdfViewModel(private val container: AppContainer, appContext: Context) : V
     fun messageShown() { _message.value = null }
     fun say(text: String) { _message.value = text }
 
+    /** Converts the open PDF to an editable Word document and hands its id to [onDone] so the editor opens. */
+    fun convertToWord(file: File, name: String, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            _busy.value = "Converting to Word…"
+            runCatching {
+                val conv = container.pdfToWord.convert(file, name.removeSuffix(".pdf").removeSuffix(".PDF"),
+                    { p, total -> _busy.value = "Converting page $p of $total…" }, { t -> _busy.value = t })
+                val id = withContext(Dispatchers.IO) { container.words.add(conv.doc) }
+                conv to id
+            }.onSuccess { (conv, id) ->
+                _busy.value = null
+                if (conv.notes.isNotEmpty()) _message.value = conv.notes.joinToString(" ")
+                onDone(id)
+            }.onFailure {
+                _busy.value = null
+                _message.value = if (it is PdfPasswordException) "This PDF is password protected. Remove the password first, then convert it."
+                else it.message?.takeIf { m -> m.length < 120 } ?: "Could not convert that PDF."
+            }
+        }
+    }
+
     private fun displayName(uri: Uri): String {
         val raw = runCatching {
             context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
