@@ -487,6 +487,13 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
     var searchNote by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     val jumpScope = androidx.compose.runtime.rememberCoroutineScope()
+    val ocrEngine = com.docscan.app.LocalContainer.current.ocr
+    val scanned = remember(preview) { com.docscan.app.pdf.ScannedText(preview, ocrEngine) }
+    // Text pages are searched through their text layer; pages without one (scans) are read with the phone's text recogniser.
+    suspend fun findAny(i: Int, q: String): List<PdfPhones.Box> {
+        val hits = phones.find(i, q)
+        return if (hits.isNotEmpty() || phones.hasText(i)) hits else scanned.find(i, q)
+    }
     fun runSearch(forward: Boolean) {
         val q = query.trim()
         if (q.isEmpty() || searching) return
@@ -499,14 +506,15 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
             var hit = -1
             for (k in 1..count) {
                 val idx = Math.floorMod(base + if (forward) k else -k, count)
-                if (phones.find(idx, q).isNotEmpty()) { hit = idx; break }
+                searchNote = "Searching page ${idx + 1} of $count…"
+                if (findAny(idx, q).isNotEmpty()) { hit = idx; break }
             }
             if (hit >= 0) {
                 lastHit = hit
                 state.scrollToItem(hit)
                 searchNote = "Page ${hit + 1} of $count"
             } else {
-                searchNote = "Not found. Scanned pages have no text to search."
+                searchNote = "Not found."
             }
             searching = false
         }
@@ -553,7 +561,7 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                     val bmp by produceState<Bitmap?>(null, preview, i, renderScale) { value = runCatching { preview.render(i, widthPx * renderScale) }.getOrNull() }
                     val ratio by produceState(0.707f, preview, i) { value = runCatching { preview.pageSize(i).let { it.first.toFloat() / it.second } }.getOrDefault(0.707f) }
                     val numbers by produceState<List<PdfPhones.Box>>(emptyList(), phones, i) { value = phones.page(i) }
-                    val marks by produceState<List<PdfPhones.Box>>(emptyList(), phones, i, active) { value = if (active.isBlank()) emptyList() else phones.find(i, active) }
+                    val marks by produceState<List<PdfPhones.Box>>(emptyList(), phones, i, active) { value = if (active.isBlank()) emptyList() else findAny(i, active) }
                     BoxWithConstraints(
                         Modifier.requiredWidth(maxWidth * zoom - 24.dp * zoom).offset { androidx.compose.ui.unit.IntOffset(panX.toInt(), 0) }
                             .aspectRatio(ratio).background(if (night) Color.Black else Color.White),

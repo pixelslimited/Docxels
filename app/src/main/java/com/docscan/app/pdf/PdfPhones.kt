@@ -72,6 +72,25 @@ class PdfPhones(private val context: Context, private val file: File) : AutoClos
         return out
     }
 
+    private val textPages = HashMap<Int, Boolean>()
+
+    /** True when the page has a text layer (a scanned page has none). */
+    suspend fun hasText(index: Int): Boolean = lock.withLock {
+        textPages[index]?.let { return@withLock it }
+        val has = withContext(Dispatchers.IO) {
+            runCatching {
+                val d = open() ?: return@runCatching false
+                if (index !in 0 until d.numberOfPages) return@runCatching false
+                val s = PDFTextStripper()
+                s.startPage = index + 1
+                s.endPage = index + 1
+                s.getText(d).any { !it.isWhitespace() }
+            }.getOrDefault(false)
+        }
+        textPages[index] = has
+        has
+    }
+
     private val searchCache = HashMap<String, List<Box>>()
 
     /** Where [query] (case-insensitive) appears on page [index]; empty when the page has no text layer (scans). */

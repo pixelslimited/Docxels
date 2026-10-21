@@ -391,7 +391,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     }
     var signPad by remember { mutableStateOf(false) }
 
-    fun saveNow() = vm.save(controller.toDoc(title, page))
+    var unsaved by remember { mutableStateOf(false) }
+    fun saveNow() { unsaved = false; vm.save(controller.toDoc(title, page)) }
     val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { msg -> scope.launch { snackbar.showSnackbar(msg) } }
     fun saveAsFile(make: suspend (WordDoc) -> java.io.File) {
         val d = controller.toDoc(title, page)
@@ -400,11 +401,19 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         }
     }
 
-    controller.onChanged = { tick++ }
+    controller.onChanged = { tick++; unsaved = true }
     LaunchedEffect(tick, title, page) {
         if (tick > 0 || title != initial.title || page != initial.page) {
+            unsaved = true
             delay(1500)
             saveNow()
+        }
+    }
+    // The save above waits for a pause in typing; this one makes sure a long unbroken stretch is still saved every 15 seconds.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(15_000)
+            if (unsaved) saveNow()
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { saveNow() }
@@ -643,7 +652,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                     openState = ribbonOpen,
                     c = controller,
                     s = state,
-                    status = status,
+                    status = status + if (unsaved) "  ·  Saving…" else "  ·  Saved",
                     onStatus = { statsOpen = true },
                     tab = ribbonTab,
                     onTab = { ribbonTab = it },
