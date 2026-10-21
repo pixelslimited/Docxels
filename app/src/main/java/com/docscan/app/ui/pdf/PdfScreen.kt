@@ -103,7 +103,7 @@ enum class PdfMode(val route: String, val title: String, val hint: String, val m
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PdfScreen(vm: PdfViewModel, mode startMode: PdfMode, onBack: () -> Unit, autoPick: Boolean = true, storedId: String? = null, onOpenWord: (String) -> Unit = {}) {
+fun PdfScreen(vm: PdfViewModel, startMode: PdfMode, onBack: () -> Unit, autoPick: Boolean = true, storedId: String? = null, onOpenWord: (String) -> Unit = {}) {
     var editing by remember { mutableStateOf(false) }
     val mode = if (editing) PdfMode.SIGN else startMode
     androidx.activity.compose.BackHandler(enabled = editing) { editing = false }
