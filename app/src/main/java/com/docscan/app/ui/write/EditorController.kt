@@ -61,7 +61,8 @@ class PageDecor(
  * metrics it already enlarged (two spans changing the same line cannot do that reliably).
  */
 class PageGapSpan {
-    var starts: Set<Int> = emptySet()
+    /** Text offset of each page's first line -> extra blank px above its gap (fills the sheet before it after a hard page break). */
+    var starts: Map<Int, Int> = emptyMap()
     var gapPx = 0
 }
 
@@ -101,7 +102,7 @@ class RichEditText(context: Context) : EditText(context) {
     private fun syncGap() {
         val d = decor
         val want = d?.pageGapPx?.toInt() ?: 0
-        if (gapSpan.gapPx != want) { gapSpan.gapPx = want; gapSpan.starts = emptySet() }
+        if (gapSpan.gapPx != want) { gapSpan.gapPx = want; gapSpan.starts = emptyMap() }
         if (d == null) return
         val e = text as? Editable ?: return
         if (e.getSpanStart(gapSpan) != 0 || e.getSpanEnd(gapSpan) != e.length) {
@@ -122,28 +123,30 @@ class RichEditText(context: Context) : EditText(context) {
         return t.getSpans(ls, ls + 1, BlockChipSpan::class.java).firstOrNull { it.isTable && !it.floating }
     }
 
-    private fun scanPages(): Pair<List<Float>, Set<Int>> {
-        val d = decor ?: return listOf(0f) to emptySet()
-        val l = layout ?: return listOf(0f) to emptySet()
+    private fun scanPages(): Pair<List<Float>, Map<Int, Int>> {
+        val d = decor ?: return listOf(0f) to emptyMap()
+        val l = layout ?: return listOf(0f) to emptyMap()
         val t = text
         val has = gapSpan.gapPx.toFloat()
         val full = d.pageGapPx
         val ys = arrayListOf(0f)
-        val set = LinkedHashSet<Int>()
+        val set = LinkedHashMap<Int, Int>()
         var pageStart = 0f
         var breakNext = false
         for (i in 0 until l.lineCount) {
             val ls = l.getLineStart(i)
             val top = l.getLineTop(i).toFloat()
             val bottom = l.getLineBottom(i).toFloat()
-            val g = if (ls in gapSpan.starts) has else 0f
+            val g = if (ls in gapSpan.starts) has + (gapSpan.starts[ls] ?: 0) else 0f
             // A table pages itself, row by row, like the PDF export; every other line moves whole.
             val table = tableChipAt(ls)
             val brk = i > 0 && (breakNext || (table == null && top > pageStart && (bottom - g) - pageStart > d.contentHeightPx + 0.5f))
             if (brk) {
-                ys += top
-                set += ls
-                pageStart = top + full
+                // After a hard page break the sheet is still a whole sheet: blank room fills it down to the bottom margin.
+                val fill = if (breakNext) Math.round(maxOf(0f, pageStart + d.contentHeightPx - top)).toFloat() else 0f
+                ys += top + fill
+                set[ls] = fill.toInt()
+                pageStart = top + fill + full
             }
             if (table != null) {
                 val startY = if (brk) 0f else (top - pageStart).coerceAtLeast(0f)
@@ -374,7 +377,7 @@ class RichEditText(context: Context) : EditText(context) {
             if (pageImg != null && dec != null) {
                 // Pinned to the sheet the anchor falls on, measured from that sheet's top-left corner.
                 val ys = pageStarts()
-                val lineTop = l.getLineTop(line).toFloat()
+                val lineTop = l.getLineBottom(line).toFloat() - 1f
                 val sheet = ys.indexOfLast { it <= lineTop }.coerceAtLeast(0)
                 val sheetTop = if (sheet == 0) 0f else totalPaddingTop + ys[sheet] + dec.bottomMarginPx + dec.deskGapPx
                 out += Hit(span, ox * k, sheetTop + oy * k, w.toFloat(), h.toFloat())
@@ -1442,8 +1445,8 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
         if (v.decor == null) return null
         val l = v.layout ?: return null
         val starts = v.pageStarts()
-        val y = l.getLineTop(l.getLineForOffset(selection.first.coerceIn(0, v.text.length))).toFloat()
-        val page = starts.indexOfLast { it <= y + 0.5f }.coerceAtLeast(0) + 1
+        val y = l.getLineBottom(l.getLineForOffset(selection.first.coerceIn(0, v.text.length))).toFloat() - 1f
+        val page = starts.indexOfLast { it <= y }.coerceAtLeast(0) + 1
         return page to starts.size
     }
 
