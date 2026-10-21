@@ -16,8 +16,8 @@ object NightPaper {
 
     private val values = floatArrayOf(
         0.574f * K, -1.430f * K, -0.144f * K, 0f, OFFSET,
-        -0.426f * K, 0.570f * K, -0.144f * K, 0f, OFFSET,
-        -0.426f * K, -1.430f * K, 1.856f * K, 0f, OFFSET,
+        -0.426f * K, -0.430f * K, -0.144f * K, 0f, OFFSET,
+        -0.426f * K, -1.430f * K, 0.856f * K, 0f, OFFSET,
         0f, 0f, 0f, 1f, 0f,
     )
 

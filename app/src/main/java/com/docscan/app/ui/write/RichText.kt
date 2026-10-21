@@ -926,8 +926,11 @@ class BlockChipSpan(
         val saved = paint.color
         val pad = paint.textSize * 0.3f
         val w = paint.measureText(label) + 4 * pad
+        // The line also carries the blank room between sheets; the label is only as tall as its text, on the baseline.
+        val labelTop = maxOf(top.toFloat(), y - paint.textSize * 1.2f)
+        val labelBottom = minOf(bottom.toFloat(), y + paint.textSize * 0.4f)
         paint.color = 0xFFE8EAF0.toInt()
-        c.drawRoundRect(x, top.toFloat() + pad, x + w, bottom.toFloat() - pad, pad, pad, paint)
+        c.drawRoundRect(x, labelTop, x + w, labelBottom, pad, pad, paint)
         paint.color = 0xFF444B5A.toInt()
         c.drawText(label, x + 2 * pad, y.toFloat(), paint)
         paint.color = saved

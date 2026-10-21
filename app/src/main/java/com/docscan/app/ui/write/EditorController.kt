@@ -161,21 +161,28 @@ class RichEditText(context: Context) : EditText(context) {
         val set = LinkedHashMap<Int, Int>()
         var pageStart = 0f
         var breakNext = false
+        // The layout still has the gaps of the previous pass. Positions are corrected by how far the gaps above a line
+        // are about to change, so one pass gives the final page starts (a page that ends early is filled down to the bottom
+        // margin, so every sheet is a whole sheet and its letterhead footer is not cut off).
+        var shift = 0f
         for (i in 0 until l.lineCount) {
             val ls = l.getLineStart(i)
-            val top = l.getLineTop(i).toFloat()
-            val bottom = l.getLineBottom(i).toFloat()
+            val top = l.getLineTop(i) + shift
+            val bottom = l.getLineBottom(i) + shift
             val g = if (ls in gapSpan.starts) has + (gapSpan.starts[ls] ?: 0) else 0f
             // A table pages itself, row by row, like the PDF export; every other line moves whole.
             val table = tableChipAt(ls)
             val brk = i > 0 && (breakNext || (table == null && top > pageStart && (bottom - g) - pageStart > d.contentHeightPx + 0.5f))
+            var newGap = 0f
             if (brk) {
-                // After a hard page break the sheet is still a whole sheet: blank room fills it down to the bottom margin.
-                val fill = if (breakNext) Math.round(maxOf(0f, pageStart + d.contentHeightPx - top)).toFloat() else 0f
+                val fill = Math.round(maxOf(0f, pageStart + d.contentHeightPx - top)).toFloat()
                 ys += top + fill
                 set[ls] = fill.toInt()
                 pageStart = top + fill + full
+                newGap = has + fill
             }
+            val gapChange = newGap - g
+            shift += gapChange
             if (table != null) {
                 val startY = if (brk) 0f else (top - pageStart).coerceAtLeast(0f)
                 if (kotlin.math.abs(table.startY - startY) > 0.5f || table.pageH != d.contentHeightPx || table.pageGap != full) {
@@ -185,7 +192,7 @@ class RichEditText(context: Context) : EditText(context) {
                     chipsDirty = true
                 }
                 table.paging(paint)?.let { plan ->
-                    val contentTop = l.getLineBaseline(i) - plan.height
+                    val contentTop = l.getLineBaseline(i) + shift - plan.height
                     for (b in plan.breaks) {
                         ys += contentTop + b.gapStart
                         pageStart = contentTop + b.gapStart + full

@@ -37,3 +37,6 @@
 *|FREE|Version history|In a Word document, More, Version history lists earlier copies (one every 10 minutes of editing, up to 10); tap one to open it as a separate document.
 *|FREE|Search scanned PDFs|PDF search now also reads pages that are pictures (scans) with the phone's own text recogniser, so it works on scanned documents too. Scanned pages are slower: each is read once.
 *|FIX|Autosave never waits too long|The Word editor now saves at least every 15 seconds while you type and shows Saving or Saved beside the word count.
+*|FIX|Dark paper is dark|Dark paper now shows black pages with light text instead of a blue tint.
+*|FIX|Letterhead no longer cut off|Every sheet is now a whole sheet, so the footer band of the letterhead shows at the bottom of each page in the editor, preview and PDF.
+*|FIX|Shorter, grouped menu|The editor menu is now grouped: Save as, Share and Document open their own lists.

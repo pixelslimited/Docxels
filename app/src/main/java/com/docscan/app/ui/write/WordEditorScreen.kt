@@ -194,6 +194,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var statsOpen by remember { mutableStateOf(false) }
     var propsOpen by remember { mutableStateOf(false) }
     var paperOpen by remember { mutableStateOf(false) }
+    var menuSection by remember { mutableStateOf<String?>(null) }
     var versionsOpen by remember { mutableStateOf(false) }
     var versionList by remember { mutableStateOf<List<Long>>(emptyList()) }
     var darkPaper by remember { mutableStateOf(NightPaper.load(context)) }
@@ -445,86 +446,70 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                     }
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
-                            DropdownMenuItem(text = { Text("Paper: " + if (darkPaper) "dark" else "light") }, onClick = { menu = false; paperOpen = true })
-                            DropdownMenuItem(text = { Text("Version history") }, onClick = {
-                                menu = false
-                                saveNow()
-                                scope.launch { kotlinx.coroutines.delay(400); versionList = vm.versions(); versionsOpen = true }
-                            })
-                            DropdownMenuItem(text = { Text("Document properties") }, onClick = { menu = false; propsOpen = true })
-                            DropdownMenuItem(text = { Text("Page preview") }, onClick = { menu = false; previewDoc = controller.toDoc(title, page) })
-                            DropdownMenuItem(
-                                text = { Text("Share as PDF") },
-                                onClick = {
-                                    menu = false
-                                    val d = controller.toDoc(title, page)
-                                    scope.launch {
-                                        runCatching { ShareHelper.share(context, listOf(vm.pdfFile(d, context)), Mime.PDF) }
-                                            .onFailure { snackbar.showSnackbar("Could not create the PDF.") }
-                                    }
-                                },
-                            )
-                            DropdownMenuItem(text = { Text("Save") }, onClick = { menu = false; saveNow(); scope.launch { snackbar.showSnackbar("Saved.") } })
-                            DropdownMenuItem(text = { Text("Save a copy in Docxels") }, onClick = {
-                                menu = false
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false; menuSection = null }) {
+                            val close = { menu = false; menuSection = null }
+                            fun share(make: suspend (WordDoc) -> java.io.File, mime: String, failure: String) {
+                                close()
                                 val d = controller.toDoc(title, page)
-                                scope.launch { runCatching { vm.saveCopy(d) }.onSuccess { snackbar.showSnackbar("Copy saved as \"${d.title} copy\".") }.onFailure { snackbar.showSnackbar("Could not save a copy.") } }
-                            })
-                            DropdownMenuItem(text = { Text("Save PDF in Docxels") }, onClick = {
-                                menu = false
-                                val d = controller.toDoc(title, page)
-                                scope.launch { snackbar.showSnackbar(if (vm.savePdfToLibrary(d, context)) "PDF saved in Documents." else "Could not save the PDF.") }
-                            })
-                            DropdownMenuItem(text = { Text("Save as .docx…") }, onClick = { menu = false; saveAsFile { vm.docxFile(it, context) } })
-                            DropdownMenuItem(text = { Text("Save as PDF…") }, onClick = { menu = false; saveAsFile { vm.pdfFile(it, context) } })
-                            DropdownMenuItem(text = { Text("Save as text…") }, onClick = { menu = false; saveAsFile { vm.txtFile(it, context) } })
-                            DropdownMenuItem(text = { Text("Save as RTF…") }, onClick = { menu = false; saveAsFile { vm.rtfFile(it, context) } })
-                            DropdownMenuItem(
-                                text = { Text("Print") },
-                                onClick = {
-                                    menu = false
-                                    val d = controller.toDoc(title, page)
-                                    scope.launch {
-                                        runCatching { com.docscan.app.export.PrintHelper.printPdf(context, vm.pdfFile(d, context), title) }
-                                            .onFailure { snackbar.showSnackbar("Could not start printing.") }
-                                    }
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Share as .docx") },
-                                onClick = {
-                                    menu = false
-                                    val d = controller.toDoc(title, page)
-                                    scope.launch {
-                                        runCatching { ShareHelper.share(context, listOf(vm.docxFile(d, context)), Mime.DOCX) }
-                                            .onFailure { snackbar.showSnackbar("Could not share the document.") }
-                                    }
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Share as text (.txt)") },
-                                onClick = {
-                                    menu = false
-                                    val d = controller.toDoc(title, page)
-                                    scope.launch {
-                                        runCatching { ShareHelper.share(context, listOf(vm.txtFile(d, context)), Mime.TXT) }
-                                            .onFailure { snackbar.showSnackbar("Could not share the document.") }
-                                    }
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Share as RTF (no pictures)") },
-                                onClick = {
-                                    menu = false
-                                    val d = controller.toDoc(title, page)
-                                    scope.launch {
-                                        runCatching { ShareHelper.share(context, listOf(vm.rtfFile(d, context)), Mime.RTF) }
-                                            .onFailure { snackbar.showSnackbar("Could not share the document.") }
-                                    }
-                                },
-                            )
+                                scope.launch { runCatching { ShareHelper.share(context, listOf(make(d)), mime) }.onFailure { snackbar.showSnackbar(failure) } }
+                            }
+                            @Composable fun section(label: String, key: String) =
+                                DropdownMenuItem(text = { Text(label) }, trailingIcon = { Text("›") }, onClick = { menuSection = key })
+                            when (menuSection) {
+                                null -> {
+                                    DropdownMenuItem(text = { Text("Page preview") }, onClick = { close(); previewDoc = controller.toDoc(title, page) })
+                                    DropdownMenuItem(text = { Text("Paper: " + if (darkPaper) "dark" else "light") }, onClick = { close(); paperOpen = true })
+                                    DropdownMenuItem(text = { Text("Save") }, onClick = { close(); saveNow(); scope.launch { snackbar.showSnackbar("Saved.") } })
+                                    section("Save as", "save")
+                                    section("Share", "share")
+                                    DropdownMenuItem(
+                                        text = { Text("Print") },
+                                        onClick = {
+                                            close()
+                                            val d = controller.toDoc(title, page)
+                                            scope.launch {
+                                                runCatching { com.docscan.app.export.PrintHelper.printPdf(context, vm.pdfFile(d, context), title) }
+                                                    .onFailure { snackbar.showSnackbar("Could not start printing.") }
+                                            }
+                                        },
+                                    )
+                                    section("Document", "doc")
+                                }
+                                "save" -> {
+                                    DropdownMenuItem(text = { Text("‹  Save as") }, onClick = { menuSection = null })
+                                    DropdownMenuItem(text = { Text("A copy in Docxels") }, onClick = {
+                                        close()
+                                        val d = controller.toDoc(title, page)
+                                        scope.launch { runCatching { vm.saveCopy(d) }.onSuccess { snackbar.showSnackbar("Copy saved as \"${d.title} copy\".") }.onFailure { snackbar.showSnackbar("Could not save a copy.") } }
+                                    })
+                                    DropdownMenuItem(text = { Text("PDF in Docxels") }, onClick = {
+                                        close()
+                                        val d = controller.toDoc(title, page)
+                                        scope.launch { snackbar.showSnackbar(if (vm.savePdfToLibrary(d, context)) "PDF saved in Documents." else "Could not save the PDF.") }
+                                    })
+                                    DropdownMenuItem(text = { Text(".docx file…") }, onClick = { close(); saveAsFile { vm.docxFile(it, context) } })
+                                    DropdownMenuItem(text = { Text("PDF file…") }, onClick = { close(); saveAsFile { vm.pdfFile(it, context) } })
+                                    DropdownMenuItem(text = { Text("Text file…") }, onClick = { close(); saveAsFile { vm.txtFile(it, context) } })
+                                    DropdownMenuItem(text = { Text("RTF file…") }, onClick = { close(); saveAsFile { vm.rtfFile(it, context) } })
+                                }
+                                "share" -> {
+                                    DropdownMenuItem(text = { Text("‹  Share") }, onClick = { menuSection = null })
+                                    DropdownMenuItem(text = { Text("As PDF") }, onClick = { share({ vm.pdfFile(it, context) }, Mime.PDF, "Could not create the PDF.") })
+                                    DropdownMenuItem(text = { Text("As .docx") }, onClick = { share({ vm.docxFile(it, context) }, Mime.DOCX, "Could not share the document.") })
+                                    DropdownMenuItem(text = { Text("As text (.txt)") }, onClick = { share({ vm.txtFile(it, context) }, Mime.TXT, "Could not share the document.") })
+                                    DropdownMenuItem(text = { Text("As RTF (no pictures)") }, onClick = { share({ vm.rtfFile(it, context) }, Mime.RTF, "Could not share the document.") })
+                                }
+                                else -> {
+                                    DropdownMenuItem(text = { Text("‹  Document") }, onClick = { menuSection = null })
+                                    DropdownMenuItem(text = { Text("Rename") }, onClick = { close(); renaming = true })
+                                    DropdownMenuItem(text = { Text("Properties") }, onClick = { close(); propsOpen = true })
+                                    DropdownMenuItem(text = { Text("Version history") }, onClick = {
+                                        close()
+                                        saveNow()
+                                        scope.launch { kotlinx.coroutines.delay(400); versionList = vm.versions(); versionsOpen = true }
+                                    })
+                                }
+                            }
                         }
                     }
                 },
