@@ -562,7 +562,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                         host.onDial = dial
                         host.edit.onDial = dial
                         host.onWidth = { w -> controller.setAvailableWidth(w) }
-                        host.onPinch = { z -> zoom = z }
+                        host.onPinch = { z -> zoom = z; controller.setZoom(z) } // lay out now, in the same pass as the host
                     }
                 },
                 update = { host ->

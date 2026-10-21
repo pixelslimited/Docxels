@@ -168,7 +168,10 @@ class RichEditText(context: Context) : EditText(context) {
                     }
                 }
             }
-            breakNext = ls < t.length && t[ls] == CHIP_CHAR && i < l.lineCount - 1 &&
+            // A page break that has just been pushed onto a new sheet by the text above it (that sheet was already full)
+            // has done its job: honouring it again would leave a whole blank sheet.
+            val flowedToNewSheet = brk && !breakNext
+            breakNext = !flowedToNewSheet && ls < t.length && t[ls] == CHIP_CHAR && i < l.lineCount - 1 &&
                 t.getSpans(ls, minOf(t.length, ls + 1), BlockChipSpan::class.java).any { isPageBreak(it.index) }
         }
         return ys to set

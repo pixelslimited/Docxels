@@ -27,3 +27,5 @@
 *|FREE|My text|Insert, My text: save an address, bank details or a closing line once, then insert it in any document with a tap.
 *|FREE|Dictate and Read aloud|Review, Speech: speak and the words are typed at the cursor; or have the selection (or the whole document) read out loud with the phone's own voice.
 *|FIX|Preview now matches the editor|Page preview, PDF, print and share are drawn by the editor's own page layout, so tables, pictures, headers and page breaks come out exactly as you see them while editing.
+*|FIX|Smoother pinch zoom|The page now follows your fingers while you pinch and is laid out once when you let go.
+*|FIX|No blank page after a page break|A page break that lands at the top of an already full page no longer adds an empty page.

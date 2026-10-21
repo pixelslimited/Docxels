@@ -35,15 +35,57 @@ class PageHost(context: Context) : ScrollView(context) {
     var pinchEnabled = true
     private var pinchZoom = 1f
     private var pinching = false
+    // While the fingers are down the sheet is only scaled visually (cheap, follows the fingers every frame); the text is
+    // laid out once at the new size when they lift. Re-laying out the whole document on every step is what made it jerky.
+    private var anchorX = 0f // the point of the sheet under the fingers when the pinch began (sheet coordinates)
+    private var anchorY = 0f
+    private var startFocusX = 0f
+    private var startFocusY = 0f
+    private var focusX = 0f
+    private var focusY = 0f
     private val scaler = android.view.ScaleGestureDetector(context, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
-        override fun onScaleBegin(detector: android.view.ScaleGestureDetector): Boolean { pinchZoom = zoom; return pinchEnabled }
+        override fun onScaleBegin(detector: android.view.ScaleGestureDetector): Boolean {
+            pinchZoom = zoom
+            startFocusX = detector.focusX; startFocusY = detector.focusY
+            focusX = startFocusX; focusY = startFocusY
+            anchorX = across.scrollX + startFocusX
+            anchorY = scrollY + startFocusY
+            sheet.pivotX = anchorX
+            sheet.pivotY = anchorY
+            return pinchEnabled
+        }
         override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
             pinchZoom = (pinchZoom * detector.scaleFactor).coerceIn(1f, 3f)
-            val q = Math.round(pinchZoom * 20f) / 20f // steps of 5% so the text is not re-laid out on every tiny move
-            if (q != zoom) { setZoom(q); onPinch?.invoke(q) }
+            focusX = detector.focusX; focusY = detector.focusY
+            val s = pinchZoom / zoom
+            sheet.scaleX = s
+            sheet.scaleY = s
+            sheet.translationX = focusX - startFocusX
+            sheet.translationY = focusY - startFocusY
             return true
         }
+        override fun onScaleEnd(detector: android.view.ScaleGestureDetector) { commitPinch() }
     })
+
+    private fun commitPinch() {
+        sheet.scaleX = 1f; sheet.scaleY = 1f
+        sheet.translationX = 0f; sheet.translationY = 0f
+        val q = Math.round(pinchZoom * 20f) / 20f
+        if (q == zoom) return
+        val ratio = q / zoom
+        // Keep the spot that was under the fingers under them once the page has been laid out at the new size.
+        val wantX = (anchorX * ratio - focusX).toInt().coerceAtLeast(0)
+        val wantY = (anchorY * ratio - focusY).toInt().coerceAtLeast(0)
+        setZoom(q)
+        onPinch?.invoke(q)
+        viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                if (viewTreeObserver.isAlive) viewTreeObserver.removeOnGlobalLayoutListener(this)
+                across.scrollTo(wantX, 0)
+                scrollTo(0, wantY)
+            }
+        })
+    }
 
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
         cellEditor?.let { ed ->
