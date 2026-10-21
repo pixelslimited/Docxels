@@ -19,3 +19,7 @@
 -dontwarn java.awt.**
 -keep class com.tom_roush.pdfbox.** { *; }
 -keep class com.tom_roush.fontbox.** { *; }
+
+# ONNX Runtime looks classes up from native code.
+-keep class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**

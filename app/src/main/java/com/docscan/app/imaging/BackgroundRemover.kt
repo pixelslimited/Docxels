@@ -79,7 +79,8 @@ object BackgroundRemover {
      * 1. The colours along the picture edge are grouped (k-means in Lab colour); every pixel is measured against them.
      * 2. Pixels that match and are joined to the edge are background: a strict match is certain, a looser match
      *    (soft shadows, gradients, paper grain) is probable. Pixels far from every edge colour are certain subject.
-     * 3. If the phone's person model finds a person, that outline guides the cut as well.
+     * 3. The bundled subject model (U^2-Net-P) outlines the main object whatever its colours; when it finds one, that
+     *    outline replaces the colour guess as the starting point.
      * 4. GrabCut settles the undecided pixels using that starting mask, instead of a plain rectangle.
      * 5. Only the main pieces are kept, small holes are filled, and the edge is softened.
      *
@@ -175,12 +176,24 @@ object BackgroundRemover {
             far.get(0, 0, farBytes)
             for (i in 0 until n) if (farBytes[i].toInt() != 0) m[i] = Imgproc.GC_FGD.toByte()
 
-            // A person found by the phone's model guides the cut where the colours alone are unsure.
-            val person = personPrior(src, w, h)
-            if (person != null) for (i in 0 until n) {
-                val p = person[i]
-                if (p > 0.97f && m[i].toInt() != Imgproc.GC_BGD) m[i] = Imgproc.GC_FGD.toByte()
-                else if (p < 0.05f && m[i].toInt() == Imgproc.GC_PR_FGD) m[i] = Imgproc.GC_PR_BGD.toByte()
+            // The subject model (U^2-Net-P, on the phone) finds the main object whatever the background looks like.
+            // When it finds one, its outline replaces the colour guess as the starting mask for GrabCut.
+            val prior = subjectPrior(small, w, h)
+            if (prior != null) {
+                val salient = Mat(h, w, CvType.CV_8UC1)
+                salient.put(0, 0, ByteArray(n) { if (prior[it] > 0.08f) 1 else 0 })
+                val nearSubject = Mat()
+                Imgproc.dilate(salient, nearSubject, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(61.0, 61.0)))
+                val nearBytes = ByteArray(n)
+                nearSubject.get(0, 0, nearBytes)
+                for (i in 0 until n) {
+                    m[i] = when {
+                        prior[i] > 0.5f -> Imgproc.GC_FGD.toByte()
+                        prior[i] > 0.08f -> Imgproc.GC_PR_FGD.toByte()
+                        nearBytes[i].toInt() == 0 -> Imgproc.GC_BGD.toByte()
+                        else -> Imgproc.GC_PR_BGD.toByte()
+                    }
+                }
             }
             for (i in 0 until n) if (onRing[i]) m[i] = Imgproc.GC_BGD.toByte()
 
@@ -188,7 +201,7 @@ object BackgroundRemover {
             mask.put(0, 0, m)
             val bgd = Mat()
             val fgd = Mat()
-            Imgproc.grabCut(small, mask, Rect(0, 0, w, h), bgd, fgd, 5, Imgproc.GC_INIT_WITH_MASK)
+            Imgproc.grabCut(small, mask, Rect(0, 0, w, h), bgd, fgd, if (prior != null) 6 else 5, Imgproc.GC_INIT_WITH_MASK)
             mask.get(0, 0, m)
 
             var fg = ByteArray(n) { if (m[it].toInt() == Imgproc.GC_FGD || m[it].toInt() == Imgproc.GC_PR_FGD) 1 else 0 }
@@ -283,34 +296,63 @@ object BackgroundRemover {
         return out
     }
 
+    private var appContext: android.content.Context? = null
+    private var session: ai.onnxruntime.OrtSession? = null
+    private var sessionFailed = false
+
+    /** Gives the remover access to the bundled subject model. */
+    fun init(context: android.content.Context) { appContext = context.applicationContext }
+
+    @Synchronized
+    private fun modelSession(): ai.onnxruntime.OrtSession? {
+        session?.let { return it }
+        if (sessionFailed) return null
+        val ctx = appContext ?: return null
+        return runCatching {
+            val bytes = ctx.assets.open("models/u2netp.onnx").use { it.readBytes() }
+            ai.onnxruntime.OrtEnvironment.getEnvironment().createSession(bytes)
+        }.onFailure { sessionFailed = true }.getOrNull()?.also { session = it }
+    }
+
     /**
-     * The phone's person model: for each pixel (at the working size) how sure it is that it belongs to a person.
-     * Null when no person is found or the model is unavailable. Blocks, so call it off the main thread.
+     * How strongly each pixel (at the working size) belongs to the main subject, 0 to 1, from the bundled U^2-Net-P
+     * model. Null when the model is unavailable or finds nothing believable. Blocks, so call it off the main thread.
      */
-    private fun personPrior(src: Bitmap, w: Int, h: Int): FloatArray? = runCatching {
-        val options = com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions.Builder()
-            .setDetectorMode(com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
-            .build()
-        val segmenter = com.google.mlkit.vision.segmentation.Segmentation.getClient(options)
-        try {
-            val result = com.google.android.gms.tasks.Tasks.await(
-                segmenter.process(com.google.mlkit.vision.common.InputImage.fromBitmap(src, 0)), 10, java.util.concurrent.TimeUnit.SECONDS,
-            )
-            val mw = result.width
-            val mh = result.height
-            val buf = result.buffer.asFloatBuffer()
-            val conf = FloatArray(mw * mh)
-            buf.get(conf)
-            val mat = Mat(mh, mw, CvType.CV_32F)
-            mat.put(0, 0, conf)
-            val scaled = Mat()
-            Imgproc.resize(mat, scaled, Size(w.toDouble(), h.toDouble()), 0.0, 0.0, Imgproc.INTER_LINEAR)
-            val out = FloatArray(w * h)
-            scaled.get(0, 0, out)
-            val covered = out.count { it > 0.5f } / out.size.toFloat()
-            if (covered in 0.04f..0.9f) out else null
-        } finally {
-            segmenter.close()
+    private fun subjectPrior(rgb: Mat, w: Int, h: Int): FloatArray? = runCatching {
+        val sess = modelSession() ?: return null
+        val side = 320
+        val resized = Mat()
+        Imgproc.resize(rgb, resized, Size(side.toDouble(), side.toDouble()), 0.0, 0.0, Imgproc.INTER_AREA)
+        val px = ByteArray(side * side * 3)
+        resized.get(0, 0, px)
+        val mean = floatArrayOf(0.485f, 0.456f, 0.406f)
+        val std = floatArrayOf(0.229f, 0.224f, 0.225f)
+        val data = FloatArray(3 * side * side)
+        for (i in 0 until side * side) for (c in 0 until 3) {
+            data[c * side * side + i] = ((px[i * 3 + c].toInt() and 0xFF) / 255f - mean[c]) / std[c]
         }
+        val env = ai.onnxruntime.OrtEnvironment.getEnvironment()
+        val input = ai.onnxruntime.OnnxTensor.createTensor(env, java.nio.FloatBuffer.wrap(data), longArrayOf(1, 3, side.toLong(), side.toLong()))
+        val raw = FloatArray(side * side)
+        input.use {
+            sess.run(mapOf(sess.inputNames.first() to input)).use { result ->
+                @Suppress("UNCHECKED_CAST")
+                val out = (result[0].value as Array<Array<Array<FloatArray>>>)[0][0]
+                for (y in 0 until side) for (x in 0 until side) raw[y * side + x] = out[y][x]
+            }
+        }
+        var lo = Float.MAX_VALUE
+        var hi = -Float.MAX_VALUE
+        for (v in raw) { if (v < lo) lo = v; if (v > hi) hi = v }
+        val range = (hi - lo).coerceAtLeast(1e-6f)
+        for (i in raw.indices) raw[i] = (raw[i] - lo) / range
+        val mat = Mat(side, side, CvType.CV_32F)
+        mat.put(0, 0, raw)
+        val scaled = Mat()
+        Imgproc.resize(mat, scaled, Size(w.toDouble(), h.toDouble()), 0.0, 0.0, Imgproc.INTER_LINEAR)
+        val result = FloatArray(w * h)
+        scaled.get(0, 0, result)
+        val covered = result.count { it > 0.08f } / result.size.toFloat()
+        if (covered in 0.003f..0.95f) result else null
     }.getOrNull()
 }

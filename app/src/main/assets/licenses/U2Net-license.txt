@@ -1,0 +1,7 @@
+U^2-Net (u2netp) salient object detection model
+Copyright (c) Xuebin Qin et al. Licensed under the Apache License, Version 2.0.
+https://github.com/xuebinqin/U-2-Net
+The model file shipped here (u2netp.onnx) is the small U^2-Net variant as distributed by the rembg project.
+Used on the phone to find the main subject of a picture for background removal. Nothing is uploaded.
+
+ONNX Runtime (Microsoft), MIT License, https://github.com/microsoft/onnxruntime

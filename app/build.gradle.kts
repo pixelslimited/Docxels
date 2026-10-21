@@ -110,8 +110,8 @@ dependencies {
     // Lossless PDF editing (merge / split / rotate / reorder / password). Pure Java, runs on the phone.
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
-    // On-device person outline (bundled model, works offline) to guide background removal on photos of people.
-    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+    // Runs the bundled U^2-Net-P subject model (assets/models/u2netp.onnx) on the phone for background removal.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
