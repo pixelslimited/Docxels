@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
@@ -784,6 +785,7 @@ fun SignatureImportDialog(source: Bitmap, onInsert: (ByteArray, Int, Int) -> Uni
  * A pad to sign on like paper with a blue ball-point pen (see [BallpointInk]).
  * Returns a transparent PNG of just the ink.
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @androidx.compose.runtime.Composable
 fun SignaturePadDialog(onDone: (ByteArray, Int, Int) -> Unit, onDismiss: () -> Unit) {
     val unit = androidx.compose.ui.platform.LocalDensity.current.density
