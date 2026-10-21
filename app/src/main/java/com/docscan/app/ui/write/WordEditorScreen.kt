@@ -1252,7 +1252,7 @@ private fun Ribbon(
                         Box {
                             Btn("Letterhead", Icons.Default.Description) { letterMenu = true }
                             DropdownMenu(expanded = letterMenu, onDismissRequest = { letterMenu = false }) {
-                                DropdownMenuItem(text = { Text("My saved letterheads…") }, onClick = { letterMenu = false; open = false; onLetterhead("saved") })
+                                DropdownMenuItem(text = { Text("My letterheads (upload or choose)…") }, onClick = { letterMenu = false; open = false; onLetterhead("saved") })
                                 DropdownMenuItem(text = { Text("First page only") }, onClick = { letterMenu = false; open = false; onLetterhead("first") })
                                 DropdownMenuItem(text = { Text("Continuous letterhead (pages after the first)") }, onClick = { letterMenu = false; open = false; onLetterhead("rest") })
                                 DropdownMenuItem(text = { Text("Same on every page") }, onClick = { letterMenu = false; open = false; onLetterhead("all") })
@@ -1264,7 +1264,7 @@ private fun Ribbon(
                         Box {
                             Btn("Signature", Icons.Default.Draw) { signMenu = true }
                             DropdownMenu(expanded = signMenu, onDismissRequest = { signMenu = false }) {
-                                DropdownMenuItem(text = { Text("My saved signatures…") }, onClick = { signMenu = false; open = false; onSignature("saved") })
+                                DropdownMenuItem(text = { Text("My signatures (upload or draw, or choose)…") }, onClick = { signMenu = false; open = false; onSignature("saved") })
                                 DropdownMenuItem(text = { Text("Draw with finger") }, onClick = { signMenu = false; open = false; onSignature("draw") })
                                 DropdownMenuItem(text = { Text("From a picture") }, onClick = { signMenu = false; open = false; onSignature("picture") })
                             }

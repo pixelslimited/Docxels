@@ -188,6 +188,36 @@ fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: Strin
     val store = remember(signature) { SavedAssets(context, if (signature) "signatures" else "letterheads") }
     var items by remember(signature) { mutableStateOf(store.list()) }
     var renaming by remember { mutableStateOf<SavedAssets.Item?>(null) }
+    val scope = rememberCoroutineScope()
+    val word = if (signature) "signature" else "letterhead"
+    var message by remember { mutableStateOf<String?>(null) }
+    var source by remember { mutableStateOf<Bitmap?>(null) }
+    var drawing by remember { mutableStateOf(false) }
+    var pendingBytes by remember { mutableStateOf<ByteArray?>(null) }
+    // Upload from the phone (picture, PDF or Word file) right here, without going to Settings.
+    val upload = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val bmp = if (signature) PageSources.signatureBitmap(context, uri, 1600) else PageSources.letterheadBitmap(context, uri, 2000)
+            if (bmp == null) { message = "Could not read a picture from that file."; return@launch }
+            if (signature) source = bmp
+            else {
+                pendingBytes = withContext(Dispatchers.Default) {
+                    val out = java.io.ByteArrayOutputStream()
+                    bmp.compress(if (bmp.hasAlpha()) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 90, out)
+                    out.toByteArray()
+                }
+                bmp.recycle()
+            }
+        }
+    }
+    source?.let { src -> com.docscan.app.ui.write.SignatureImportDialog(src, onInsert = { bytes, _, _ -> source = null; pendingBytes = bytes }, onDismiss = { source = null }) }
+    if (drawing) com.docscan.app.ui.write.SignaturePadDialog(onDone = { bytes, _, _ -> drawing = false; pendingBytes = bytes }, onDismiss = { drawing = false })
+    pendingBytes?.let { bytes ->
+        NameDialog("Name this $word", "${word.replaceFirstChar { it.uppercase() }} ${items.size + 1}", "Save",
+            onDone = { n -> store.add(n, bytes); items = store.list(); pendingBytes = null; message = "Saved. Choose it below to use it." },
+            onDismiss = { pendingBytes = null })
+    }
     renaming?.let { item ->
         NameDialog("Rename", item.name, "Rename",
             onDone = { n -> store.rename(item, n); items = store.list(); renaming = null },
@@ -198,8 +228,9 @@ fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: Strin
         title = { Text(if (signature) "My signatures" else "My letterheads") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
                 if (items.isEmpty()) {
-                    Text("Nothing saved yet. Add ${if (signature) "signatures" else "letterheads"} in Settings.", style = MaterialTheme.typography.bodyMedium)
+                    Text("Nothing saved yet. Tap Upload below to add ${if (signature) "a signature" else "a letterhead"}.", style = MaterialTheme.typography.bodyMedium)
                 }
                 items.forEach { item ->
                     val bytes = remember(item.id) { store.bytes(item) }
@@ -225,5 +256,11 @@ fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: Strin
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { upload.launch(PageSources.MIMES) }) { Text("Upload") }
+                if (signature) TextButton(onClick = { drawing = true }) { Text("Draw") }
+            }
+        },
     )
 }
