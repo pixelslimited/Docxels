@@ -351,6 +351,8 @@ class RichEditText(context: Context) : EditText(context) {
 
     /** Called with (start, end, address) when a hyperlink is tapped. */
     var onLinkTap: ((Int, Int, String) -> Unit)? = null
+    /** Called with the fill-in field (check box, text, date or drop-down) that was tapped. */
+    var onFormTap: ((com.docscan.app.core.word.FormToken) -> Unit)? = null
     /** Called with a phone number when one is double-tapped in the text (or in a table cell while reading). */
     var onDial: ((String) -> Unit)? = null
 
@@ -380,6 +382,7 @@ class RichEditText(context: Context) : EditText(context) {
                 val link = t.getSpans(maxOf(0, off - 1), minOf(t.length, off + 1), LinkSpan::class.java)
                     .firstOrNull { t.getSpanStart(it) <= off && off < t.getSpanEnd(it) }
                 if (link != null) onLinkTap?.invoke(t.getSpanStart(link), t.getSpanEnd(link), link.url)
+                else com.docscan.app.core.word.FormTokens.at(t, off)?.let { onFormTap?.invoke(it) }
             }
             return false
         }
@@ -1212,6 +1215,25 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
 
     fun setLinkTapListener(l: (Int, Int, String) -> Unit) {
         view?.onLinkTap = l
+    }
+
+    fun setFormTapListener(l: (com.docscan.app.core.word.FormToken) -> Unit) {
+        view?.onFormTap = l
+    }
+
+    /** Swaps the text between [start] and [end] for [s] (a ticked box, a chosen option, a picked date). */
+    fun replaceRange(start: Int, end: Int, s: String) {
+        val v = view ?: return
+        if (start < 0 || end > v.text.length || start > end) return
+        v.text.replace(start, end, s)
+        v.setSelection((start + s.length).coerceAtMost(v.text.length))
+        changed()
+    }
+
+    /** Selects the words between [start] and [end], so typing replaces them (a text field's hint). */
+    fun selectRange(start: Int, end: Int) {
+        val v = view ?: return
+        if (start in 0..end && end <= v.text.length) v.setSelection(start, end)
     }
 
     /** What the assistant works on: the selection if there is one, otherwise the whole document. Pictures become spaces so offsets still line up. */

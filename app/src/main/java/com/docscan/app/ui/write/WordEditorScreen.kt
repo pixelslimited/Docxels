@@ -41,6 +41,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDownCircle
+import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Spellcheck
@@ -176,6 +178,10 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var paraOpen by remember { mutableStateOf(false) }
     var symbolOpen by remember { mutableStateOf(false) }
     var dateOpen by remember { mutableStateOf(false) }
+    // Fill-in fields: a drop-down being built, a drop-down being used, a date being picked (for a tapped field, or to insert).
+    var choiceBuild by remember { mutableStateOf(false) }
+    var choicePick by remember { mutableStateOf<com.docscan.app.core.word.FormToken?>(null) }
+    var datePick by remember { mutableStateOf<com.docscan.app.core.word.FormToken?>(null) }
     var commentNew by remember { mutableStateOf(false) }
     var commentsOpen by remember { mutableStateOf(false) }
     var navOpen by remember { mutableStateOf(false) }
@@ -530,6 +536,15 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                             } else if (editing == null) editing = idx
                         }
                         controller.setLinkTapListener { a, b, u -> linkActions = Triple(a, b, u) }
+                        controller.setFormTapListener { tok ->
+                            when (tok.kind) {
+                                com.docscan.app.core.word.FormKind.CHECK ->
+                                    controller.replaceRange(tok.start, tok.end, if (tok.checked) com.docscan.app.core.word.FormTokens.BOX else com.docscan.app.core.word.FormTokens.TICKED)
+                                com.docscan.app.core.word.FormKind.TEXT -> controller.selectRange(tok.start + 2, tok.end - 2)
+                                com.docscan.app.core.word.FormKind.DATE -> datePick = tok
+                                com.docscan.app.core.word.FormKind.CHOICE -> choicePick = tok
+                            }
+                        }
                         val dial = { number: String -> com.docscan.app.ui.dialNumber(host.context, number) }
                         host.onDial = dial
                         host.edit.onDial = dial
@@ -666,6 +681,15 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                     onParagraph = { paraOpen = true },
                     onSymbol = { symbolOpen = true },
                     onDate = { dateOpen = true },
+                    onForm = { kind ->
+                        val f = com.docscan.app.core.word.FormTokens
+                        when (kind) {
+                            "check" -> controller.insertText(f.BOX + " ")
+                            "text" -> controller.insertText(f.TEXT)
+                            "date" -> controller.insertText(f.DATE)
+                            else -> choiceBuild = true
+                        }
+                    },
                     onNewComment = {
                         if (controller.selectedText().isBlank()) scope.launch { snackbar.showSnackbar("Select the words you want to comment on first.") } else commentNew = true
                     },
@@ -923,6 +947,16 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     )
     if (commentsOpen) CommentsDialog(controller, onDismiss = { commentsOpen = false })
     if (symbolOpen) SymbolDialog(onInsert = { symbolOpen = false; controller.insertText(it) }, onDismiss = { symbolOpen = false })
+    if (choiceBuild) FormChoiceBuilder(
+        onInsert = { controller.insertText(it); choiceBuild = false },
+        onDismiss = { choiceBuild = false },
+    )
+    choicePick?.let { tok ->
+        FormChoicePicker(tok.options, onPick = { controller.replaceRange(tok.start, tok.end, it); choicePick = null }, onDismiss = { choicePick = null })
+    }
+    datePick?.let { tok ->
+        FormDatePicker(onPick = { controller.replaceRange(tok.start, tok.end, it); datePick = null }, onDismiss = { datePick = null })
+    }
     if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
     if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
     if (statsOpen) WordCountDialog(remember { controller.stats() }, controller.pageInfo()?.second, onDismiss = { statsOpen = false })
@@ -972,6 +1006,7 @@ private fun Ribbon(
     onParagraph: () -> Unit,
     onSymbol: () -> Unit,
     onDate: () -> Unit,
+    onForm: (String) -> Unit,
     onToc: () -> Unit,
     onNewComment: () -> Unit,
     onComments: () -> Unit,
@@ -1056,6 +1091,10 @@ private fun Ribbon(
         cmd("Page break", "Insert", "new page") { onPageBreak() }
         cmd("Link", "Insert", "hyperlink web address email phone") { onLink() }
         cmd("Date and time", "Insert", "today") { onDate() }
+        cmd("Check box", "Insert", "form tick tickbox") { onForm("check") }
+        cmd("Text field", "Insert", "form fill in blank") { onForm("text") }
+        cmd("Date picker field", "Insert", "form calendar") { onForm("date") }
+        cmd("Drop-down list", "Insert", "form choose options select") { onForm("choice") }
         cmd("Contents", "Insert", "table of contents headings") { onToc() }
         cmd("Symbol", "Insert", "special character") { onSymbol() }
         cmd("New comment", "Review", "note") { onNewComment() }
@@ -1413,6 +1452,11 @@ private fun Ribbon(
                         Btn("Date & time", Icons.Default.Event, close = true) { onDate() }
                         Btn("Contents", Icons.Default.Description, close = true) { onToc() }
                         Btn("Symbol", Icons.Default.Functions, close = true) { onSymbol() }
+                        Group("Form fields")
+                        Btn("Check box", Icons.Default.CheckBox, close = true) { onForm("check") }
+                        Btn("Text field", Icons.Default.TextFields, close = true) { onForm("text") }
+                        Btn("Date picker", Icons.Default.Event, close = true) { onForm("date") }
+                        Btn("Drop-down", Icons.Default.ArrowDropDownCircle, close = true) { onForm("choice") }
                     }
                     2 -> {
                         Group("Page")

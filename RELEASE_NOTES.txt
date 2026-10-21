@@ -23,3 +23,4 @@
 *|FREE|Reading progress|A bar and percentage show how far through the document you got.
 *|FREE|Search your phone|Type a name to list PDF, Word and text files on the phone. Tap one to import it. Needs All files access.
 *|FIX|Older phones|Importing Word and text files works again on Android 12 and older.
+*|FREE|Form fields|Insert, Form fields: check box, text field, date picker and drop-down. Tap to tick, type, pick a date or choose. They print and open in Word as plain text.
