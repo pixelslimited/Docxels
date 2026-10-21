@@ -38,6 +38,11 @@ class WordViewModel(private val container: AppContainer, val id: String) : ViewM
         }
     }
 
+    suspend fun versions(): List<Long> = withContext(Dispatchers.IO) { container.words.versions(id) }
+
+    /** Keeps an earlier copy as a new document; returns its id or null. */
+    suspend fun restoreVersion(at: Long, label: String): String? = withContext(Dispatchers.IO) { container.words.restoreAsCopy(id, at, label) }
+
     /** Keeps a second copy of the document in the library and returns its id. */
     suspend fun saveCopy(doc: WordDoc): String = withContext(Dispatchers.IO) { container.words.add(doc.copy(title = doc.title + " copy")) }
 

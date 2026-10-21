@@ -33,3 +33,5 @@
 *|FREE|Document properties|More, Document properties: set title, author, subject and keywords, or remove your name before sharing.
 *|FREE|Dark paper (night mode)|More, Paper: choose light or dark paper. Dark shows white pages as black with light text, in the editor and Page preview; files and PDFs are unchanged.
 *|FIX|No more editor marks in the preview|The grey Page break label that showed in the editor no longer appears in Page preview, PDF, print or share.
+*|FREE|Search inside a PDF|In the PDF reader, tap Search, type a word and use Next and Prev; matches are highlighted on the page.
+*|FREE|Version history|In a Word document, More, Version history lists earlier copies (one every 10 minutes of editing, up to 10); tap one to open it as a separate document.

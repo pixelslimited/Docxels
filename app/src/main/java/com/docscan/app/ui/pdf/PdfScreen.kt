@@ -480,7 +480,37 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
     }
     var night by remember { mutableStateOf(false) }
     var jumpOpen by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var active by remember { mutableStateOf("") } // the text being highlighted on the pages
+    var lastHit by remember { mutableStateOf(-1) }
+    var searchNote by remember { mutableStateOf("") }
+    var searching by remember { mutableStateOf(false) }
     val jumpScope = androidx.compose.runtime.rememberCoroutineScope()
+    fun runSearch(forward: Boolean) {
+        val q = query.trim()
+        if (q.isEmpty() || searching) return
+        searching = true
+        searchNote = "Searching…"
+        jumpScope.launch {
+            val visible = state.firstVisibleItemIndex
+            val base = if (active.equals(q, ignoreCase = true) && lastHit >= 0) lastHit else if (forward) visible - 1 else visible + 1
+            active = q
+            var hit = -1
+            for (k in 1..count) {
+                val idx = Math.floorMod(base + if (forward) k else -k, count)
+                if (phones.find(idx, q).isNotEmpty()) { hit = idx; break }
+            }
+            if (hit >= 0) {
+                lastHit = hit
+                state.scrollToItem(hit)
+                searchNote = "Page ${hit + 1} of $count"
+            } else {
+                searchNote = "Not found. Scanned pages have no text to search."
+            }
+            searching = false
+        }
+    }
     val invert = remember { androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(
         -1f, 0f, 0f, 0f, 255f, 0f, -1f, 0f, 0f, 255f, 0f, 0f, -1f, 0f, 255f, 0f, 0f, 0f, 1f, 0f))) }
     Box(Modifier.fillMaxSize().background(if (night) Color(0xFF101010) else MaterialTheme.colorScheme.surfaceVariant)) {
@@ -523,6 +553,7 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                     val bmp by produceState<Bitmap?>(null, preview, i, renderScale) { value = runCatching { preview.render(i, widthPx * renderScale) }.getOrNull() }
                     val ratio by produceState(0.707f, preview, i) { value = runCatching { preview.pageSize(i).let { it.first.toFloat() / it.second } }.getOrDefault(0.707f) }
                     val numbers by produceState<List<PdfPhones.Box>>(emptyList(), phones, i) { value = phones.page(i) }
+                    val marks by produceState<List<PdfPhones.Box>>(emptyList(), phones, i, active) { value = if (active.isBlank()) emptyList() else phones.find(i, active) }
                     BoxWithConstraints(
                         Modifier.requiredWidth(maxWidth * zoom - 24.dp * zoom).offset { androidx.compose.ui.unit.IntOffset(panX.toInt(), 0) }
                             .aspectRatio(ratio).background(if (night) Color.Black else Color.White),
@@ -532,6 +563,15 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                         // Phone numbers in the PDF's own text: underlined, tap one to open the dialer.
                         val pageW = this.maxWidth
                         val pageH = this.maxHeight
+                        for (m in marks) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopStart)
+                                    .offset(pageW * m.x - 2.dp, pageH * m.y - 2.dp)
+                                    .size(pageW * m.w + 4.dp, pageH * m.h + 4.dp)
+                                    .background(Color(0x88FFEB3B)),
+                            )
+                        }
                         for (p in numbers) {
                             Box(
                                 Modifier
@@ -557,6 +597,36 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp).clip(RoundedCornerShape(50)).background(Color(0xAA000000))
                 .clickable { jumpOpen = true }.padding(horizontal = 14.dp, vertical = 6.dp),
         )
+        Text(
+            "Search",
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 16.dp).clip(RoundedCornerShape(50)).background(Color(0xAA000000))
+                .clickable { searchOpen = true }.padding(horizontal = 14.dp, vertical = 6.dp),
+        )
+        if (searchOpen) {
+            androidx.compose.material3.Surface(
+                modifier = Modifier.align(Alignment.TopCenter).padding(8.dp),
+                shape = RoundedCornerShape(16.dp),
+                tonalElevation = 6.dp,
+                shadowElevation = 6.dp,
+            ) {
+                androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.OutlinedTextField(
+                            query, { query = it }, singleLine = true, placeholder = { Text("Find in this PDF") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { runSearch(true) }),
+                        )
+                        androidx.compose.material3.TextButton(onClick = { runSearch(false) }) { Text("Prev") }
+                        androidx.compose.material3.TextButton(onClick = { runSearch(true) }) { Text("Next") }
+                        androidx.compose.material3.TextButton(onClick = { searchOpen = false; active = ""; lastHit = -1; searchNote = "" }) { Text("Close") }
+                    }
+                    if (searchNote.isNotEmpty()) Text(searchNote, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 8.dp, bottom = 2.dp))
+                }
+            }
+        }
         Text(
             if (night) "Day" else "Night",
             color = Color.White,

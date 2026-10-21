@@ -58,7 +58,36 @@ class WordStore(context: Context) {
         DocxReader.read(bytes, title).copy(title = title)
     }
 
+    // -- version history: the saved copy that is about to be replaced is kept, at most one every 10 minutes, newest 10 --
+    private fun versionDir(id: String) = File(dir, "versions/$id")
+
+    /** When each earlier copy of the document was kept (newest first). */
+    fun versions(id: String): List<Long> = synchronized(lock) {
+        versionDir(id).listFiles()?.mapNotNull { it.name.removeSuffix(".docx").toLongOrNull() }?.sortedDescending().orEmpty()
+    }
+
+    private fun keepVersion(id: String) {
+        val current = file(id)
+        if (!current.exists()) return
+        val known = versions(id)
+        val now = System.currentTimeMillis()
+        if (known.isNotEmpty() && now - known.first() < VERSION_GAP_MS) return
+        val bytes = SecureFiles.read(current) ?: return
+        val d = versionDir(id).apply { mkdirs() }
+        SecureFiles.write(File(d, "$now.docx"), bytes)
+        (listOf(now) + known).drop(MAX_VERSIONS).forEach { SecureFiles.wipe(File(d, "$it.docx")); File(d, "$it.docx").delete() }
+    }
+
+    /** Keeps an earlier copy as a new document and returns its id, or null if it is gone. The current document is not touched. */
+    fun restoreAsCopy(id: String, at: Long, label: String): String? = synchronized(lock) {
+        val bytes = SecureFiles.read(File(versionDir(id), "$at.docx")) ?: return null
+        val title = _items.value.firstOrNull { it.id == id }?.title ?: "Untitled"
+        val doc = runCatching { DocxReader.read(bytes, title) }.getOrNull() ?: return null
+        add(doc.copy(title = "$title (earlier, $label)"))
+    }
+
     fun save(id: String, doc: WordDoc) = synchronized(lock) {
+        runCatching { keepVersion(id) }
         SecureFiles.write(file(id), DocxWriter.toBytes(doc))
         val now = System.currentTimeMillis()
         writeIndex(_items.value.map { if (it.id == id) it.copy(title = doc.title, modified = now) else it })
@@ -70,6 +99,7 @@ class WordStore(context: Context) {
     }
 
     fun delete(id: String) = synchronized(lock) {
+        SecureFiles.wipeDirectory(versionDir(id))
         SecureFiles.wipe(file(id))
         writeIndex(_items.value.filterNot { it.id == id })
     }
@@ -92,6 +122,11 @@ class WordStore(context: Context) {
         SecureFiles.write(file(id), DocxWriter.toBytes(doc))
         writeIndex(_items.value + WordItem(id, doc.title, System.currentTimeMillis()))
         id
+    }
+
+    private companion object {
+        const val VERSION_GAP_MS = 10 * 60_000L
+        const val MAX_VERSIONS = 10
     }
 
     fun docxBytes(id: String): ByteArray? = SecureFiles.read(file(id))

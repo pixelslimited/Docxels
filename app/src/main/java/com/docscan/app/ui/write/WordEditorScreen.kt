@@ -194,6 +194,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var statsOpen by remember { mutableStateOf(false) }
     var propsOpen by remember { mutableStateOf(false) }
     var paperOpen by remember { mutableStateOf(false) }
+    var versionsOpen by remember { mutableStateOf(false) }
+    var versionList by remember { mutableStateOf<List<Long>>(emptyList()) }
     var darkPaper by remember { mutableStateOf(NightPaper.load(context)) }
     var linkOpen by remember { mutableStateOf<Triple<String, String, IntArray?>?>(null) }
     var mergeOpen by remember { mutableStateOf(false) }
@@ -437,6 +439,11 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
                             DropdownMenuItem(text = { Text("Paper: " + if (darkPaper) "dark" else "light") }, onClick = { menu = false; paperOpen = true })
+                            DropdownMenuItem(text = { Text("Version history") }, onClick = {
+                                menu = false
+                                saveNow()
+                                scope.launch { kotlinx.coroutines.delay(400); versionList = vm.versions(); versionsOpen = true }
+                            })
                             DropdownMenuItem(text = { Text("Document properties") }, onClick = { menu = false; propsOpen = true })
                             DropdownMenuItem(text = { Text("Page preview") }, onClick = { menu = false; previewDoc = controller.toDoc(title, page) })
                             DropdownMenuItem(
@@ -1002,6 +1009,33 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     }
     if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
     if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
+    if (versionsOpen) AlertDialog(
+        onDismissRequest = { versionsOpen = false },
+        title = { Text("Version history") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (versionList.isEmpty()) Text("No earlier copies yet. Docxels keeps one every 10 minutes of editing, up to 10.")
+                else {
+                    Text("Tap a time to open that copy as a separate document. Your current document is not changed.", style = MaterialTheme.typography.bodySmall)
+                    versionList.forEach { at ->
+                        val label = java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(at))
+                        Text(
+                            label,
+                            Modifier.fillMaxWidth().clickable {
+                                versionsOpen = false
+                                scope.launch {
+                                    val id = vm.restoreVersion(at, label)
+                                    if (id != null) onOpenWord(id) else snackbar.showSnackbar("That copy could not be opened.")
+                                }
+                            }.padding(vertical = 12.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { versionsOpen = false }) { Text("Close") } },
+    )
     if (paperOpen) AlertDialog(
         onDismissRequest = { paperOpen = false },
         title = { Text("Paper") },
