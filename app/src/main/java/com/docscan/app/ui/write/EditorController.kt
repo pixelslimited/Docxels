@@ -751,10 +751,15 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
 
     private fun snapshot() = Snap(EditorModel.toBlocks(text, originals), selection.first, selection.second)
 
+    /** File properties carried through every save (set by the screen). */
+    var author = "Kelvin Codes"
+    var subject = ""
+    var keywords = ""
+
     fun toDoc(title: String, page: PageSetup): WordDoc {
         val blocks = EditorModel.toBlocks(text, originals)
         val live = liveCommentIds()
-        return WordDoc(title, blocks, page, comments = allComments.filter { it.id in live })
+        return WordDoc(title, blocks, page, comments = allComments.filter { it.id in live }, author = author, subject = subject, keywords = keywords)
     }
 
     private fun liveCommentIds(): Set<Int> =

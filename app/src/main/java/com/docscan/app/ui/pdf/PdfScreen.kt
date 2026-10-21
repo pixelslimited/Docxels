@@ -8,6 +8,7 @@ import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
+import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.drawBehind
 import com.docscan.app.pdf.PdfPhones
 import androidx.compose.foundation.layout.Arrangement
@@ -477,7 +478,12 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
     androidx.compose.runtime.LaunchedEffect(state, count) {
         androidx.compose.runtime.snapshotFlow { state.firstVisibleItemIndex }.collectLatest { i -> kotlinx.coroutines.delay(800); onPage(i + 1, count) }
     }
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
+    var night by remember { mutableStateOf(false) }
+    var jumpOpen by remember { mutableStateOf(false) }
+    val jumpScope = androidx.compose.runtime.rememberCoroutineScope()
+    val invert = remember { androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(
+        -1f, 0f, 0f, 0f, 255f, 0f, -1f, 0f, 0f, 255f, 0f, 0f, -1f, 0f, 255f, 0f, 0f, 0f, 1f, 0f))) }
+    Box(Modifier.fillMaxSize().background(if (night) Color(0xFF101010) else MaterialTheme.colorScheme.surfaceVariant)) {
         BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
             val widthPx = with(LocalDensity.current) { maxWidth.toPx() }.toInt()
             // Pinch to zoom: pages are laid out wider (real layout zoom) so vertical scrolling keeps working.
@@ -519,10 +525,10 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                     val numbers by produceState<List<PdfPhones.Box>>(emptyList(), phones, i) { value = phones.page(i) }
                     BoxWithConstraints(
                         Modifier.requiredWidth(maxWidth * zoom - 24.dp * zoom).offset { androidx.compose.ui.unit.IntOffset(panX.toInt(), 0) }
-                            .aspectRatio(ratio).background(Color.White),
+                            .aspectRatio(ratio).background(if (night) Color.Black else Color.White),
                         contentAlignment = Alignment.Center,
                     ) {
-                        bmp?.let { Image(it.asImageBitmap(), "Page ${i + 1}", contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxSize()) }
+                        bmp?.let { Image(it.asImageBitmap(), "Page ${i + 1}", contentScale = ContentScale.FillWidth, colorFilter = if (night) invert else null, modifier = Modifier.fillMaxSize()) }
                         // Phone numbers in the PDF's own text: underlined, tap one to open the dialer.
                         val pageW = this.maxWidth
                         val pageH = this.maxHeight
@@ -548,7 +554,34 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
             "${(state.firstVisibleItemIndex + 1).coerceAtMost(count)} / $count",
             color = Color.White,
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp).clip(RoundedCornerShape(50)).background(Color(0xAA000000)).padding(horizontal = 14.dp, vertical = 6.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp).clip(RoundedCornerShape(50)).background(Color(0xAA000000))
+                .clickable { jumpOpen = true }.padding(horizontal = 14.dp, vertical = 6.dp),
+        )
+        Text(
+            if (night) "Day" else "Night",
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 16.dp).clip(RoundedCornerShape(50)).background(Color(0xAA000000))
+                .clickable { night = !night }.padding(horizontal = 14.dp, vertical = 6.dp),
+        )
+    }
+    if (jumpOpen) {
+        var text by remember { mutableStateOf("") }
+        val go = {
+            text.trim().toIntOrNull()?.let { n -> jumpScope.launch { state.scrollToItem((n - 1).coerceIn(0, (count - 1).coerceAtLeast(0))) } }
+            jumpOpen = false
+        }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { jumpOpen = false },
+            title = { Text("Go to page") },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    text, { text = it.filter(Char::isDigit).take(5) }, singleLine = true, label = { Text("1 to $count") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                )
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { go() }) { Text("Go") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { jumpOpen = false }) { Text("Cancel") } },
         )
     }
 }

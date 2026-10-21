@@ -29,3 +29,5 @@
 *|FIX|Preview now matches the editor|Page preview, PDF, print and share are drawn by the editor's own page layout, so tables, pictures, headers and page breaks come out exactly as you see them while editing.
 *|FIX|Smoother pinch zoom|The page now follows your fingers while you pinch and is laid out once when you let go.
 *|FIX|No blank page after a page break|A page break that lands at the top of an already full page no longer adds an empty page.
+*|FREE|PDF night mode and Go to page|In the PDF reader, tap Night to invert the pages for dark rooms, or tap the page counter to jump to a page.
+*|FREE|Document properties|More, Document properties: set title, author, subject and keywords, or remove your name before sharing.

@@ -300,6 +300,10 @@ data class WordDoc(
     /** Fonts the file embeds; only set when reading, the editor registers them so the text shows in its own font. */
     val fonts: List<EmbeddedFont> = emptyList(),
     val comments: List<DocComment> = emptyList(),
+    /** File properties (Document properties). Blank author = personal data removed. */
+    val author: String = "Kelvin Codes",
+    val subject: String = "",
+    val keywords: String = "",
 )
 
 object Twips {

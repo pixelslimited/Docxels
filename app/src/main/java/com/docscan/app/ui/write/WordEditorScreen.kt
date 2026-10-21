@@ -175,7 +175,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
-    val controller = remember { EditorController(density, initial.blocks, initial.comments) }
+    val controller = remember { EditorController(density, initial.blocks, initial.comments).also { it.author = initial.author; it.subject = initial.subject; it.keywords = initial.keywords } }
     val state by controller.state.collectAsState()
     var fontOpen by remember { mutableStateOf(false) }
     var sizeOpen by remember { mutableStateOf(false) }
@@ -191,6 +191,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var commentsOpen by remember { mutableStateOf(false) }
     var navOpen by remember { mutableStateOf(false) }
     var statsOpen by remember { mutableStateOf(false) }
+    var propsOpen by remember { mutableStateOf(false) }
     var linkOpen by remember { mutableStateOf<Triple<String, String, IntArray?>?>(null) }
     var mergeOpen by remember { mutableStateOf(false) }
     var linkActions by remember { mutableStateOf<Triple<Int, Int, String>?>(null) }
@@ -432,6 +433,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
+                            DropdownMenuItem(text = { Text("Document properties") }, onClick = { menu = false; propsOpen = true })
                             DropdownMenuItem(text = { Text("Page preview") }, onClick = { menu = false; previewDoc = controller.toDoc(title, page) })
                             DropdownMenuItem(
                                 text = { Text("Share as PDF") },
@@ -995,6 +997,16 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     }
     if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
     if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
+    if (propsOpen) DocumentPropertiesDialog(
+        title = title, author = controller.author, subject = controller.subject, keywords = controller.keywords,
+        onSave = { t, a, s, k ->
+            propsOpen = false
+            if (t.isNotBlank()) title = t.trim()
+            controller.author = a.trim(); controller.subject = s.trim(); controller.keywords = k.trim()
+            tick++
+        },
+        onDismiss = { propsOpen = false },
+    )
     if (statsOpen) WordCountDialog(remember { controller.stats() }, controller.pageInfo()?.second, onDismiss = { statsOpen = false })
     counts?.let { (words, chars) ->
         AlertDialog(

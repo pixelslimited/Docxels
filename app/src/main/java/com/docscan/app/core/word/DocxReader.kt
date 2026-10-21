@@ -216,7 +216,10 @@ object DocxReader {
             }
             scan(blocks)
             val kept = comments.values.filter { it.id in used || comments.size <= 200 }.sortedBy { it.id }
-            return WordDoc(title.ifEmpty { fallbackTitle }, blocks, page, readEmbeddedFonts(dir), kept)
+            val core = xml("docProps/core.xml")
+            fun prop(name: String) = core?.find(name)?.text?.toString()?.trim().orEmpty()
+            return WordDoc(title.ifEmpty { fallbackTitle }, blocks, page, readEmbeddedFonts(dir), kept,
+                author = if (core == null) "Kelvin Codes" else prop("creator"), subject = prop("subject"), keywords = prop("keywords"))
         }
 
         /** Footnote and endnote text, added under a "Notes" heading with the [n] numbers cited in the text. */
