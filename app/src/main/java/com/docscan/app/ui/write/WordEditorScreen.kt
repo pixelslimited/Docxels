@@ -889,15 +889,20 @@ private fun Ribbon(
         Column {
             if (!open) {
                 // Closed: the quick bar (frequent tools) with the pixel D beside it; the page and word count sit above.
-                if (quick || tableTools != null) Text(
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = quick || tableTools != null,
+                    modifier = Modifier.align(Alignment.End),
+                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it * 3 }) + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it * 3 }) + androidx.compose.animation.fadeOut(),
+                ) { Text(
                     status,
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
                     maxLines = 1,
-                    modifier = Modifier.align(Alignment.End).padding(end = 16.dp, bottom = 4.dp)
+                    modifier = Modifier.padding(end = 16.dp, bottom = 4.dp)
                         .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(Color(0xB3000000))
                         .clickable(onClick = onStatus).padding(horizontal = 8.dp, vertical = 3.dp),
-                )
+                ) }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box {
                         Box(Modifier.size(44.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).clickable { tabMenu = true }, contentAlignment = Alignment.Center) {
@@ -918,8 +923,14 @@ private fun Ribbon(
                             contentAlignment = Alignment.Center,
                         ) { Icon(icon, contentDescription = label, tint = ink, modifier = Modifier.size(22.dp)) }
                     }
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = quick || tableTools != null,
+                        modifier = Modifier.weight(1f),
+                        enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it * 2 }) + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it * 2 }) + androidx.compose.animation.fadeOut(),
+                    ) {
                     if (tableTools != null) Row(
-                        Modifier.weight(1f).height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
+                        Modifier.fillMaxWidth().height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Q(Icons.Default.TableChart, "Table options") { tableTools.options() }
@@ -927,8 +938,8 @@ private fun Ribbon(
                         Q(Icons.Default.ViewColumn, "Add a column to the right") { tableTools.addColumn() }
                         Q(Icons.Default.Remove, "Delete this row") { tableTools.deleteRow() }
                         Q(Icons.Default.Delete, "Delete the table") { tableTools.deleteTable() }
-                    } else if (quick) Row(
-                        Modifier.weight(1f).height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
+                    } else Row(
+                        Modifier.fillMaxWidth().height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Q(Icons.Default.Add, "Insert") { onTab(1); open = true; grid = true }
@@ -952,6 +963,7 @@ private fun Ribbon(
                         Q(Icons.AutoMirrored.Filled.FormatListBulleted, "Bullets", s.list == ListKind.BULLET) { c.toggleList(ListKind.BULLET) }
                         Q(Icons.Default.FormatListNumbered, "Numbering", s.list == ListKind.NUMBER) { c.toggleList(ListKind.NUMBER) }
                         Q(Icons.Default.MoreVert, "More tools") { onTab(0); open = true; grid = true }
+                    }
                     }
                 }
             } else {
