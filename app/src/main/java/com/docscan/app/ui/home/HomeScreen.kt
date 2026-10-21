@@ -280,6 +280,20 @@ private fun ContinueCard(item: LibraryItem, export: com.docscan.app.export.Expor
                         (if (item.meta.lastPage > 0 && item.meta.pageTotal > 0) "Page ${item.meta.lastPage.coerceAtMost(item.meta.pageTotal)} of ${item.meta.pageTotal}" else item.detail),
                     color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, modifier = Modifier.padding(top = 4.dp),
                 )
+                if (item.meta.lastPage > 0 && item.meta.pageTotal > 0) {
+                    // How far through the document the person got (page reached out of all pages).
+                    val frac = (item.meta.lastPage.toFloat() / item.meta.pageTotal).coerceIn(0f, 1f)
+                    val shown by androidx.compose.animation.core.animateFloatAsState(frac, androidx.compose.animation.core.tween(900), label = "readPct")
+                    Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { shown },
+                            modifier = Modifier.weight(1f).height(8.dp).clip(CircleShape),
+                            color = Color.White, trackColor = Color.White.copy(alpha = 0.25f), strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
+                            gapSize = 0.dp, drawStopIndicator = {},
+                        )
+                        Text("${(frac * 100).toInt()}%", color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
                 if (export != null) Row(
                     Modifier.padding(top = 10.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)).padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,

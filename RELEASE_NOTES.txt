@@ -133,3 +133,4 @@ The quick tool bar above the keyboard now has Paste and a Clipboard menu (Copy, 
 The quick tool bar no longer has the Insert button (Insert is still in the tools menu); Paste comes first.
 Review → Mail merge: type fields such as {{Name}} in a letter, choose a list (a table in the document, or an Excel or CSV file), and get one new document with a page for every recipient. Tip: in Excel, format phone numbers as text so the leading 0 stays.
 On Home, the "Continue where you stopped" page now comes alive: it fans in on top of two pages behind it, floats and sways gently, and leans toward your finger in 3D when you touch it, then springs back. Scrolling and tapping the card still work. It stays still if your phone has animations switched off.
+The Continue card now shows a progress bar and percentage under "Edited … · Page X of Y", showing how far through the document you got.
