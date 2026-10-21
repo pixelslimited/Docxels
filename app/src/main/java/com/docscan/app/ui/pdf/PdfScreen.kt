@@ -8,6 +8,8 @@ import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.drawBehind
+import com.docscan.app.pdf.PdfPhones
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.pointer.pointerInput
@@ -463,6 +465,9 @@ private fun PageThumbnail(preview: PdfPreview, index: Int, modifier: Modifier) {
 private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total: Int) -> Unit = { _, _ -> }) {
     val preview = remember(file.path) { runCatching { PdfPreview(file) }.getOrNull() }
     DisposableEffect(preview) { onDispose { preview?.close() } }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val phones = remember(file.path) { PdfPhones(context, file) }
+    DisposableEffect(phones) { onDispose { phones.close() } }
     if (preview == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("This PDF could not be displayed.") }
         return
@@ -511,12 +516,30 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                 items(count) { i ->
                     val bmp by produceState<Bitmap?>(null, preview, i, renderScale) { value = runCatching { preview.render(i, widthPx * renderScale) }.getOrNull() }
                     val ratio by produceState(0.707f, preview, i) { value = runCatching { preview.pageSize(i).let { it.first.toFloat() / it.second } }.getOrDefault(0.707f) }
-                    Box(
+                    val numbers by produceState<List<PdfPhones.Box>>(emptyList(), phones, i) { value = phones.page(i) }
+                    BoxWithConstraints(
                         Modifier.requiredWidth(maxWidth * zoom - 24.dp * zoom).offset { androidx.compose.ui.unit.IntOffset(panX.toInt(), 0) }
                             .aspectRatio(ratio).background(Color.White),
                         contentAlignment = Alignment.Center,
                     ) {
                         bmp?.let { Image(it.asImageBitmap(), "Page ${i + 1}", contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxSize()) }
+                        // Phone numbers in the PDF's own text: underlined, tap one to open the dialer.
+                        val pageW = this.maxWidth
+                        val pageH = this.maxHeight
+                        for (p in numbers) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopStart)
+                                    .offset(pageW * p.x - 3.dp, pageH * p.y - 3.dp)
+                                    .size(pageW * p.w + 6.dp, pageH * p.h + 6.dp)
+                                    .drawBehind {
+                                        val y = size.height - 3.dp.toPx()
+                                        drawRect(Color(0x221565C0), topLeft = androidx.compose.ui.geometry.Offset(3.dp.toPx(), 3.dp.toPx()), size = androidx.compose.ui.geometry.Size(size.width - 6.dp.toPx(), size.height - 6.dp.toPx()))
+                                        drawLine(Color(0xFF1565C0), androidx.compose.ui.geometry.Offset(3.dp.toPx(), y), androidx.compose.ui.geometry.Offset(size.width - 3.dp.toPx(), y), strokeWidth = 1.5.dp.toPx())
+                                    }
+                                    .clickable { com.docscan.app.ui.dialNumber(context, p.number) },
+                            )
+                        }
                     }
                 }
             }
