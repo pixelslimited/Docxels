@@ -46,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -81,11 +82,36 @@ private enum class Filter { ALL, WORD, SCANS, PDFS, FAVOURITES, TRASH }
 private enum class Sort(val label: String) { DATE("Date modified"), NAME("Name") }
 
 @Composable
-fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions: Actions, vm: LibraryViewModel, onOpen: (LibraryItem) -> Unit) {
+fun DocumentsScreen(
+    items: List<LibraryItem>, trash: List<LibraryItem>, actions: Actions, vm: LibraryViewModel, onOpen: (LibraryItem) -> Unit,
+    onImportDevice: (java.io.File) -> Unit = {}, focusSearch: Boolean = false, onSearchFocused: () -> Unit = {},
+) {
     val context = LocalContext.current
     val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { vm.say(it) }
     val t = DocxelsTheme.tints
     var query by remember { mutableStateOf("") }
+    // Documents anywhere on the phone, listed while typing (needs the optional "All files access" switch).
+    val searchFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(focusSearch) { if (focusSearch) { runCatching { searchFocus.requestFocus() }; onSearchFocused() } }
+    var deviceAccess by remember { mutableStateOf(android.os.Environment.isExternalStorageManager()) }
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) deviceAccess = android.os.Environment.isExternalStorageManager()
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+    var deviceIndex by remember { mutableStateOf<List<com.docscan.app.core.DeviceFile>?>(null) }
+    val deviceActive = query.trim().length >= 2
+    LaunchedEffect(deviceAccess, deviceActive) {
+        if (deviceAccess && deviceActive && deviceIndex == null) {
+            deviceIndex = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.docscan.app.core.DeviceFiles.scan(android.os.Environment.getExternalStorageDirectory())
+            }
+        }
+    }
+    val deviceHits = remember(deviceIndex, query) { deviceIndex?.let { com.docscan.app.core.DeviceFiles.filter(it, query) } ?: emptyList() }
     var filter by remember { mutableStateOf(Filter.ALL) }
     var sort by remember { mutableStateOf(Sort.DATE) }
     var sortMenu by remember { mutableStateOf(false) }
@@ -172,7 +198,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                placeholder = { Text("Search names, tags and words inside") },
+                placeholder = { Text("Search your documents and this phone") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 shape = CircleShape,
                 colors = TextFieldDefaults.colors(
@@ -181,7 +207,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                 ),
-                modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth().focusRequester(searchFocus),
             )
             Row(
                 Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
@@ -218,7 +244,7 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                 Text("Items stay here for 30 days, then they are deleted for good.", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 24.dp))
             }
-            if (shown.isEmpty()) {
+            if (shown.isEmpty() && !(deviceActive && filter != Filter.TRASH)) {
                 Text(
                     "Nothing matches.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -226,7 +252,8 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                     modifier = Modifier.padding(24.dp),
                 )
             }
-            if (grid) {
+            val showDevice = deviceActive && filter != Filter.TRASH
+            if (grid && !showDevice) {
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(150.dp),
                     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
@@ -245,6 +272,26 @@ fun DocumentsScreen(items: List<LibraryItem>, trash: List<LibraryItem>, actions:
                 ) {
                     items(shown, key = { it.kind.name + it.id }) { item ->
                         LibraryRow(item, onClick = { actionsFor = item })
+                    }
+                    if (showDevice) {
+                        item(key = "device-head") {
+                            Text("ON THIS PHONE", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp, start = 4.dp))
+                        }
+                        when {
+                            !deviceAccess -> item(key = "device-allow") {
+                                DeviceNote("Allow access to all files to search the documents on your phone as you type. Tap here to switch it on.") {
+                                    val pkg = android.net.Uri.parse("package:" + context.packageName)
+                                    runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, pkg)) }
+                                        .onFailure { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) } }
+                                }
+                            }
+                            deviceIndex == null -> item(key = "device-wait") { DeviceNote("Looking through your phone…", null) }
+                            deviceHits.isEmpty() -> item(key = "device-none") { DeviceNote("No PDF, Word or text file on the phone matches.", null) }
+                            else -> items(deviceHits.size, key = { "dev:" + deviceHits[it].file.path }) { idx ->
+                                val f = deviceHits[idx]
+                                DeviceRow(f) { onImportDevice(f.file) }
+                            }
+                        }
                     }
                 }
             }
@@ -432,5 +479,34 @@ fun friendlyDate(millis: Long): String {
         sameDay -> "Today, " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(millis))
         yesterday -> "Yesterday"
         else -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis))
+    }
+}
+
+@Composable
+private fun DeviceNote(text: String, onClick: (() -> Unit)?) {
+    Text(
+        text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(16.dp),
+    )
+}
+
+/** A document found on the phone. Tapping it imports a copy into Docxels and opens it. */
+@Composable
+private fun DeviceRow(f: com.docscan.app.core.DeviceFile, onClick: () -> Unit) {
+    val pdf = f.name.endsWith(".pdf", ignoreCase = true)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "Import and open", onClick = onClick).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(if (pdf) Icons.Default.PictureAsPdf else Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column(Modifier.padding(start = 14.dp).weight(1f)) {
+            Text(f.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(
+                "${f.folder} · ${android.text.format.Formatter.formatShortFileSize(androidx.compose.ui.platform.LocalContext.current, f.size)}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+            )
+        }
     }
 }

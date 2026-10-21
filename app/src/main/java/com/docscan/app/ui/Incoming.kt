@@ -1,5 +1,6 @@
 package com.docscan.app.ui
 
+import com.docscan.app.core.readUpTo
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -47,12 +48,12 @@ object Incoming {
                     } finally { com.docscan.app.security.SecureFiles.wipe(tmp) }
                 }
                 lower.endsWith(".docx") || mime.contains("wordprocessingml") -> {
-                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readNBytes(MAX_BYTES.toInt() + 1) } ?: error("unreadable")
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readUpTo(MAX_BYTES.toInt() + 1) } ?: error("unreadable")
                     if (bytes.size > MAX_BYTES) { say("That file is too large to import."); return@withContext null }
                     "write/" + container.words.importDocx(bytes, base)
                 }
                 mime.startsWith("text/") || lower.endsWith(".txt") -> {
-                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readNBytes(2_000_000) } ?: error("unreadable")
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readUpTo(2_000_000) } ?: error("unreadable")
                     val paragraphs = String(bytes, Charsets.UTF_8).replace("\r\n", "\n").split('\n').map { Paragraph(listOf(Run(it)), align = Align.LEFT) }
                     "write/" + container.words.add(WordDoc(title = base, blocks = paragraphs.map { com.docscan.app.core.word.Block.Para(it) }.ifEmpty { listOf(com.docscan.app.core.word.Block.Para(Paragraph())) }))
                 }

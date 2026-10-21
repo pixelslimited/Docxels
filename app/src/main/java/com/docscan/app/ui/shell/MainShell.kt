@@ -1,5 +1,6 @@
 package com.docscan.app.ui.shell
 
+import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -124,6 +125,8 @@ fun MainShell(
     var invoiceMaker by remember { mutableStateOf(false) }
     var displayName by remember { mutableStateOf(container.ui.displayName) }
     var pick by remember { mutableStateOf<Pick?>(null) }
+    var focusSearch by remember { mutableStateOf(false) }
+    val shellScope = androidx.compose.runtime.rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     // Back from Documents, Tools or Settings goes to Home first; only Home leaves the app.
     androidx.activity.compose.BackHandler(enabled = tab != Tab.HOME) { tab = Tab.HOME }
@@ -181,7 +184,7 @@ fun MainShell(
                     items = items,
                     actions = actions,
                     onOpen = { when (it.kind) { DocKind.SCAN -> onOpenScan(it.id); DocKind.PDF -> onOpenPdf(it.id); else -> onOpenWord(it.id) } },
-                    onSearch = { tab = Tab.DOCS },
+                    onSearch = { focusSearch = true; tab = Tab.DOCS },
                     onAllTools = { tab = Tab.TOOLS },
                     onAllDocs = { tab = Tab.DOCS },
                     name = displayName,
@@ -194,6 +197,24 @@ fun MainShell(
                     actions = actions,
                     vm = vm,
                     onOpen = { when (it.kind) { DocKind.SCAN -> onOpenScan(it.id); DocKind.PDF -> onOpenPdf(it.id); else -> onOpenWord(it.id) } },
+                    focusSearch = focusSearch,
+                    onSearchFocused = { focusSearch = false },
+                    onImportDevice = { file ->
+                        // Picking a document found on the phone imports a copy into Docxels and opens it.
+                        shellScope.launch {
+                            vm.setBusy("Importing ${file.name}…")
+                            val route = try {
+                                com.docscan.app.ui.Incoming.import(context.applicationContext, container, android.net.Uri.fromFile(file)) { vm.say(it) }
+                            } finally { vm.setBusy(null) }
+                            val id = route?.substringAfter('/')
+                            when {
+                                route == null || id == null -> {}
+                                route.startsWith("pdfdoc/") -> onOpenPdf(id)
+                                route.startsWith("write/") -> onOpenWord(id)
+                                else -> onOpenScan(id)
+                            }
+                        }
+                    },
                 )
                 Tab.TOOLS -> ToolsScreen(actions)
                 Tab.SETTINGS -> SettingsScreen(container = container)

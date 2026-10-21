@@ -5,6 +5,9 @@
     <!-- Only permission needed: live camera. Gallery import uses the system photo picker (no permission),
          and saving uses MediaStore (no storage permission on Android 10+). -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Optional "All files access": lets Documents search list PDF/Word/text files anywhere on the phone while typing.
+         The person turns it on themselves in Settings; everything else works without it. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- Network is used for exactly one thing: the user-initiated "Check for updates" in Settings (see update/Updater.kt).
          Scanning, OCR, editing and exports never touch the network. CI fails if networking code appears outside update/. -->
     <uses-permission android:name="android.permission.INTERNET" />

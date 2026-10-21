@@ -1,5 +1,6 @@
 package com.docscan.app.ui.shell
 
+import com.docscan.app.core.readUpTo
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -115,6 +116,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
     val message: StateFlow<String?> = _message
 
     fun messageShown() { _message.value = null }
+    fun setBusy(label: String?) { _busy.value = label }
 
     fun say(text: String) { _message.value = text }
 
@@ -211,7 +213,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
                         }
                     }
                     require(size < 0 || size <= MAX_IMPORT_BYTES) { "That file is too large to import." }
-                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readNBytes(MAX_IMPORT_BYTES.toInt() + 1) }
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readUpTo(MAX_IMPORT_BYTES.toInt() + 1) }
                         ?: error("Could not read that file.")
                     require(bytes.size <= MAX_IMPORT_BYTES) { "That file is too large to import." }
                     val count = if (tracked == null) com.docscan.app.core.word.DocxReader.trackedCount(bytes) else 0
