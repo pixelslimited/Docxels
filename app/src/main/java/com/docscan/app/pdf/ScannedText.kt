@@ -25,7 +25,7 @@ class ScannedText(private val preview: PdfPreview, private val ocr: OcrEngine) {
                 val r = l.boundingBox ?: return@mapNotNull null
                 Line(l.text, r.left / w, r.top / h, r.width() / w, r.height() / h)
             }
-        }.getOrNull() ?: return@lock emptyList() // a failure is not remembered, so a later search tries again
+        }.getOrNull() ?: return@withLock emptyList() // a failure is not remembered, so a later search tries again
         cache[index] = read
         read
     }
