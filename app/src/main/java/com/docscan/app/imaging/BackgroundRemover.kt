@@ -178,9 +178,9 @@ object BackgroundRemover {
 
             // The subject model (U^2-Net-P, on the phone) finds the main object whatever the background looks like.
             // When it finds one, its outline replaces the colour guess as the starting mask for GrabCut.
-            val sureT: Float = if (subjectOnly) 0.85f else 0.5f
-            val probT: Float = if (subjectOnly) 0.5f else 0.08f
-            val growPx: Double = if (subjectOnly) 41.0 else 61.0
+            val sureT: Float = if (subjectOnly) 0.95f else 0.5f
+            val probT: Float = if (subjectOnly) 0.85f else 0.08f
+            val growPx: Double = if (subjectOnly) 25.0 else 61.0
             val prior = subjectPrior(small, w, h)
             if (prior != null) {
                 val salient = Mat(h, w, CvType.CV_8UC1)

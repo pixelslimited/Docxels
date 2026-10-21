@@ -49,7 +49,7 @@ fun AboutPanel(context: Context) {
     }
     InfoRow(
         "Privacy",
-        "Scanning, text recognition and exports all run on this phone. Files you export or share leave the app only where you send them. The only network use is checking for and downloading app updates when you ask.",
+        "Scanning, text recognition and exports all run on this phone. Files you export or share leave the app only where you send them. It goes online only when you ask: to check for and download app updates, or, if you sign in, to run an assistant action on the text you chose or to pay for Pro.",
     )
     InfoRow(
         "Open-source notices",

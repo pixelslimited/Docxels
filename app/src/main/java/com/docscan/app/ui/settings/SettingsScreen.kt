@@ -211,8 +211,8 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             HorizontalDivider()
             InfoRow(
                 "How your documents are protected",
-                "Pages are encrypted on this phone with a key held in the Android Keystore. Docxels never uploads your documents: " +
-                    "its only network use is the update check you start yourself. Backups of app data are switched off. This keeps casual access " +
+                "Pages are encrypted on this phone with a key held in the Android Keystore. Docxels never uploads your documents in the background. " +
+                    "It goes online only for the update check you start, and, if you sign in, for the assistant action you tap (the text you chose is sent for that one request) and for payments. Backups of app data are switched off. This keeps casual access " +
                     "and stolen-storage attacks out; it can't protect a phone that is already unlocked, rooted or infected.",
             )
 

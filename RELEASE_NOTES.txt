@@ -115,3 +115,4 @@ New: sign in with an email and password (Settings → Account, or the editor's R
 New: writing assistant in the editor (Review → Assistant): check writing (underlines with tap-to-fix), fix spelling and grammar, improve, shorten, lengthen, translate (English, Hausa, Yoruba, Igbo, French, Arabic), clean scanned text, summarise, and ask about the document. It works on the selection, or the whole document. Text is sent only when you tap an action.
 New: Pro upgrade through Paystack (opens the payment page in your browser). Prices are not set yet, so the button says payments are not open yet until the price is switched on.
 Your documents are NOT uploaded: cloud backup and sync are not in this version yet.
+Remove background → Subject only is stricter: in a test it keeps the baby and the bottom text plate and drops the title and teddy. The privacy text now says the app also goes online for the signed-in assistant and payments.
