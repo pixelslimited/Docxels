@@ -66,7 +66,9 @@ android {
     testOptions { unitTests { isIncludeAndroidResources = true } }
     buildFeatures { compose = true }
     packaging {
-        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+        // The post-quantum part of Bouncy Castle (pulled in by the PDF library) ships about 8 MB of tables that nothing
+        // in Docxels uses (PDF passwords use the ordinary algorithms); leaving them out saves about 4 MB in the APK.
+        resources { excludes += listOf("/META-INF/{AL2.0,LGPL2.1}", "/org/bouncycastle/pqc/**") }
         // Compress native libraries inside the APK (much smaller download than the uncompressed default).
         jniLibs { useLegacyPackaging = true }
     }

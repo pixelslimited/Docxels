@@ -40,3 +40,4 @@
 *|FIX|Dark paper is dark|Dark paper now shows black pages with light text instead of a blue tint.
 *|FIX|Letterhead no longer cut off|Every sheet is now a whole sheet, so the footer band of the letterhead shows at the bottom of each page in the editor, preview and PDF.
 *|FIX|Shorter, grouped menu|The editor menu is now grouped: Save as, Share and Document open their own lists.
+*|FIX|Smaller download|The app file is about 4 MB smaller; nothing you use is removed.
