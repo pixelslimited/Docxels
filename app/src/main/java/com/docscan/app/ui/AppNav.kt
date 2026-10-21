@@ -102,7 +102,7 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 key = "write-$id",
                 factory = viewModelFactory { initializer { WordViewModel(container, id) } },
             )
-            WordEditorScreen(vm = vm, onBack = { nav.popBackStack() })
+            WordEditorScreen(vm = vm, onBack = { nav.popBackStack() }, onOpenWord = { nid -> nav.navigate("write/$nid") })
         }
         composable(SCAN) { entry ->
             val docId = entry.arguments?.getString("docId") ?: return@composable

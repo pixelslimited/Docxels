@@ -41,6 +41,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Spellcheck
 import androidx.compose.material.icons.filled.SelectAll
@@ -146,7 +147,7 @@ private val HIGHLIGHTS = listOf(0xFFFF00, 0x92D050, 0x00FFFF, 0xFF99CC, 0xFFC000
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WordEditorScreen(vm: WordViewModel, onBack: () -> Unit) {
+fun WordEditorScreen(vm: WordViewModel, onBack: () -> Unit, onOpenWord: (String) -> Unit = {}) {
     val doc = vm.doc
     when {
         vm.failed -> {
@@ -158,13 +159,13 @@ fun WordEditorScreen(vm: WordViewModel, onBack: () -> Unit) {
             }
         }
         doc == null -> Surface(Modifier.fillMaxSize()) {}
-        else -> Editor(vm, doc, onBack)
+        else -> Editor(vm, doc, onBack, onOpenWord)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
+private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOpenWord: (String) -> Unit) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
@@ -180,6 +181,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var navOpen by remember { mutableStateOf(false) }
     var statsOpen by remember { mutableStateOf(false) }
     var linkOpen by remember { mutableStateOf<Triple<String, String, IntArray?>?>(null) }
+    var mergeOpen by remember { mutableStateOf(false) }
     var linkActions by remember { mutableStateOf<Triple<Int, Int, String>?>(null) }
     val recentFonts = remember { mutableStateListOf<String>() }
     var caseMenu by remember { mutableStateOf(false) }
@@ -643,6 +645,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     onFind = { findOpen = true },
                     onAssistant = { assistantOpen = true },
                     onCount = { statsOpen = true },
+                    onMailMerge = { mergeOpen = true },
                     onSpelling = {
                         scope.launch {
                             val sc = controller.assistantScope()
@@ -733,6 +736,22 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                 placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT), keep = true)
             },
             onDismiss = { signSource = null },
+        )
+    }
+    if (mergeOpen) {
+        MailMergeDialog(
+            document = { controller.toDoc(title, page) },
+            onInsertField = { controller.insertText(it) },
+            onCreate = { merged, _ ->
+                mergeOpen = false
+                scope.launch {
+                    val id = withContext(Dispatchers.IO) { container.words.add(merged) }
+                    val letters = merged.blocks.count { it == Block.PageBreak } + 1
+                    val r = snackbar.showSnackbar("Created $letters letters: ${merged.title}", actionLabel = "Open", duration = androidx.compose.material3.SnackbarDuration.Long)
+                    if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) onOpenWord(id)
+                }
+            },
+            onDismiss = { mergeOpen = false },
         )
     }
     if (signPad) {
@@ -946,6 +965,7 @@ private fun Ribbon(
     onFind: () -> Unit,
     onAssistant: () -> Unit,
     onCount: () -> Unit,
+    onMailMerge: () -> Unit,
     onSpelling: () -> Unit,
     onFont: () -> Unit,
     onSize: () -> Unit,
@@ -1040,6 +1060,7 @@ private fun Ribbon(
         cmd("Symbol", "Insert", "special character") { onSymbol() }
         cmd("New comment", "Review", "note") { onNewComment() }
         cmd("Page setup", "Layout", "margins orientation landscape portrait paper size a4 header footer page number first page odd even") { onPageSetup() }
+        cmd("Mail merge", "Review", "letters recipients list fields excel csv personalised") { onMailMerge() }
         cmd("Find and replace", "Review", "search") { onFind() }
         cmd("Check spelling", "Review · Proofing", "spell mistakes typo") { onSpelling() }
         cmd("Assistant", "Review", "ai rewrite summarise grammar translate") { onAssistant() }
@@ -1061,7 +1082,7 @@ private fun Ribbon(
         0 -> listOf("Font" to Icons.Default.TextFields, "Clipboard" to Icons.Default.ContentPaste, "Paragraph" to Icons.Default.FormatAlignLeft, "Style" to Icons.Default.Title, "Clear" to Icons.Default.FormatClear)
         1 -> listOf("Illustrations" to Icons.Default.Image, "Letterhead and signature" to Icons.Default.Draw, "Text and page" to Icons.Default.Link)
         2 -> listOf("Page" to Icons.Default.Description)
-        3 -> listOf("Find" to Icons.Default.Search, "Proofing" to Icons.Default.Numbers, "Comments" to Icons.Default.Menu)
+        3 -> listOf("Mail merge" to Icons.Default.Email, "Find" to Icons.Default.Search, "Proofing" to Icons.Default.Numbers, "Comments" to Icons.Default.Menu)
         else -> listOf("Views" to Icons.Default.Description, "Zoom" to Icons.Default.Search, "Reading" to Icons.Default.Menu)
     }
     val pickedGroup = groupPick[tab]?.takeIf { n -> groupsOf(tab).any { it.first == n } } ?: groupsOf(tab).first().first
@@ -1398,6 +1419,8 @@ private fun Ribbon(
                         Btn("Page setup", Icons.Default.Description, close = true) { onPageSetup() }
                     }
                     3 -> {
+                        Group("Mail merge")
+                        Btn("Mail merge", Icons.Default.Email, close = true) { onMailMerge() }
                         Group("Find")
                         Btn("Find and replace", Icons.Default.Search, close = true) { onFind() }
                         Group("Assistant")

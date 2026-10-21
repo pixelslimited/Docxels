@@ -131,3 +131,4 @@ Home now has a Clipboard group: Paste, Paste as plain text, Cut, Copy, Select al
 Page setup: headers and footers can have several lines, be left, centred or right, and show "Page X of Y". They carry through to PDF and Word.
 The quick tool bar above the keyboard now has Paste and a Clipboard menu (Copy, Cut, Paste as plain text, Select all). The bar scrolls sideways to fit them.
 The quick tool bar no longer has the Insert button (Insert is still in the tools menu); Paste comes first.
+Review → Mail merge: type fields such as {{Name}} in a letter, choose a list (a table in the document, or an Excel or CSV file), and get one new document with a page for every recipient. Tip: in Excel, format phone numbers as text so the leading 0 stays.
