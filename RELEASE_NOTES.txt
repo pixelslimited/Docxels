@@ -104,3 +104,4 @@
 225|My styles: save the formatting at the cursor (font, size, bold, italic, colours) under a name, then apply it to selected text or a whole paragraph (Home, Style).
 226|The floating quick tools slide up to show and slide down to hide.
 227|Tap a picture or shape: the floating tools switch to picture tools (options, turn 90 degrees, smaller, larger, delete). Tap the page to go back to the text tools.
+228|Picture tools on the floating bar now also have text wrap, crop (with sliders and a shaded preview) and remove background.

@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.WrapText
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
@@ -207,6 +210,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     var tableCtx by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
     // The picture or shape (block index) whose tools the floating bar shows.
     var pictureCtx by remember { mutableStateOf<Int?>(null) }
+    var wrapFor by remember { mutableStateOf<Int?>(null) }
+    var cropFor by remember { mutableStateOf<Int?>(null) }
     var ribbonPx by remember { mutableIntStateOf(0) }
     fun resizePicture(idx: Int, factor: Float) {
         val maxW = page.contentWidthTwips
@@ -540,10 +545,23 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                         )
                     } ?: pictureCtx?.let { idx ->
                         buildList {
-                            add(ToolAction(Icons.Default.Image, "Picture options") { pictureCtx = null; editing = idx })
-                            if (controller.blockAt(idx) is Block.Image) add(ToolAction(Icons.Default.RotateRight, "Turn 90 degrees") {
-                                (controller.blockAt(idx) as? Block.Image)?.let { b -> rotateQuarterTurn(b.image)?.let { controller.replaceBlock(idx, Block.Image(it)) } }
-                            })
+                            add(ToolAction(Icons.Default.Image, "Edit picture") { pictureCtx = null; editing = idx })
+                            add(ToolAction(Icons.Default.WrapText, "Text wrap") { wrapFor = idx })
+                            if (controller.blockAt(idx) is Block.Image) {
+                                add(ToolAction(Icons.Default.Crop, "Crop") { cropFor = idx })
+                                add(ToolAction(Icons.Default.AutoFixHigh, "Remove background") {
+                                    val img = (controller.blockAt(idx) as? Block.Image)?.image
+                                    if (img != null) scope.launch {
+                                        val note = launch { snackbar.showSnackbar("Removing the background…", duration = androidx.compose.material3.SnackbarDuration.Indefinite) }
+                                        val cut = withContext(Dispatchers.Default) { removePictureBackground(img) }
+                                        note.cancel()
+                                        if (cut != null) controller.replaceBlock(idx, Block.Image(cut)) else snackbar.showSnackbar("Couldn't remove the background from this picture.")
+                                    }
+                                })
+                                add(ToolAction(Icons.Default.RotateRight, "Turn 90 degrees") {
+                                    (controller.blockAt(idx) as? Block.Image)?.let { b -> rotateQuarterTurn(b.image)?.let { controller.replaceBlock(idx, Block.Image(it)) } }
+                                })
+                            }
                             add(ToolAction(Icons.Default.ZoomOut, "Smaller") { resizePicture(idx, 0.85f) })
                             add(ToolAction(Icons.Default.ZoomIn, "Larger") { resizePicture(idx, 1.18f) })
                             add(ToolAction(Icons.Default.Delete, "Delete") { pictureCtx = null; controller.select(-1); controller.removeBlock(idx) })
@@ -751,6 +769,37 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
     if (findOpen) FindDialog(controller, onClose = { findOpen = false })
     if (myStylesOpen) MyStylesDialog(controller, onClose = { myStylesOpen = false })
+    wrapFor?.let { idx ->
+        val cur = (controller.blockAt(idx) as? Block.Image)?.image?.wrap ?: (controller.blockAt(idx) as? Block.Shape)?.shape?.wrap
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { wrapFor = null },
+            title = { Text("Text wrap") },
+            text = {
+                Column {
+                    Text("Behind and in front of text let you drag the picture anywhere. The other choices are saved in the file; the editor may still show them in line with the text.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+                    com.docscan.app.core.word.ImageWrap.entries.forEach { w ->
+                        Row(Modifier.fillMaxWidth().clickable {
+                            wrapFor = null
+                            when (val b = controller.blockAt(idx)) {
+                                is Block.Image -> controller.replaceBlock(idx, Block.Image(b.image.copy(wrap = w)))
+                                is Block.Shape -> controller.replaceBlock(idx, Block.Shape(b.shape.copy(wrap = w)))
+                                else -> {}
+                            }
+                        }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.RadioButton(selected = cur == w, onClick = null)
+                            Text(w.label, modifier = Modifier.padding(start = 12.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { wrapFor = null }) { Text("Close") } },
+        )
+    }
+    cropFor?.let { idx ->
+        val img = (controller.blockAt(idx) as? Block.Image)?.image
+        if (img == null) cropFor = null
+        else CropDialog(img, onDone = { cropFor = null; controller.replaceBlock(idx, Block.Image(it)) }, onDismiss = { cropFor = null })
+    }
     if (pageOpen) PageSetupDialog(page, onApply = { page = it; pageOpen = false }, onDismiss = { pageOpen = false })
     if (fontOpen) FontPickerDialog(
         current = state.font, recent = recentFonts.toList(),
