@@ -261,13 +261,12 @@ private fun greeting(): String {
 /** The most recent document as a large card: a little page, its title and details, and a button to carry on. */
 @Composable
 private fun ContinueCard(item: LibraryItem, export: com.docscan.app.export.ExportStatus.State?, onClick: () -> Unit) {
-    val sheets = rememberSheetsState()
     Column(
-        Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(DocxelsTheme.brand.gradient).sheetsTouch(sheets).padding(20.dp),
+        Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(DocxelsTheme.brand.gradient).padding(20.dp),
     ) {
         Text("CONTINUE WHERE YOU STOPPED", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelLarge, letterSpacing = 1.sp)
         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            CardThumb(item, sheets)
+            CardThumb(item)
             Column(Modifier.padding(start = 16.dp).weight(1f)) {
                 Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 2)
                 Text(
@@ -312,26 +311,48 @@ private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier, on
     }
 }
 
-/** A real picture of the document's first page for scans and PDFs; Word documents keep the little animated page. */
+/** First pages already drawn, so Home does not redraw them every time it is shown. */
+private object CardThumbs {
+    private val cache = object : android.util.LruCache<String, android.graphics.Bitmap>(6) {}
+    fun get(key: String): android.graphics.Bitmap? = cache.get(key)
+    fun put(key: String, b: android.graphics.Bitmap) { cache.put(key, b) }
+}
+
+/** A real picture of the document's first page: scans, PDFs and Word documents alike. */
 @Composable
-private fun CardThumb(item: LibraryItem, sheets: com.docscan.app.ui.home.SheetsState) {
+private fun CardThumb(item: LibraryItem) {
     val container = com.docscan.app.LocalContainer.current
-    val bmp by androidx.compose.runtime.produceState<android.graphics.Bitmap?>(null, item.id, item.modified) {
-        value = when (item.kind) {
-            com.docscan.app.data.DocKind.SCAN -> item.cover?.let { runCatching { container.renderer.thumbnail(it) }.getOrNull() }
-            com.docscan.app.data.DocKind.PDF -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching {
-                    val f = container.pdfs.open(item.id) ?: return@runCatching null
-                    try { com.docscan.app.pdf.PdfPreview(f).use { it.render(0, 360) } } finally { f.delete() }
-                }.getOrNull()
-            }
-            else -> null
-        }
+    val key = "${item.kind}:${item.id}:${item.modified}"
+    val bmp by androidx.compose.runtime.produceState<android.graphics.Bitmap?>(CardThumbs.get(key), key) {
+        if (value != null) return@produceState
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                when (item.kind) {
+                    com.docscan.app.data.DocKind.SCAN -> item.cover?.let { container.renderer.thumbnail(it) }
+                    com.docscan.app.data.DocKind.PDF -> {
+                        val f = container.pdfs.open(item.id)
+                        if (f == null) null else try { com.docscan.app.pdf.PdfPreview(f).use { it.render(0, 360) } } finally { f.delete() }
+                    }
+                    com.docscan.app.data.DocKind.DOCX -> {
+                        val doc = container.words.load(item.id)
+                        if (doc == null) null else {
+                            // Only the start of the document is needed for page one.
+                            val tmp = java.io.File.createTempFile("thumb", ".pdf", container.thumbDir())
+                            try {
+                                tmp.outputStream().use { com.docscan.app.export.WordPdf.write(doc.copy(blocks = doc.blocks.take(40)), it) }
+                                com.docscan.app.pdf.PdfPreview(tmp).use { it.render(0, 360) }
+                            } finally { tmp.delete() }
+                        }
+                    }
+                }
+            }.getOrNull()
+        }?.also { CardThumbs.put(key, it) }
     }
     val b = bmp
-    if (b == null) FloatingSheets(sheets)
-    else Image(
-        b.asImageBitmap(), contentDescription = "First page of ${item.title}", contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-        modifier = Modifier.size(width = 84.dp, height = 112.dp).clip(RoundedCornerShape(10.dp)).background(Color.White),
-    )
+    Box(Modifier.size(width = 84.dp, height = 112.dp).clip(RoundedCornerShape(10.dp)).background(Color.White)) {
+        if (b != null) Image(
+            b.asImageBitmap(), contentDescription = "First page of ${item.title}", contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            alignment = Alignment.TopCenter, modifier = Modifier.fillMaxSize(),
+        )
+    }
 }

@@ -65,6 +65,9 @@ class AppContainer(context: Context) {
     val pdfs = com.docscan.app.data.PdfStore(context)
     val cloud = com.docscan.app.cloud.Cloud(context)
     val exportStatus = com.docscan.app.export.ExportStatus()
+    private val appCache = context.cacheDir
+    /** Scratch folder for page thumbnails. */
+    fun thumbDir(): java.io.File = java.io.File(appCache, "thumbs").apply { mkdirs() }
     val libraryMeta = com.docscan.app.data.LibraryMeta(context)
     val scanToWord = com.docscan.app.ocr.ScanToWord(renderer, ocr)
     /** A scan that has been read into Word text and is waiting for the person to check it (see ScanReviewScreen). */
