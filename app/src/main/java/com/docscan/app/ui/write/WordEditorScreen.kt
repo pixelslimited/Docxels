@@ -764,7 +764,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         }
     }
 
-    previewDoc?.let { d -> PagePreview(vm, d, dark = darkPaper) { previewDoc = null } }
+    previewDoc?.let { d -> PagePreview(vm, d) { previewDoc = null } // the preview shows the page as it prints, so no dark filter }
     savedPicker?.let { isSignature ->
         com.docscan.app.ui.settings.SavedAssetsDialog(
             signature = isSignature,

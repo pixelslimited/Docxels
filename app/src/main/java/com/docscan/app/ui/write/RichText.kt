@@ -720,6 +720,11 @@ object ChipLimits {
     @Volatile var maxWidthPx: Float = Float.MAX_VALUE
     /** True while the editor's view is drawn into a PDF/preview: editor-only marks (the grey "Page break" pill) are left out. */
     @Volatile var exporting: Boolean = false
+    /**
+     * Dark paper only: while the page is drawn through the colour filter, pictures and shapes are not drawn; each one is
+     * kept here and drawn afterwards, so a logo or photo keeps its real colours.
+     */
+    @Volatile var deferred: MutableList<(android.graphics.Canvas) -> Unit>? = null
 }
 
 class BlockChipSpan(
@@ -911,10 +916,18 @@ class BlockChipSpan(
         val objTop = if (h != null) y - h else top
         val objBottom = if (h != null) y else bottom
         when (val b = block) {
-            is com.docscan.app.core.word.Block.Image -> drawImage(c, b.image, x, objTop, objBottom, paint)
+            is com.docscan.app.core.word.Block.Image -> {
+                val later = ChipLimits.deferred
+                if (later != null) { val p = Paint(paint); later.add { cv -> drawImage(cv, b.image, x, objTop, objBottom, p) } }
+                else drawImage(c, b.image, x, objTop, objBottom, paint)
+            }
             is com.docscan.app.core.word.Block.Shape -> {
                 val w = (widthPx(paint) ?: 0).toFloat()
-                com.docscan.app.export.ShapeDraw.draw(c, b.shape, android.graphics.RectF(x, objTop.toFloat(), x + w, objBottom.toFloat()), pxPerTwip(paint) * 20f)
+                val box = android.graphics.RectF(x, objTop.toFloat(), x + w, objBottom.toFloat())
+                val scale = pxPerTwip(paint) * 20f
+                val later = ChipLimits.deferred
+                if (later != null) later.add { cv -> com.docscan.app.export.ShapeDraw.draw(cv, b.shape, box, scale) }
+                else com.docscan.app.export.ShapeDraw.draw(c, b.shape, box, scale)
             }
             is com.docscan.app.core.word.Block.Table -> drawTable(c, b.table, x, objTop, paint)
             else -> drawLabel(c, x, top, y, bottom, paint)

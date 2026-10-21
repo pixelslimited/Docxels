@@ -105,15 +105,43 @@ class RichEditText(context: Context) : EditText(context) {
 
     /** Dark paper (see [NightPaper]): screen only. The desk strips between pages are drawn after the filter so they keep the desk colour. */
     var nightPaper = false
-        set(v) { if (field != v) { field = v; invalidate() } }
+        set(v) {
+            if (field != v) {
+                field = v
+                // The paper is painted by draw() in night mode, so that pictures can go on it with their own colours.
+                setBackgroundColor(if (v) android.graphics.Color.TRANSPARENT else 0xFFFFFFFF.toInt())
+                invalidate()
+            }
+        }
     private val nightPaint by lazy { android.graphics.Paint().apply { colorFilter = NightPaper.androidFilter() } }
+    private val nightPaperPaint = android.graphics.Paint().apply { style = android.graphics.Paint.Style.FILL; color = NightPaper.PAPER }
+    private var inNightLayer = false
 
+    /**
+     * Dark paper: the paper, then pictures behind the text, then the text and everything else through the colour filter,
+     * then pictures in front. Pictures and logos never go through the filter, so they keep their real colours.
+     */
     override fun draw(canvas: android.graphics.Canvas) {
         if (!nightPaper) { super.draw(canvas); return }
-        val n = canvas.saveLayer(null, nightPaint)
-        super.draw(canvas)
-        canvas.restoreToCount(n)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), nightPaperPaint)
+        drawFloating(canvas, true)
+        drawAllPics(canvas, true)
+        val later = ArrayList<(android.graphics.Canvas) -> Unit>()
+        ChipLimits.deferred = later
+        inNightLayer = true
+        val layer = canvas.saveLayer(null, nightPaint)
+        try { super.draw(canvas) } finally {
+            canvas.restoreToCount(layer)
+            inNightLayer = false
+            ChipLimits.deferred = null
+        }
         drawDeskGaps(canvas)
+        canvas.save()
+        canvas.translate(compoundPaddingLeft.toFloat(), extendedPaddingTop.toFloat()) // where the text layout is drawn
+        for (step in later) step(canvas)
+        canvas.restore()
+        drawFloating(canvas, false)
+        drawAllPics(canvas, false)
     }
 
     private fun drawDeskGaps(canvas: android.graphics.Canvas) {
@@ -331,13 +359,15 @@ class RichEditText(context: Context) : EditText(context) {
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
-        drawFloating(canvas, true)
-        drawAllPics(canvas, true)
+        if (!inNightLayer) {
+            drawFloating(canvas, true)
+            drawAllPics(canvas, true)
+        }
         super.onDraw(canvas)
-        drawFloating(canvas, false)
+        if (!inNightLayer) drawFloating(canvas, false)
         drawHandles(canvas)
         val d = decor ?: return
-        drawAllPics(canvas, false)
+        if (!inNightLayer) drawAllPics(canvas, false)
         val ys = pageStarts()
         small.textSize = d.smallTextPx
         val topPad = totalPaddingTop.toFloat()

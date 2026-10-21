@@ -41,3 +41,4 @@
 *|FIX|Letterhead no longer cut off|Every sheet is now a whole sheet, so the footer band of the letterhead shows at the bottom of each page in the editor, preview and PDF.
 *|FIX|Shorter, grouped menu|The editor menu is now grouped: Save as, Share and Document open their own lists.
 *|FIX|Smaller download|The app file is about 4 MB smaller; nothing you use is removed.
+*|FIX|Dark paper keeps logos and pictures true|On dark paper only the paper and text change; logos, pictures and shapes keep their real colours. Page preview shows the page as it prints.

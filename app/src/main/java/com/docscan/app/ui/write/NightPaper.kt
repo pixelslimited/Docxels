@@ -14,6 +14,9 @@ object NightPaper {
     private const val K = 0.831f
     private const val OFFSET = 230f
 
+    /** What white paper becomes: the same #121212 the filter gives, painted directly in night mode. */
+    const val PAPER: Int = 0xFF121212.toInt()
+
     private val values = floatArrayOf(
         0.574f * K, -1.430f * K, -0.144f * K, 0f, OFFSET,
         -0.426f * K, -0.430f * K, -0.144f * K, 0f, OFFSET,
