@@ -606,6 +606,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                         else signaturePicker.launch(PageSources.MIMES)
                     },
                     onTable = { tableOpen = true },
+                    onColumns = { n -> controller.insertBlock(Block.Table(newColumns(n, page.contentWidthTwips))) },
                     onPicture = { photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     onShape = { preset ->
                         val w = (page.contentWidthTwips * 0.45f).toInt()
@@ -894,6 +895,7 @@ private fun Ribbon(
     onLetterhead: (String) -> Unit,
     onSignature: (String) -> Unit,
     onTable: () -> Unit,
+    onColumns: (Int) -> Unit,
     onPicture: () -> Unit,
     onShape: (String) -> Unit,
     onPageBreak: () -> Unit,
@@ -1212,6 +1214,14 @@ private fun Ribbon(
                     1 -> {
                         Group("Illustrations")
                         Btn("Table", Icons.Default.TableChart, close = true) { onTable() }
+                        Box {
+                            var colMenu by remember { mutableStateOf(false) }
+                            Btn("Columns", Icons.Default.ViewColumn) { colMenu = true }
+                            DropdownMenu(expanded = colMenu, onDismissRequest = { colMenu = false }) {
+                                DropdownMenuItem(text = { Text("Two columns") }, onClick = { colMenu = false; onColumns(2) })
+                                DropdownMenuItem(text = { Text("Three columns") }, onClick = { colMenu = false; onColumns(3) })
+                            }
+                        }
                         Btn("Picture", Icons.Default.Image, close = true) { onPicture() }
                         Box {
                             Btn("Shape", Icons.Default.CropSquare) { shapeMenu = true }

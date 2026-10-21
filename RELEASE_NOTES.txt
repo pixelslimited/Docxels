@@ -110,3 +110,4 @@
 The PDF viewer now shows Edit PDF first (sign, fill, highlight, draw), then a menu with Convert to Word, Print, Save, Save as, Share and Choose another PDF. Convert to Word turns the PDF into a Word document and opens the editor.
 Pinch to zoom in the PDF viewer (up to 4 times), drag sideways when zoomed, double-tap to zoom in or reset. Pages re-draw sharper when zoomed.
 Remove background now offers a Subject only button after it finishes, for posters and artwork with no plain background: it cuts tighter around just the main subject (for example a baby on a designed card). It starts again from the original picture.
+Insert → Columns adds two or three text columns side by side that you type in directly (a borderless table, so they also open in Word and print as columns). They do not flow from one column into the next.

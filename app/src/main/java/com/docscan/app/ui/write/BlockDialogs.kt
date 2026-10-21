@@ -74,6 +74,12 @@ fun newTable(rows: Int, cols: Int, header: Boolean, contentWidthTwips: Int): Tab
     return TableBlock(grid, List(cols) { w }, headerRow = header)
 }
 
+/** Side-by-side text columns: a one-row table with no borders, typed into like any table. */
+fun newColumns(count: Int, contentWidthTwips: Int): TableBlock {
+    val w = (contentWidthTwips / count).coerceAtLeast(720)
+    return TableBlock(listOf(List(count) { TableCell() }), List(count) { w }, headerRow = false, borders = false)
+}
+
 internal fun TableCell.plain() = paragraphs.joinToString("\n") { it.text }
 
 internal fun TableCell.withText(s: String): TableCell {
