@@ -523,6 +523,17 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                             } else if (editing == null) editing = idx
                         }
                         controller.setLinkTapListener { a, b, u -> linkActions = Triple(a, b, u) }
+                        val dial = { number: String ->
+                            runCatching {
+                                host.context.startActivity(
+                                    android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:" + android.net.Uri.encode(number)))
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                            Unit
+                        }
+                        host.onDial = dial
+                        host.edit.onDial = dial
                         host.onWidth = { w -> controller.setAvailableWidth(w) }
                         host.onPinch = { z -> zoom = z }
                     }

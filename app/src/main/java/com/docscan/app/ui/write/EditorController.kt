@@ -338,7 +338,24 @@ class RichEditText(context: Context) : EditText(context) {
 
     /** Called with (start, end, address) when a hyperlink is tapped. */
     var onLinkTap: ((Int, Int, String) -> Unit)? = null
+    /** Called with a phone number when one is double-tapped in the text (or in a table cell while reading). */
+    var onDial: ((String) -> Unit)? = null
+
     private val taps = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+        override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+            val t = text
+            val off = getOffsetForPosition(e.x, e.y)
+            val chip = t.getSpans(maxOf(0, off - 1), minOf(t.length, off + 1), BlockChipSpan::class.java)
+                .firstOrNull { t.getSpanStart(it) <= off && off <= t.getSpanEnd(it) }
+            val number = if (chip != null && chip.isTable) {
+                val hit = chip.cellAt(e.x - paddingLeft, e.y - totalPaddingTop, paint)
+                val cell = (chip.block as? com.docscan.app.core.word.Block.Table)?.table?.rows?.getOrNull(hit?.row ?: -1)?.getOrNull(hit?.col ?: -1)
+                cell?.let { com.docscan.app.core.PhoneNumbers.first(it.plain()) }
+            } else if (chip == null) com.docscan.app.core.PhoneNumbers.at(t, off) else null
+            if (number != null) onDial?.invoke(number)
+            return false
+        }
+
         override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
             onUserTouch?.invoke()
             val t = text

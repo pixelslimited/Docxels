@@ -83,6 +83,9 @@ class PageHost(context: Context) : ScrollView(context) {
     }
 
     private var cellEditor: android.widget.EditText? = null
+
+    /** Called with a phone number when it is double-tapped (the screen opens the dialer). */
+    var onDial: ((String) -> Unit)? = null
     private var cellDone: ((String) -> Unit)? = null
 
     /** Types straight into a table cell: an edit box laid exactly over the cell, scrolling with the page. */
@@ -105,6 +108,25 @@ class PageHost(context: Context) : ScrollView(context) {
         sheet.addView(ed, lp)
         cellEditor = ed
         cellDone = onDone
+        // The first tap of a double tap opened this box, so the second one lands here: count the box opening as the first tap.
+        var lastTap = android.os.SystemClock.uptimeMillis()
+        ed.setOnTouchListener { v, ev ->
+            if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                val now = ev.eventTime
+                val double = now - lastTap <= android.view.ViewConfiguration.getDoubleTapTimeout()
+                lastTap = now
+                val number = if (double) {
+                    val box = v as android.widget.EditText
+                    val off = box.getOffsetForPosition(ev.x, ev.y)
+                    com.docscan.app.core.PhoneNumbers.at(box.text, off) ?: com.docscan.app.core.PhoneNumbers.first(box.text)
+                } else null
+                if (number != null) {
+                    discardCellEditor()
+                    onDial?.invoke(number)
+                    true
+                } else false
+            } else false
+        }
         ed.requestFocus()
         ed.setSelection(ed.length())
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(ed, 0)
