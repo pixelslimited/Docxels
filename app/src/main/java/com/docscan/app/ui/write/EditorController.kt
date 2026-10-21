@@ -1179,6 +1179,43 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
         view?.onLinkTap = l
     }
 
+    /** What the assistant works on: the selection if there is one, otherwise the whole document. Pictures become spaces so offsets still line up. */
+    class Scope(val start: Int, val end: Int, val text: String, val isSelection: Boolean)
+    fun assistantScope(): Scope {
+        val (a, b) = selection
+        val whole = a >= b
+        val s = if (whole) 0 else a
+        val e = if (whole) text.length else b
+        return Scope(s, e, text.subSequence(s, e).toString().replace(CHIP_CHAR, ' '), !whole)
+    }
+
+    /** Replaces [a, b) with [s] as one edit (so Undo brings the old text back). */
+    fun replaceRange(a: Int, b: Int, s: String) {
+        val t = text
+        val x = a.coerceIn(0, t.length); val y = b.coerceIn(x, t.length)
+        t.replace(x, y, s)
+        changed()
+    }
+
+    /** Underlines writing problems. Tapping one shows the suggested fix, like the keyboard's spelling suggestions. */
+    fun markIssues(base: Int, issues: List<com.docscan.app.cloud.WritingIssue>) {
+        val v = view ?: return
+        val t = v.text
+        clearIssues()
+        issues.forEach { i ->
+            val a = (base + i.start).coerceIn(0, t.length); val b = (base + i.end).coerceIn(a, t.length)
+            if (b > a) t.setSpan(
+                android.text.style.SuggestionSpan(v.context, arrayOf(i.replacement), android.text.style.SuggestionSpan.FLAG_MISSPELLED),
+                a, b, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
+    }
+
+    fun clearIssues() {
+        val t = view?.text ?: return
+        t.getSpans(0, t.length, android.text.style.SuggestionSpan::class.java).forEach { t.removeSpan(it) }
+    }
+
     fun textBetween(a: Int, b: Int): String = text.subSequence(a.coerceIn(0, text.length), b.coerceIn(0, text.length)).toString()
 
     /** The text currently selected (empty if none). */

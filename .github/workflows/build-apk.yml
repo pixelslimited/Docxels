@@ -133,11 +133,11 @@ jobs:
             unzip -v "$APK" | awk 'NR>3 && NF>=8 {print $3, $8}' | sort -rn | head -12
           } | tee size.txt
 
-      # Networking is allowed only for the user-initiated update check. Fail if network code appears anywhere else.
+      # Networking is allowed only for the update check (update/) and the signed-in assistant, payments and sync (cloud/). Fail if network code appears anywhere else.
       - name: Check networking is confined to the updater
         run: |
-          if grep -rEl "HttpURLConnection|java\.net\.URL|okhttp3|openConnection" app/src/main/java | grep -v "/update/"; then
-            echo "::error::Network code found outside com.docscan.app.update."
+          if grep -rEl "HttpURLConnection|java\.net\.URL|okhttp3|openConnection" app/src/main/java | grep -v -e "/update/" -e "/cloud/"; then
+            echo "::error::Network code found outside com.docscan.app.update or .cloud."
             exit 1
           fi
 

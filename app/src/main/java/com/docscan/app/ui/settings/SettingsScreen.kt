@@ -245,6 +245,12 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 Text("Delete all my data", color = MaterialTheme.colorScheme.error)
             }
 
+            Section("Account")
+            var accountOpen by remember { mutableStateOf(false) }
+            val cloudSession by container.cloud.session.collectAsState()
+            OutlinedButton(onClick = { accountOpen = true }) { Text(cloudSession?.email ?: "Sign in for the writing assistant") }
+            if (accountOpen) com.docscan.app.ui.cloud.AccountDialog(container.cloud) { accountOpen = false }
+
             Section("App updates")
             UpdatePanel()
 

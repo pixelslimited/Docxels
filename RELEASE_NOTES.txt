@@ -111,3 +111,7 @@ The PDF viewer now shows Edit PDF first (sign, fill, highlight, draw), then a me
 Pinch to zoom in the PDF viewer (up to 4 times), drag sideways when zoomed, double-tap to zoom in or reset. Pages re-draw sharper when zoomed.
 Remove background now offers a Subject only button after it finishes, for posters and artwork with no plain background: it cuts tighter around just the main subject (for example a baby on a designed card). It starts again from the original picture.
 Insert → Columns adds two or three text columns side by side that you type in directly (a borderless table, so they also open in Word and print as columns). They do not flow from one column into the next.
+New: sign in with an email and password (Settings → Account, or the editor's Review → Assistant).
+New: writing assistant in the editor (Review → Assistant): check writing (underlines with tap-to-fix), fix spelling and grammar, improve, shorten, lengthen, translate (English, Hausa, Yoruba, Igbo, French, Arabic), clean scanned text, summarise, and ask about the document. It works on the selection, or the whole document. Text is sent only when you tap an action.
+New: Pro upgrade through Paystack (opens the payment page in your browser). Prices are not set yet, so the button says payments are not open yet until the price is switched on.
+Your documents are NOT uploaded: cloud backup and sync are not in this version yet.

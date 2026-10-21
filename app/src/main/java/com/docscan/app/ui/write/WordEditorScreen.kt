@@ -239,6 +239,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
     }
     val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     var tableOpen by remember { mutableStateOf(false) }
+    var assistantOpen by remember { mutableStateOf(false) }
     var tableCustom by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Int?>(null) }
     val photo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -619,6 +620,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
                     onPageBreak = { controller.insertPageBreak() },
                     onPageSetup = { pageOpen = true },
                     onFind = { findOpen = true },
+                    onAssistant = { assistantOpen = true },
                     onCount = { statsOpen = true },
                     onFont = { fontOpen = true },
                     onSize = { sizeOpen = true },
@@ -719,6 +721,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit) {
         tableCustom = false
         controller.insertBlock(Block.Table(newTable(r, c, h, page.contentWidthTwips)))
     }
+    if (assistantOpen) AssistantSheet(controller, container.cloud, { assistantOpen = false }) { msg -> scope.launch { snackbar.showSnackbar(msg) } }
     if (tableOpen && !tableCustom) TablePickerDialog(
         onPick = { r, c, h -> insertTable(r, c, h) },
         onCustom = { tableCustom = true },
@@ -901,6 +904,7 @@ private fun Ribbon(
     onPageBreak: () -> Unit,
     onPageSetup: () -> Unit,
     onFind: () -> Unit,
+    onAssistant: () -> Unit,
     onCount: () -> Unit,
     onFont: () -> Unit,
     onSize: () -> Unit,
@@ -1266,6 +1270,8 @@ private fun Ribbon(
                     3 -> {
                         Group("Find")
                         Btn("Find and replace", Icons.Default.Search, close = true) { onFind() }
+                        Group("Assistant")
+                        Btn("Assistant", Icons.Default.AutoFixHigh, close = true) { onAssistant() }
                         Group("Proofing")
                         Btn("Word count", Icons.Default.Numbers, close = true) { onCount() }
                         Group("Comments")

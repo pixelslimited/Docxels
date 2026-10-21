@@ -1,0 +1,141 @@
+package com.docscan.app.cloud
+
+import android.content.Context
+import com.docscan.app.security.SecureFiles
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+
+/** Public by design: the project address and the publishable key. Secrets (AI key, Paystack key) live only on the server. */
+object CloudConfig {
+    const val URL = "https://nakwuhzrcbmfjyscodyr.supabase.co"
+    const val PUBLISHABLE_KEY = "sb_publishable_Mzy575TimsBYbty4jdt4tQ_F4ZWBsb9"
+}
+
+class CloudException(message: String, val limitReached: Boolean = false) : Exception(message)
+
+data class Session(val email: String, val access: String, val refresh: String, val expiresAtSec: Long)
+
+data class Plan(val pro: Boolean, val proUntil: String?)
+
+/** Parsed grammar finding with character offsets into the text that was sent. */
+data class WritingIssue(val start: Int, val end: Int, val kind: String, val message: String, val replacement: String)
+
+/**
+ * Talks to the Docxels backend, and only when the person signs in, uses an assistant action, or upgrades.
+ * Document text leaves the phone only for the action they tapped, and nothing is sent in the background.
+ */
+class Cloud(context: Context) {
+    private val file = File(context.filesDir, "cloud.session")
+    private val _session = MutableStateFlow<Session?>(null)
+    val session: StateFlow<Session?> = _session
+
+    init { _session.value = load() }
+
+    private fun load(): Session? = runCatching {
+        val j = JSONObject(SecureFiles.read(file)!!.toString(Charsets.UTF_8))
+        Session(j.getString("email"), j.getString("access"), j.getString("refresh"), j.getLong("exp"))
+    }.getOrNull()
+
+    private fun store(s: Session?) {
+        _session.value = s
+        if (s == null) file.delete()
+        else SecureFiles.write(file, JSONObject().put("email", s.email).put("access", s.access).put("refresh", s.refresh).put("exp", s.expiresAtSec).toString().toByteArray())
+    }
+
+    private suspend fun call(method: String, path: String, body: JSONObject?, token: String?): Pair<Int, String> = withContext(Dispatchers.IO) {
+        val c = URL(CloudConfig.URL + path).openConnection() as HttpURLConnection
+        try {
+            c.requestMethod = method
+            c.connectTimeout = 15000
+            c.readTimeout = 60000
+            c.setRequestProperty("apikey", CloudConfig.PUBLISHABLE_KEY)
+            c.setRequestProperty("Authorization", "Bearer " + (token ?: CloudConfig.PUBLISHABLE_KEY))
+            c.setRequestProperty("Content-Type", "application/json")
+            if (body != null) { c.doOutput = true; c.outputStream.use { it.write(body.toString().toByteArray()) } }
+            val code = c.responseCode
+            val stream = if (code in 200..299) c.inputStream else c.errorStream
+            code to (stream?.use { it.readBytes().take(512 * 1024).toByteArray().toString(Charsets.UTF_8) } ?: "")
+        } finally { c.disconnect() }
+    }
+
+    private fun parseSession(text: String, fallbackEmail: String): Session? {
+        val j = JSONObject(text)
+        val access = j.optString("access_token").ifEmpty { return null }
+        val email = j.optJSONObject("user")?.optString("email")?.ifEmpty { null } ?: fallbackEmail
+        return Session(email, access, j.getString("refresh_token"), System.currentTimeMillis() / 1000 + j.optLong("expires_in", 3600) - 60)
+    }
+
+    private fun friendly(text: String): String = runCatching {
+        val j = JSONObject(text)
+        j.optString("msg").ifEmpty { j.optString("error_description").ifEmpty { j.optString("error") } }
+    }.getOrDefault("").ifEmpty { "Something went wrong. Try again." }
+
+    /** Creates an account. Returns true if signed in at once, false if the person must confirm their email first. */
+    suspend fun signUp(email: String, password: String): Boolean {
+        val (code, text) = call("POST", "/auth/v1/signup", JSONObject().put("email", email).put("password", password), null)
+        if (code !in 200..299) throw CloudException(friendly(text))
+        val s = parseSession(text, email) ?: return false
+        store(s); return true
+    }
+
+    suspend fun signIn(email: String, password: String) {
+        val (code, text) = call("POST", "/auth/v1/token?grant_type=password", JSONObject().put("email", email).put("password", password), null)
+        if (code !in 200..299) throw CloudException(friendly(text))
+        store(parseSession(text, email) ?: throw CloudException("Could not sign in."))
+    }
+
+    fun signOut() = store(null)
+
+    private suspend fun token(): String {
+        val s = _session.value ?: throw CloudException("Sign in first.")
+        if (System.currentTimeMillis() / 1000 < s.expiresAtSec) return s.access
+        val (code, text) = call("POST", "/auth/v1/token?grant_type=refresh_token", JSONObject().put("refresh_token", s.refresh), null)
+        if (code !in 200..299) { store(null); throw CloudException("Your session ended. Sign in again.") }
+        val n = parseSession(text, s.email) ?: throw CloudException("Your session ended. Sign in again.")
+        store(n); return n.access
+    }
+
+    /** Runs one assistant action. [task] is one of the server's task names; the server limits use per day. */
+    suspend fun ai(task: String, text: String, instruction: String = "", question: String = ""): String {
+        val body = JSONObject().put("task", task).put("text", text).put("instruction", instruction).put("question", question)
+        val (code, resp) = call("POST", "/functions/v1/ai", body, token())
+        if (code in 200..299) return JSONObject(resp).getString("result")
+        throw CloudException(friendly(resp), limitReached = code == 429)
+    }
+
+    suspend fun checkWriting(text: String): List<WritingIssue> {
+        val raw = ai("grammar", text).trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+        val arr: JSONArray = runCatching { JSONObject(raw).getJSONArray("issues") }.getOrNull() ?: return emptyList()
+        return (0 until arr.length()).mapNotNull {
+            val o = arr.getJSONObject(it)
+            val a = o.optInt("start", -1); val b = o.optInt("end", -1)
+            if (a < 0 || b <= a || b > text.length) null
+            else WritingIssue(a, b, o.optString("kind"), o.optString("message"), o.optString("replacement"))
+        }
+    }
+
+    suspend fun plan(): Plan {
+        val (code, text) = call("GET", "/rest/v1/entitlements?select=plan,pro_until", null, token())
+        if (code !in 200..299) throw CloudException(friendly(text))
+        val a = JSONArray(text)
+        if (a.length() == 0) return Plan(false, null)
+        val o = a.getJSONObject(0)
+        val until = o.optString("pro_until").takeIf { it.isNotEmpty() && it != "null" }
+        val active = o.optString("plan") == "pro" && (until == null || until > java.time.Instant.now().toString())
+        return Plan(active, until)
+    }
+
+    /** Address of the Paystack payment page for Pro. Opened in the browser; the webhook then turns Pro on. */
+    suspend fun checkoutUrl(): String {
+        val (code, text) = call("POST", "/functions/v1/paystack-init", JSONObject(), token())
+        if (code !in 200..299) throw CloudException(friendly(text))
+        return JSONObject(text).getString("url")
+    }
+}

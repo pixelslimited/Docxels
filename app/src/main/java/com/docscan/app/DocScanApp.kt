@@ -63,6 +63,7 @@ class AppContainer(context: Context) {
     val words = com.docscan.app.data.WordStore(context)
     val searchIndex = com.docscan.app.data.SearchIndex(context)
     val pdfs = com.docscan.app.data.PdfStore(context)
+    val cloud = com.docscan.app.cloud.Cloud(context)
     val libraryMeta = com.docscan.app.data.LibraryMeta(context)
     val scanToWord = com.docscan.app.ocr.ScanToWord(renderer, ocr)
     /** A scan that has been read into Word text and is waiting for the person to check it (see ScanReviewScreen). */
