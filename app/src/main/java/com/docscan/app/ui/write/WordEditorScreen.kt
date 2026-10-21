@@ -41,6 +41,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.material.icons.filled.ArrowDropDownCircle
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Email
@@ -178,6 +179,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var paraOpen by remember { mutableStateOf(false) }
     var symbolOpen by remember { mutableStateOf(false) }
     var dateOpen by remember { mutableStateOf(false) }
+    var snippetsOpen by remember { mutableStateOf(false) }
     // Fill-in fields: a drop-down being built, a drop-down being used, a date being picked (for a tapped field, or to insert).
     var choiceBuild by remember { mutableStateOf(false) }
     var choicePick by remember { mutableStateOf<com.docscan.app.core.word.FormToken?>(null) }
@@ -681,6 +683,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                     onParagraph = { paraOpen = true },
                     onSymbol = { symbolOpen = true },
                     onDate = { dateOpen = true },
+                    onSnippets = { snippetsOpen = true },
                     onForm = { kind ->
                         val f = com.docscan.app.core.word.FormTokens
                         when (kind) {
@@ -957,6 +960,15 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     datePick?.let { tok ->
         FormDatePicker(onPick = { controller.replaceRange(tok.start, tok.end, it); datePick = null }, onDismiss = { datePick = null })
     }
+    if (snippetsOpen) {
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        SnippetsDialog(
+            store = remember { SnippetStore(ctx) },
+            selectedText = controller.selectedText(),
+            onInsert = { controller.insertText(it); snippetsOpen = false },
+            onDismiss = { snippetsOpen = false },
+        )
+    }
     if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
     if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
     if (statsOpen) WordCountDialog(remember { controller.stats() }, controller.pageInfo()?.second, onDismiss = { statsOpen = false })
@@ -1006,6 +1018,7 @@ private fun Ribbon(
     onParagraph: () -> Unit,
     onSymbol: () -> Unit,
     onDate: () -> Unit,
+    onSnippets: () -> Unit,
     onForm: (String) -> Unit,
     onToc: () -> Unit,
     onNewComment: () -> Unit,
@@ -1091,6 +1104,7 @@ private fun Ribbon(
         cmd("Page break", "Insert", "new page") { onPageBreak() }
         cmd("Link", "Insert", "hyperlink web address email phone") { onLink() }
         cmd("Date and time", "Insert", "today") { onDate() }
+        cmd("My text (saved snippets)", "Insert", "address bank details closing line boilerplate") { onSnippets() }
         cmd("Check box", "Insert", "form tick tickbox") { onForm("check") }
         cmd("Text field", "Insert", "form fill in blank") { onForm("text") }
         cmd("Date picker field", "Insert", "form calendar") { onForm("date") }
@@ -1450,6 +1464,7 @@ private fun Ribbon(
                         Btn("Page break", Icons.Default.InsertPageBreak, close = true) { onPageBreak() }
                         Btn("Link", Icons.Default.Link, close = true) { onLink() }
                         Btn("Date & time", Icons.Default.Event, close = true) { onDate() }
+                        Btn("My text", Icons.Default.TextSnippet, close = true) { onSnippets() }
                         Btn("Contents", Icons.Default.Description, close = true) { onToc() }
                         Btn("Symbol", Icons.Default.Functions, close = true) { onSymbol() }
                         Group("Form fields")
