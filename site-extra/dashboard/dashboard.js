@@ -321,9 +321,20 @@ function shell() {
   show(root);
   load(body, when);
 }
+/** Placeholder shaped like a dashboard page (cards, charts, a table) shown while the numbers load. */
+function skeleton() {
+  const sk = (cls) => el("div", { class: "sk " + cls });
+  const kpi = () => el("div", { class: "card skcard" }, sk("w40"), sk("h28 w60"), sk("w80"));
+  const chart = () => el("div", { class: "card skcard" }, sk("w30"), sk("h180 w100"));
+  const rows = el("div", { class: "wrap" }, el("div", { class: "skrows" }, ...[1, 2, 3, 4, 5, 6].map(() => sk("h40 w100"))));
+  const box = el("div", { class: "content-sk", role: "status", "aria-label": "Loading" },
+    el("div", { class: "grid g-kpi" }, kpi(), kpi(), kpi(), kpi()),
+    el("div", { class: "grid g-2" }, chart(), chart()), rows);
+  return box;
+}
 async function load(body, when) {
   redraws.clear();
-  body.replaceChildren(el("p", { class: "mute" }, "Loading…"));
+  body.replaceChildren(skeleton());
   const v = S.view;
   try {
     const nodes = await VIEWS[v](body);

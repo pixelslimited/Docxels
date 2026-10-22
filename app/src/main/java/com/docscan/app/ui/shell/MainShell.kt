@@ -117,6 +117,7 @@ fun MainShell(
     val context = LocalContext.current
     val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(container) } })
     val items by vm.items.collectAsState()
+    val loaded by vm.loaded.collectAsState()
     val busy by vm.busy.collectAsState()
     val message by vm.message.collectAsState()
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
@@ -180,7 +181,7 @@ fun MainShell(
         Box(Modifier.padding(padding).fillMaxSize()) {
             com.docscan.app.ui.announce.AnnouncementHost(container, onOpenUpdates = { tab = Tab.SETTINGS }, onOpenProfile = { tab = Tab.SETTINGS })
             when (tab) {
-                Tab.HOME -> HomeScreen(
+                Tab.HOME -> if (!loaded) com.docscan.app.ui.HomeSkeleton() else HomeScreen(
                     items = items,
                     actions = actions,
                     onOpen = { when (it.kind) { DocKind.SCAN -> onOpenScan(it.id); DocKind.PDF -> onOpenPdf(it.id); else -> onOpenWord(it.id) } },
@@ -189,7 +190,7 @@ fun MainShell(
                     onAllDocs = { tab = Tab.DOCS },
                     onSettings = { tab = Tab.SETTINGS },
                 )
-                Tab.DOCS -> DocumentsScreen(
+                Tab.DOCS -> if (!loaded) com.docscan.app.ui.ListSkeleton() else DocumentsScreen(
                     items = items,
                     trash = trash,
                     actions = actions,

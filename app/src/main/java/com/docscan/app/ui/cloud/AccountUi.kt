@@ -87,8 +87,9 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
                 } else {
                     Text(s.email, style = MaterialTheme.typography.titleMedium)
                     val p = plan
-                    Text(
-                        when { p == null -> "Checking your plan…"; p.pro -> "Pro" + (p.proUntil?.let { " until ${it.take(10)}" } ?: ""); else -> "Free plan: a few assistant actions a day" },
+                    if (p == null) com.docscan.app.ui.SkeletonLine(160.dp, 18.dp)
+                    else Text(
+                        if (p.pro) "Pro" + (p.proUntil?.let { " until ${it.take(10)}" } ?: "") else "Free plan: a few assistant actions a day",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     if (plan?.pro == false) Button(enabled = !busy, onClick = {

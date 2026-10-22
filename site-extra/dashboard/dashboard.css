@@ -147,3 +147,14 @@ textarea{resize:vertical}
 .pv h3,.pv p{margin:0}
 .pwrow{display:flex;gap:8px;align-items:center}.pwrow input{flex:1;min-width:0}.box .pwrow button.pwtog{width:auto;margin-top:0;flex:none}
 .pwmeter{display:grid;gap:4px;margin-top:8px}.pwmeter .okmsg,.pwmeter .mute{margin-top:0}.pwmeter .bars{display:flex;gap:4px}.pwmeter .bars span{flex:1;height:6px;border-radius:3px;background:var(--hover)}.pwmeter .bars span.on.l1{background:var(--bad)}.pwmeter .bars span.on.l2{background:var(--warn)}.pwmeter .bars span.on.l3{background:var(--acc)}.pwmeter .bars span.on.l4{background:var(--ok)}
+
+/* skeleton loading */
+.sk{background:linear-gradient(90deg,var(--hover) 25%,var(--line) 50%,var(--hover) 75%);background-size:200% 100%;animation:skm 1.3s linear infinite;border-radius:8px;height:16px}
+@keyframes skm{from{background-position:200% 0}to{background-position:-200% 0}}
+.sk.w30{width:30%}.sk.w40{width:40%}.sk.w60{width:60%}.sk.w80{width:80%}.sk.w100{width:100%}
+.sk.h28{height:28px}.sk.h180{height:180px;border-radius:12px}.sk.h40{height:40px}
+.skcard{display:grid;gap:10px}
+.skrows{display:grid;gap:10px;padding:16px}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+.content-sk{display:grid;gap:16px}
+.box .sk{margin:12px 0}.box .sk.h40{height:40px}

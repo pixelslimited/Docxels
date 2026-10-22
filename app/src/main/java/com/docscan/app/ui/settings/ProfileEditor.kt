@@ -15,6 +15,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.height
 import com.docscan.app.cloud.Cloud
 import com.docscan.app.cloud.Plan
 import com.docscan.app.cloud.Session
@@ -34,8 +35,9 @@ fun ProfileEditor(cloud: Cloud, session: Session?, plan: Plan?) {
     var note by remember { mutableStateOf<String?>(null) }
     var failed by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            when { plan == null -> "Plan: checking…"; plan.pro -> "Plan: Pro" + (plan.proUntil?.let { " until ${it.take(10)}" } ?: ""); else -> "Plan: Free" },
+        if (plan == null) com.docscan.app.ui.SkeletonLine(120.dp, 18.dp)
+        else Text(
+            if (plan.pro) "Plan: Pro" + (plan.proUntil?.let { " until ${it.take(10)}" } ?: "") else "Plan: Free",
             style = MaterialTheme.typography.titleSmall,
         )
         Text(session.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

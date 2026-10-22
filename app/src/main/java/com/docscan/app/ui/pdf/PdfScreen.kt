@@ -62,6 +62,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.docscan.app.ui.shimmer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -567,6 +568,7 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                         contentAlignment = Alignment.Center,
                     ) {
                         bmp?.let { Image(it.asImageBitmap(), "Page ${i + 1}", contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxSize()) }
+                            ?: Box(Modifier.fillMaxSize().shimmer())
                         // Phone numbers in the PDF's own text: underlined, tap one to open the dialer.
                         val pageW = this.maxWidth
                         val pageH = this.maxHeight

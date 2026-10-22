@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,7 +44,11 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
         val b = words.map { LibraryItem(DocKind.DOCX, it.id, it.title, it.modified, "Word document", null, meta[LibraryMeta.key(DocKind.DOCX, it.id)] ?: ItemMeta()) }
         val c = pdfs.map { LibraryItem(DocKind.PDF, it.id, it.title, it.modified, "${it.pages} page${if (it.pages == 1) "" else "s"} · PDF", null, meta[LibraryMeta.key(DocKind.PDF, it.id)] ?: ItemMeta()) }
         (a + b + c).sortedByDescending { it.modified }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }.onEach { _loaded.value = true }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** False until the library has been read once, so the screens can show placeholders instead of "nothing here". */
+    private val _loaded = MutableStateFlow(false)
+    val loaded: StateFlow<Boolean> = _loaded
 
     /** Everything that is not in Trash. */
     val items: StateFlow<List<LibraryItem>> = everything.map { l -> l.filter { it.meta.trashedAt == 0L } }

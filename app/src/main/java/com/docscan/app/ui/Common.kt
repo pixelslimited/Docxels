@@ -76,7 +76,7 @@ fun PageThumb(page: PageEntity?, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else if (page != null) {
-            CircularProgressIndicator(modifier = Modifier.semantics { contentDescription = "Loading preview" })
+            Box(Modifier.fillMaxSize().shimmer().semantics { contentDescription = "Loading preview" })
         }
     }
 }

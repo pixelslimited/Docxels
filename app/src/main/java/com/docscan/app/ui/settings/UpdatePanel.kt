@@ -83,7 +83,7 @@ fun UpdatePanel() {
         if (!updating) builds.getOrNull(1)?.let { c -> NotesCard("Before that · build $c", mine.filter { it.code == c }) }
         when (s) {
             UpdateState.Idle -> OutlinedButton(onClick = ::check) { Text("Check for updates") }
-            UpdateState.Checking -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Checking…") }
+            UpdateState.Checking -> { com.docscan.app.ui.SkeletonBox(Modifier.fillMaxWidth().height(18.dp)); com.docscan.app.ui.SkeletonBox(Modifier.fillMaxWidth(0.6f).height(18.dp)); Text("Checking…") }
             UpdateState.UpToDate -> {
                 Text("You have the latest version.")
                 OutlinedButton(onClick = ::check) { Text("Check again") }
