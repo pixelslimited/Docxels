@@ -176,7 +176,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
-    val controller = remember { EditorController(density, initial.blocks, initial.comments).also { it.author = initial.author; it.subject = initial.subject; it.keywords = initial.keywords } }
+    val controller = remember { EditorController(density, initial.blocks, initial.comments).also { it.author = initial.author.takeIf { a -> a != com.docscan.app.core.word.DocOwner.LEGACY_AUTHOR } ?: com.docscan.app.core.word.DocOwner.label; it.subject = initial.subject; it.keywords = initial.keywords } }
     val state by controller.state.collectAsState()
     var fontOpen by remember { mutableStateOf(false) }
     var sizeOpen by remember { mutableStateOf(false) }

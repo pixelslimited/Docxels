@@ -301,7 +301,7 @@ data class WordDoc(
     val fonts: List<EmbeddedFont> = emptyList(),
     val comments: List<DocComment> = emptyList(),
     /** File properties (Document properties). Blank author = personal data removed. */
-    val author: String = "Kelvin Codes",
+    val author: String = DocOwner.label,
     val subject: String = "",
     val keywords: String = "",
 )

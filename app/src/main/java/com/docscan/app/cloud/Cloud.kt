@@ -41,7 +41,7 @@ class Cloud(context: Context) {
     /** Last known plan of the signed-in person (null when signed out or not yet checked). */
     val planState: StateFlow<Plan?> = _plan
 
-    init { _session.value = load() }
+    init { _session.value = load(); com.docscan.app.core.word.DocOwner.set(_session.value?.email) }
 
     suspend fun refreshPlan() {
         if (_session.value == null) { _plan.value = null; return }
@@ -55,6 +55,7 @@ class Cloud(context: Context) {
 
     private fun store(s: Session?) {
         _session.value = s
+        com.docscan.app.core.word.DocOwner.set(s?.email)
         if (s == null) file.delete()
         else SecureFiles.write(file, JSONObject().put("email", s.email).put("access", s.access).put("refresh", s.refresh).put("exp", s.expiresAtSec).toString().toByteArray())
     }

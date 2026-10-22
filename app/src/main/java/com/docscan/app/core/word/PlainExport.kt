@@ -155,7 +155,7 @@ object PlainExport {
         head.append("}\n{\\colortbl;")
         for (rgb in colors.keys) head.append("\\red${(rgb shr 16) and 255}\\green${(rgb shr 8) and 255}\\blue${rgb and 255};")
         head.append("}\n")
-        head.append("{\\info{\\title ").append(rtfEscape(doc.title)).append("}{\\author Kelvin Codes}}\n")
+        head.append("{\\info{\\title ").append(rtfEscape(doc.title)).append("}{\\author ").append(rtfEscape(doc.author)).append("}}\n")
         head.append("\\paperw${doc.page.sheetWidthTwips}\\paperh${doc.page.sheetHeightTwips}")
         head.append("\\margl${doc.page.marginLeftTwips}\\margr${doc.page.marginRightTwips}")
         head.append("\\margt${doc.page.marginTopTwips}\\margb${doc.page.marginBottomTwips}")

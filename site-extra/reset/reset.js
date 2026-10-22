@@ -19,11 +19,16 @@
   const box = (...kids) => { app.replaceChildren(h("div", { class: "auth" }, h("div", { class: "box" },
     h("div", { class: "brand" }, h("img", { class: "logoimg", src: "/icon-512.png", alt: "" }), "Docxels"), ...kids))); };
 
+  function passField(id) {
+    const input = h("input", { type: "password", autocomplete: "new-password", id });
+    const tog = h("button", { class: "btn pwtog", type: "button", "aria-label": "Show password" }, "Show");
+    tog.addEventListener("click", () => { const on = input.type === "password"; input.type = on ? "text" : "password"; tog.textContent = on ? "Hide" : "Show"; tog.setAttribute("aria-label", on ? "Hide password" : "Show password"); });
+    return { box: h("div", { class: "pwrow" }, input, tog), input };
+  }
   function strong(p) { return p.length >= 10 && /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p); }
 
   function form() {
-    const pw = h("input", { type: "password", autocomplete: "new-password", id: "pw" });
-    const pw2 = h("input", { type: "password", autocomplete: "new-password", id: "pw2" });
+    const f1 = passField("pw"), f2 = passField("pw2"), pw = f1.input, pw2 = f2.input;
     const msg = h("p", { class: "err", role: "alert" });
     const go = h("button", { class: "btn primary", type: "button" }, "Set new password");
     go.addEventListener("click", async () => {
@@ -38,8 +43,8 @@
       } catch (e) { msg.textContent = e.message; go.disabled = false; }
     });
     box(h("h1", {}, "Choose a new password"),
-      h("label", { for: "pw" }, "New password"), pw,
-      h("label", { for: "pw2" }, "Repeat it"), pw2, msg, go);
+      h("label", { for: "pw" }, "New password"), f1.box,
+      h("label", { for: "pw2" }, "Repeat it"), f2.box, msg, go);
   }
 
   if (token) form();

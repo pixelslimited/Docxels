@@ -42,11 +42,6 @@ class UiPrefs(context: Context) {
         _accent.value = a
     }
 
-    /** The name shown in the Home greeting; empty until the person sets it. */
-    var displayName: String
-        get() = prefs.getString("display_name", "") ?: ""
-        set(v) = prefs.edit().putString("display_name", v.trim().take(40)).apply()
-
     /** PAGE, TEXT or MOBILE; remembered between documents. */
     var editorView: String
         get() = prefs.getString("editor_view", "PAGE") ?: "PAGE"

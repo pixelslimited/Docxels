@@ -98,9 +98,16 @@ async function api(section, extra) {
 /* ---------- sign-in ---------- */
 function authBox(...kids) { return el("div", { class: "auth" }, el("div", { class: "box" }, ...kids)); }
 function brand() { return el("div", { class: "brand" }, el("img", { class: "logoimg", src: "/icon-512.png", alt: "Docxels", width: "34", height: "34" }), "Docxels Admin"); }
+/** A password box with a Show/Hide button. Returns { box, input }. */
+function passField(autocomplete) {
+  const input = el("input", { type: "password", autocomplete, required: "" });
+  const tog = el("button", { class: "btn pwtog", type: "button", "aria-label": "Show password" }, "Show");
+  tog.addEventListener("click", () => { const on = input.type === "password"; input.type = on ? "text" : "password"; tog.textContent = on ? "Hide" : "Show"; tog.setAttribute("aria-label", on ? "Hide password" : "Show password"); });
+  return { box: el("div", { class: "pwrow" }, input, tog), input };
+}
 function login(msg) {
   const email = el("input", { type: "email", autocomplete: "username", required: "" });
-  const pass = el("input", { type: "password", autocomplete: "current-password", required: "" });
+  const pf = passField("current-password"), pass = pf.input;
   const err = el("div", { class: "err" }, msg || "");
   const go = el("button", { class: "btn primary", type: "submit" }, "Sign in");
   const mk = el("button", { class: "btn", type: "button" }, "First time? Create admin account");
@@ -111,7 +118,7 @@ function login(msg) {
     catch (x) { err.textContent = "Could not create the account."; }
   });
   const form = el("form", null, brand(), el("p", { class: "mute" }, "Authorised staff only. All access is logged."),
-    el("label", null, "Email"), email, el("label", null, "Password"), pass, go, mk, err);
+    el("label", null, "Email"), email, el("label", null, "Password"), pf.box, go, mk, err);
   form.addEventListener("submit", async (e) => {
     e.preventDefault(); go.disabled = true; err.textContent = "";
     try {

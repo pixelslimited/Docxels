@@ -9,7 +9,6 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.runtime.mutableStateOf
@@ -18,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.painterResource
 import com.docscan.app.R
-import com.docscan.app.ui.TextInputDialog
 import com.docscan.app.ui.library.friendlyDate
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,8 +74,6 @@ fun HomeScreen(
     onSearch: () -> Unit,
     onAllTools: () -> Unit,
     onAllDocs: () -> Unit,
-    name: String,
-    onName: (String) -> Unit,
     onSettings: () -> Unit,
 ) {
     val t = DocxelsTheme.tints
@@ -88,10 +84,6 @@ fun HomeScreen(
     var accountOpen by remember { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(session?.email, accountOpen) { container.cloud.refreshPlan() }
     if (accountOpen) com.docscan.app.ui.cloud.AccountDialog(container.cloud) { accountOpen = false }
-    var editingName by remember { mutableStateOf(false) }
-    if (editingName) {
-        TextInputDialog("Your name", name, "Save", { onName(it); editingName = false }, { editingName = false }, allowBlank = true, maxLength = 30)
-    }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 20.dp).padding(bottom = 24.dp),
     ) {
@@ -103,11 +95,10 @@ fun HomeScreen(
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Text(greeting(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    name.ifBlank { "Welcome" },
+                    com.docscan.app.core.word.DocOwner.fromEmail(session?.email).ifBlank { "Welcome" },
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClickLabel = "Change your name") { editingName = true },
                 )
             }
             Row(

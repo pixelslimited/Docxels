@@ -86,7 +86,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.docscan.app.export.Mime
 import com.docscan.app.pdf.PdfPreview
@@ -253,7 +252,7 @@ fun PdfScreen(vm: PdfViewModel, startMode: PdfMode, onBack: () -> Unit, autoPick
                 Column {
                     Text("“${l.name}” is protected. Docxels opens an unlocked copy for this session only.")
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(pw, { pw = it }, singleLine = true, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation())
+                    com.docscan.app.ui.PasswordField(pw, { pw = it }, "Password")
                 }
             },
             confirmButton = { TextButton(onClick = { vm.unlock(pw) }, enabled = pw.isNotEmpty()) { Text("Unlock") } },
@@ -418,8 +417,8 @@ private fun ProtectBody(vm: PdfViewModel, s: PdfSource, onView: (PdfSource) -> U
     Column(Modifier.fillMaxSize().padding(bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         FileHeader(s, onView)
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(pw, { pw = it }, singleLine = true, label = { Text("Password (4+ characters)") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(again, { again = it }, singleLine = true, label = { Text("Repeat password") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            com.docscan.app.ui.PasswordField(pw, { pw = it }, "Password (4+ characters)", Modifier.fillMaxWidth())
+            com.docscan.app.ui.PasswordField(again, { again = it }, "Repeat password", Modifier.fillMaxWidth())
             val ok = pw.length >= 4 && pw == again
             GradientButton("Protect PDF", onClick = { vm.protect(pw) }, enabled = ok, modifier = Modifier.fillMaxWidth())
             if (pw.isNotEmpty() && again.isNotEmpty() && pw != again) {
@@ -519,8 +518,6 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
             searching = false
         }
     }
-    val invert = remember { androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(
-        -1f, 0f, 0f, 0f, 255f, 0f, -1f, 0f, 0f, 255f, 0f, 0f, -1f, 0f, 255f, 0f, 0f, 0f, 1f, 0f))) }
     Box(Modifier.fillMaxSize().background(if (night) Color(0xFF101010) else MaterialTheme.colorScheme.surfaceVariant)) {
         BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
             val widthPx = with(LocalDensity.current) { maxWidth.toPx() }.toInt()
@@ -558,7 +555,9 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                     },
             ) {
                 items(count) { i ->
-                    val bmp by produceState<Bitmap?>(null, preview, i, renderScale) { value = runCatching { preview.render(i, widthPx * renderScale) }.getOrNull() }
+                    val bmp by produceState<Bitmap?>(null, preview, i, renderScale, night) {
+                        value = runCatching { preview.render(i, widthPx * renderScale).let { if (night) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { com.docscan.app.imaging.NightPdf.darken(it) } else it } }.getOrNull()
+                    }
                     val ratio by produceState(0.707f, preview, i) { value = runCatching { preview.pageSize(i).let { it.first.toFloat() / it.second } }.getOrDefault(0.707f) }
                     val numbers by produceState<List<PdfPhones.Box>>(emptyList(), phones, i) { value = phones.page(i) }
                     val marks by produceState<List<PdfPhones.Box>>(emptyList(), phones, i, active) { value = if (active.isBlank()) emptyList() else findAny(i, active) }
@@ -567,7 +566,7 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                             .aspectRatio(ratio).background(if (night) Color.Black else Color.White),
                         contentAlignment = Alignment.Center,
                     ) {
-                        bmp?.let { Image(it.asImageBitmap(), "Page ${i + 1}", contentScale = ContentScale.FillWidth, colorFilter = if (night) invert else null, modifier = Modifier.fillMaxSize()) }
+                        bmp?.let { Image(it.asImageBitmap(), "Page ${i + 1}", contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxSize()) }
                         // Phone numbers in the PDF's own text: underlined, tap one to open the dialer.
                         val pageW = this.maxWidth
                         val pageH = this.maxHeight

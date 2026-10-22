@@ -813,7 +813,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
     private fun snapshot() = Snap(EditorModel.toBlocks(text, originals), selection.first, selection.second)
 
     /** File properties carried through every save (set by the screen). */
-    var author = "Kelvin Codes"
+    var author = com.docscan.app.core.word.DocOwner.label
     var subject = ""
     var keywords = ""
 

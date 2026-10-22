@@ -123,7 +123,6 @@ fun MainShell(
     var importSheet by remember { mutableStateOf(false) }
     var templateSheet by remember { mutableStateOf(false) }
     var invoiceMaker by remember { mutableStateOf(false) }
-    var displayName by remember { mutableStateOf(container.ui.displayName) }
     var pick by remember { mutableStateOf<Pick?>(null) }
     var focusSearch by remember { mutableStateOf(false) }
     val shellScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -188,8 +187,6 @@ fun MainShell(
                     onSearch = { focusSearch = true; tab = Tab.DOCS },
                     onAllTools = { tab = Tab.TOOLS },
                     onAllDocs = { tab = Tab.DOCS },
-                    name = displayName,
-                    onName = { container.ui.displayName = it; displayName = container.ui.displayName },
                     onSettings = { tab = Tab.SETTINGS },
                 )
                 Tab.DOCS -> DocumentsScreen(
