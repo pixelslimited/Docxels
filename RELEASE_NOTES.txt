@@ -45,5 +45,5 @@
 *|FREE|Announcements|Welcome and news pop-ups from Docxels, plus a notice when a new version is ready. Switch off in Settings.
 *|FREE|Forgot password|Get a reset link by email from the sign-in box and choose a new password on the Docxels site.
 *|FIX|Dark PDF view|Logos, coloured text and highlights keep their colours in the PDF Night view.
-*|FREE|Your name|Home greets you by the name in your account email; signing out says goodbye and clears it.
+*|FREE|Profile|Add your first and last name in Settings. It shows on Home and as the owner of new documents; Settings also shows your plan.
 *|FREE|Show password|An eye button shows or hides what you type in every password box.

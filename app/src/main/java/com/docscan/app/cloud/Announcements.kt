@@ -48,6 +48,11 @@ class Announcements(context: Context) {
         get() = prefs.getLong("noticed_update", 0L)
         set(v) = prefs.edit().putLong("noticed_update", v).apply()
 
+    /** The day (days since 1970) the "complete your profile" reminder was last shown, so it appears at most once a day. */
+    var profileNudgeDay: Long
+        get() = prefs.getLong("profile_nudge_day", 0L)
+        set(v) = prefs.edit().putLong("profile_nudge_day", v).apply()
+
     /** True when 12 hours have passed since the last check. */
     fun due(): Boolean = System.currentTimeMillis() - prefs.getLong("last_check", 0L) >= REFRESH_MS
 

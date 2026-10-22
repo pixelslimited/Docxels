@@ -95,7 +95,7 @@ fun HomeScreen(
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Text(greeting(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    com.docscan.app.core.word.DocOwner.fromEmail(session?.email).ifBlank { "Welcome" },
+                    (session?.fullName ?: "").ifBlank { "Welcome" },
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,

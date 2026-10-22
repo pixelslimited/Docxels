@@ -20,7 +20,9 @@ object CloudConfig {
 
 class CloudException(message: String, val limitReached: Boolean = false) : Exception(message)
 
-data class Session(val email: String, val access: String, val refresh: String, val expiresAtSec: Long)
+data class Session(val email: String, val access: String, val refresh: String, val expiresAtSec: Long, val first: String = "", val last: String = "") {
+    val fullName: String get() = "$first $last".trim()
+}
 
 data class Plan(val pro: Boolean, val proUntil: String?)
 
@@ -41,7 +43,7 @@ class Cloud(context: Context) {
     /** Last known plan of the signed-in person (null when signed out or not yet checked). */
     val planState: StateFlow<Plan?> = _plan
 
-    init { _session.value = load(); com.docscan.app.core.word.DocOwner.set(_session.value?.email) }
+    init { _session.value = load(); com.docscan.app.core.word.DocOwner.set(_session.value?.fullName) }
 
     suspend fun refreshPlan() {
         if (_session.value == null) { _plan.value = null; return }
@@ -50,14 +52,14 @@ class Cloud(context: Context) {
 
     private fun load(): Session? = runCatching {
         val j = JSONObject(SecureFiles.read(file)!!.toString(Charsets.UTF_8))
-        Session(j.getString("email"), j.getString("access"), j.getString("refresh"), j.getLong("exp"))
+        Session(j.getString("email"), j.getString("access"), j.getString("refresh"), j.getLong("exp"), j.optString("first"), j.optString("last"))
     }.getOrNull()
 
     private fun store(s: Session?) {
         _session.value = s
-        com.docscan.app.core.word.DocOwner.set(s?.email)
+        com.docscan.app.core.word.DocOwner.set(s?.fullName)
         if (s == null) file.delete()
-        else SecureFiles.write(file, JSONObject().put("email", s.email).put("access", s.access).put("refresh", s.refresh).put("exp", s.expiresAtSec).toString().toByteArray())
+        else SecureFiles.write(file, JSONObject().put("email", s.email).put("access", s.access).put("refresh", s.refresh).put("exp", s.expiresAtSec).put("first", s.first).put("last", s.last).toString().toByteArray())
     }
 
     private suspend fun call(method: String, path: String, body: JSONObject?, token: String?): Pair<Int, String> = withContext(Dispatchers.IO) {
@@ -76,11 +78,14 @@ class Cloud(context: Context) {
         } finally { c.disconnect() }
     }
 
-    private fun parseSession(text: String, fallbackEmail: String): Session? {
+    private fun parseSession(text: String, fallbackEmail: String, previous: Session? = null): Session? {
         val j = JSONObject(text)
         val access = j.optString("access_token").ifEmpty { return null }
         val email = j.optJSONObject("user")?.optString("email")?.ifEmpty { null } ?: fallbackEmail
-        return Session(email, access, j.getString("refresh_token"), System.currentTimeMillis() / 1000 + j.optLong("expires_in", 3600) - 60)
+        val meta = j.optJSONObject("user")?.optJSONObject("user_metadata")
+        val first = meta?.optString("first_name").orEmpty().ifEmpty { previous?.first.orEmpty() }
+        val last = meta?.optString("last_name").orEmpty().ifEmpty { previous?.last.orEmpty() }
+        return Session(email, access, j.getString("refresh_token"), System.currentTimeMillis() / 1000 + j.optLong("expires_in", 3600) - 60, first, last)
     }
 
     private fun friendly(text: String): String = runCatching {
@@ -111,12 +116,22 @@ class Cloud(context: Context) {
 
     fun signOut() = store(null)
 
+    /** Saves the first and last name on the account (so every phone shows them) and updates this phone at once. */
+    suspend fun saveProfile(first: String, last: String) {
+        fun clean(v: String) = v.trim().replace(Regex("\\s+"), " ").take(30)
+        val f = clean(first); val l = clean(last)
+        if (f.isEmpty() || l.isEmpty()) throw CloudException("Enter both your first and your last name.")
+        val (code, text) = call("PUT", "/auth/v1/user", JSONObject().put("data", JSONObject().put("first_name", f).put("last_name", l)), token())
+        if (code !in 200..299) throw CloudException(friendly(text))
+        _session.value?.let { store(it.copy(first = f, last = l)) }
+    }
+
     private suspend fun token(): String {
         val s = _session.value ?: throw CloudException("Sign in first.")
         if (System.currentTimeMillis() / 1000 < s.expiresAtSec) return s.access
         val (code, text) = call("POST", "/auth/v1/token?grant_type=refresh_token", JSONObject().put("refresh_token", s.refresh), null)
         if (code !in 200..299) { store(null); throw CloudException("Your session ended. Sign in again.") }
-        val n = parseSession(text, s.email) ?: throw CloudException("Your session ended. Sign in again.")
+        val n = parseSession(text, s.email, s) ?: throw CloudException("Your session ended. Sign in again.")
         store(n); return n.access
     }
 

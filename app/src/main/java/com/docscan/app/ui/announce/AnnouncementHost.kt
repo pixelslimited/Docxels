@@ -42,6 +42,7 @@ import kotlinx.coroutines.delay
 private sealed interface Pending {
     data class Message(val a: Announcement, val image: Bitmap?) : Pending
     data class NewVersion(val info: UpdateInfo) : Pending
+    data object Profile : Pending
 }
 
 /**
@@ -50,10 +51,11 @@ private sealed interface Pending {
  * "Announcements and update notices" switch in Settings is off.
  */
 @Composable
-fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit) {
+fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit, onOpenProfile: () -> Unit) {
     val context = LocalContext.current
     val manager = container.announcements
     val plan by container.cloud.planState.collectAsState()
+    val session by container.cloud.session.collectAsState()
     var enabled by remember { mutableStateOf(container.ui.announcements) }
     var introDone by remember { mutableStateOf(container.ui.introSeen) }
     var update by remember { mutableStateOf<UpdateInfo?>(null) }
@@ -72,12 +74,15 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit) {
         refreshed++
     }
 
-    LaunchedEffect(enabled, introDone, plan, refreshed, pending == null) {
+    LaunchedEffect(enabled, introDone, plan, refreshed, pending == null, session?.fullName) {
         if (!enabled || pending != null) return@LaunchedEffect
         val a = manager.next(plan?.pro == true, introDone)
+        val today = System.currentTimeMillis() / 86_400_000L
+        val needProfile = session != null && session?.fullName.isNullOrBlank() && introDone && manager.profileNudgeDay != today
         val u = update?.takeIf { it.versionCode != manager.noticedUpdate }
         pending = when {
             a != null -> Pending.Message(a, a.imagePath?.let { manager.image(it) })
+            needProfile -> { manager.profileNudgeDay = today; Pending.Profile }
             u != null -> Pending.NewVersion(u)
             else -> null
         }
@@ -100,6 +105,13 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit) {
             image = null, button = "Update now",
             onButton = { manager.noticedUpdate = p.info.versionCode; update = null; pending = null; onOpenUpdates() },
             onClose = { manager.noticedUpdate = p.info.versionCode; update = null; pending = null },
+        )
+        Pending.Profile -> MessageDialog(
+            title = "Complete your profile",
+            body = "Add your first and last name in Settings, Profile. Your name then shows on Home and is written as the owner of the documents you create.",
+            image = null, button = "Open Profile",
+            onButton = { pending = null; onOpenProfile() },
+            onClose = { pending = null },
         )
         null -> Unit
     }
