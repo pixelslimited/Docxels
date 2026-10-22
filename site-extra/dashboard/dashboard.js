@@ -99,6 +99,13 @@ function login(msg) {
   show(form);
 }
 
+// GoTrue returns the QR as an unescaped SVG data URI; characters such as # break it, so re-encode the SVG text.
+function qrSrc(q) {
+  const m = /^data:image\/svg\+xml;(?:charset=)?utf-8,(.*)$/is.exec(q || "");
+  return m ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(decodeURIComponentSafe(m[1])) : q;
+}
+function decodeURIComponentSafe(t) { try { return decodeURIComponent(t); } catch (e) { return t; } }
+
 async function enroll() {
   const err = el("div", { class: "err" });
   const box = el("div", { class: "box" }, el("h1", null, "Set up two-step sign-in"), err);
@@ -110,7 +117,7 @@ async function enroll() {
     ok.addEventListener("click", () => challenge(f.id, code.value, err, ok));
     box.append(
       el("p", { class: "mute" }, "Scan this with an authenticator app (Google Authenticator, Authy, 1Password), then enter the 6-digit code."),
-      el("img", { class: "qr", alt: "Authenticator QR code", src: f.totp.qr_code }),
+      el("img", { class: "qr", alt: "Authenticator QR code", src: qrSrc(f.totp.qr_code) }),
       el("p", { class: "mute" }, "Or enter this key: ", el("code", null, f.totp.secret)),
       el("label", null, "6-digit code"), code, ok);
   } catch (x) { err.textContent = "Could not start setup. Sign in again."; }
