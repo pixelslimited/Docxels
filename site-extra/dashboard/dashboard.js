@@ -136,31 +136,37 @@ async function enroll() {
   try {
     const f = await gotrue("factors", { factor_type: "totp", friendly_name: "Docxels admin " + Date.now() }, S.access);
     const code = el("input", { inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
-    const ok = el("button", { class: "btn primary" }, "Confirm and continue");
-    ok.addEventListener("click", () => challenge(f.id, code.value, err, ok));
+    autoSubmit(code, (c) => challenge(f.id, c, err, code));
     holder.append(
       el("p", { class: "mute" }, "Scan this with an authenticator app (Google Authenticator, Authy, 1Password), then enter the 6-digit code."),
       el("img", { class: "qr", alt: "Authenticator QR code", src: qrSrc(f.totp.qr_code) }),
       el("p", { class: "mute" }, "Or enter this key: ", el("code", null, f.totp.secret)),
-      el("label", null, "6-digit code"), code, ok);
+      el("label", null, "6-digit code"), code);
+    code.focus();
   } catch (x) { err.textContent = "Could not start setup. Sign in again."; }
 }
 function verifyCode(factorId) {
   const err = el("div", { class: "err" });
   const code = el("input", { inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
-  const ok = el("button", { class: "btn primary" }, "Verify");
-  ok.addEventListener("click", () => challenge(factorId, code.value, err, ok));
-  code.addEventListener("keydown", (e) => { if (e.key === "Enter") ok.click(); });
-  show(authBox(brand(), el("h1", null, "Enter your code"), el("label", null, "6-digit code from your authenticator"), code, ok, err));
+  autoSubmit(code, (c) => challenge(factorId, c, err, code));
+  show(authBox(brand(), el("h1", null, "Enter your code"), el("label", null, "6-digit code from your authenticator"), code, err));
   code.focus();
 }
-async function challenge(id, code, err, btn) {
-  btn.disabled = true; err.textContent = "";
+// Submits as soon as the sixth digit is typed or pasted; no button needed.
+function autoSubmit(input, submit) {
+  input.setAttribute("inputmode", "numeric"); input.setAttribute("autocomplete", "one-time-code"); input.setAttribute("maxlength", "6");
+  input.addEventListener("input", () => {
+    input.value = input.value.replace(/\D/g, "").slice(0, 6);
+    if (input.value.length === 6 && !input.disabled) submit(input.value);
+  });
+}
+async function challenge(id, code, err, input) {
+  input.disabled = true; err.textContent = "";
   try {
     const c = await gotrue("factors/" + id + "/challenge", {}, S.access);
     keep(await gotrue("factors/" + id + "/verify", { challenge_id: c.id, code: code.trim() }, S.access));
     arm(); shell();
-  } catch (x) { err.textContent = "That code didn't work."; btn.disabled = false; }
+  } catch (x) { err.textContent = "That code didn't work. Try the next one."; input.disabled = false; input.value = ""; input.focus(); }
 }
 
 /* ---------- charts (hand-drawn SVG; no libraries) ---------- */
