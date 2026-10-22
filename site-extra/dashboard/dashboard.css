@@ -17,6 +17,7 @@ svg{display:block}
 .box label{display:block;margin:14px 0 4px;color:var(--mute)}
 .box button{margin-top:14px;width:100%}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.125rem}
+.logoimg{width:34px;height:34px;border-radius:10px;flex:none}
 .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--c1),var(--c4));display:grid;place-items:center;color:#fff}
 input{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
 input:focus{outline:2px solid var(--acc);outline-offset:1px}

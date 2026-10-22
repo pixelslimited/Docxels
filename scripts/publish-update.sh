@@ -93,6 +93,26 @@ if [ -d site-extra/dashboard ]; then
   [ -d "$T/site/.git" ] || { echo "Site sync: clone of $SITE failed (output above)" >&2; exit 1; }
   mkdir -p "$T/site/dashboard" && cp site-extra/dashboard/* "$T/site/dashboard/"
   grep -q 'dashboard' "$T/site/.cpanel.yml" 2>/dev/null || sed -i 's#^    - /bin/cp -R index.html#    - mkdir -p $DEPLOYPATH/dashboard \&\& /bin/cp -R dashboard/* $DEPLOYPATH/dashboard/\n    - /bin/cp -R index.html#' "$T/site/.cpanel.yml"
+  # Docxels logo (the pixel "D"): icons, the site header mark and the cPanel copy list.
+  cp site-extra/assets/*.png "$T/site/"
+  python3 - "$T/site" <<'PY'
+import re, sys, pathlib
+d = pathlib.Path(sys.argv[1])
+for f in ("index.html", "privacy.html", "terms.html"):
+    p = d / f
+    if p.exists():
+        t = p.read_text()
+        t2 = re.sub(r'<span class="logo"><svg.*?</svg></span>', '<span class="logo"><img src="icon-512.png" alt="" width="36" height="36"></span>', t, flags=re.S)
+        if t2 != t: p.write_text(t2)
+c = d / "styles.css"
+if c.exists() and "logo img" not in c.read_text():
+    c.write_text(c.read_text().rstrip() + "\n.logo{background:none}.logo img{width:100%;height:100%;border-radius:12px;display:block}\n")
+y = d / ".cpanel.yml"
+if y.exists():
+    t = y.read_text()
+    if "icon-512.png" not in t:
+        y.write_text(t.replace("index.html privacy.html", "favicon.png icon-512.png apple-touch-icon.png index.html privacy.html"))
+PY
   git -C "$T/site" add -A
   if ! git -C "$T/site" diff --cached --quiet; then
     git -C "$T/site" -c user.name="Kelvin Codes" -c user.email="docxels@pixelslimited.ng" commit -qm "Site: admin dashboard" || { echo "Site sync: commit failed" >&2; exit 1; }

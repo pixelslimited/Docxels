@@ -97,7 +97,7 @@ async function api(section, extra) {
 
 /* ---------- sign-in ---------- */
 function authBox(...kids) { return el("div", { class: "auth" }, el("div", { class: "box" }, ...kids)); }
-function brand() { return el("div", { class: "brand" }, el("div", { class: "logo" }, icon("doc")), "Docxels Admin"); }
+function brand() { return el("div", { class: "brand" }, el("img", { class: "logoimg", src: "/icon-512.png", alt: "Docxels", width: "34", height: "34" }), "Docxels Admin"); }
 function login(msg) {
   const email = el("input", { type: "email", autocomplete: "username", required: "" });
   const pass = el("input", { type: "password", autocomplete: "current-password", required: "" });

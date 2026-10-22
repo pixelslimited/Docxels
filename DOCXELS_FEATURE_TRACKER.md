@@ -373,4 +373,4 @@ Visual Basic, macros, XML mapping pane, COM add-ins, Get Add-ins, 3D models, Sma
 | Leaked-password protection | BLOCKED ON USER | Dashboard toggle (Auth > Passwords), not settable from here. |
 | App versions in use | NOT POSSIBLE | The app collects no analytics; only release download counts are shown. |
 | Actions: grant/revoke Pro, suspend/unsuspend, reset today's AI count | IMPLEMENTED — NOT VERIFIED | Server function `admin_act` tested in a rolled-back transaction. Each needs the user's email typed to confirm, is logged, and admins can't be suspended. |
-
+| Docxels logo (the pixel "D") everywhere: site header, favicons, apple-touch icon, 512 icon, Play listing icon, dashboard | IMPLEMENTED — NOT VERIFIED | Old scan-page icon removed. Applied to the site by the publish script. The app launcher and Home already used the D. |
