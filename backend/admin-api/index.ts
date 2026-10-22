@@ -78,6 +78,11 @@ Deno.serve(async (req) => {
   }
   const section = String(body.section ?? "");
   if (section === "releases") { await log(ip, "view:releases", true, who); return reply(200, await releases()); }
+  if (section === "trends") {
+    const { data: t, error: te } = await admin.rpc("admin_trends");
+    if (te) { await log(ip, "error:trends", false, who, { code: te.code }); return reply(500, { error: "server" }); }
+    return reply(200, t);
+  }
   if (!SECTIONS.has(section)) return reply(400, { error: "bad_section" });
   const q = String(body.q ?? "").slice(0, 100);
   const lim = Math.min(Math.max(parseInt(body.limit) || 50, 1), 200);
