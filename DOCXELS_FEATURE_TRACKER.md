@@ -371,5 +371,5 @@ Visual Basic, macros, XML mapping pane, COM add-ins, Get Add-ins, 3D models, Sma
 | Security controls | IMPLEMENTED — NOT VERIFIED | Email allowlist; mandatory authenticator-app (TOTP) session (aal2) checked on the server; 8 h absolute session limit; 15 min idle sign-out; 8 failed attempts per network per 15 min locks it; 120 requests/min limit; every request audit-logged; service-role key only inside the function; strict CSP, no third-party scripts, no innerHTML, noindex; CORS limited to the dashboard origin; tables have RLS with no policies; `handle_new_user` no longer callable through the API. |
 | Leaked-password protection | BLOCKED ON USER | Dashboard toggle (Auth > Passwords), not settable from here. |
 | App versions in use | NOT POSSIBLE | The app collects no analytics; only release download counts are shown. |
-| Actions (grant Pro, suspend user) | NOT STARTED | Dashboard is read-only by choice; add with re-confirmation and audit logging. |
+| Actions: grant/revoke Pro, suspend/unsuspend, reset today's AI count | IMPLEMENTED — NOT VERIFIED | Server function `admin_act` tested in a rolled-back transaction. Each needs the user's email typed to confirm, is logged, and admins can't be suspended. |
 

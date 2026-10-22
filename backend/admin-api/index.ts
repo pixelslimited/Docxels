@@ -66,6 +66,16 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch { /* empty */ }
+  if (body.action) {
+    const ACTS = new Set(["grant_pro", "revoke_pro", "suspend", "unsuspend", "reset_ai_today"]);
+    const act = String(body.action), uid = String(body.user_id ?? "");
+    if (!ACTS.has(act) || !/^[0-9a-f-]{36}$/i.test(uid)) return reply(400, { error: "bad_action" });
+    const days = Math.min(Math.max(parseInt(body.days) || 30, 1), 365);
+    const { data: res, error: ae } = await admin.rpc("admin_act", { act, uid, confirm_email: String(body.confirm_email ?? ""), days, actor: user.id });
+    if (ae) { await log(ip, "act-rejected:" + act, true, who, { target: uid, reason: ae.message.slice(0, 60) }); return reply(400, { error: "rejected", message: ae.message }); }
+    await log(ip, "act:" + act, true, who, { target: uid, target_email: res?.email, days: act === "grant_pro" ? days : undefined });
+    return reply(200, { ok: true });
+  }
   const section = String(body.section ?? "");
   if (section === "releases") { await log(ip, "view:releases", true, who); return reply(200, await releases()); }
   if (!SECTIONS.has(section)) return reply(400, { error: "bad_section" });

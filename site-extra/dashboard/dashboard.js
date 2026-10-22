@@ -160,6 +160,31 @@ async function load(body) {
   }
 }
 
+/* ---------- actions ---------- */
+function manage(u, holder) {
+  const msg = el("div", { class: "err" });
+  const confirm = el("input", { placeholder: "Type " + u.email + " to confirm", autocomplete: "off" });
+  const days = el("input", { type: "number", min: "1", max: "365", value: "30" });
+  const panel = el("div", { class: "box" }, el("h1", null, u.email),
+    el("p", { class: "mute" }, "Every action is logged with your name and network."),
+    el("label", null, "Type the user's email to confirm"), confirm,
+    el("label", null, "Days of Pro (for Grant)"), days);
+  const run = async (action, label, danger) => {
+    if (confirm.value.trim().toLowerCase() !== u.email.toLowerCase()) { msg.textContent = "Type the email exactly to confirm."; return; }
+    msg.textContent = "";
+    try {
+      await api("", { action, user_id: u.id, confirm_email: confirm.value.trim(), days: Number(days.value) });
+      msg.className = "ok"; msg.textContent = label + " done.";
+      const t = S.tab; if (t === "users") shell();
+    } catch (x) { msg.className = "err"; msg.textContent = x.code === "rejected" ? "Rejected by the server." : "Could not do that."; }
+  };
+  [["grant_pro", "Grant Pro"], ["revoke_pro", "Revoke Pro"], ["reset_ai_today", "Reset today's AI count"], ["suspend", "Suspend user"], ["unsuspend", "Unsuspend user"]]
+    .forEach(([a, l]) => { const b = el("button", null, l); b.addEventListener("click", () => run(a, l)); panel.append(b); });
+  const close = el("button", null, "Close"); close.addEventListener("click", () => shell());
+  panel.append(close, msg);
+  show(panel);
+}
+
 /* ---------- views ---------- */
 const card = (k, v, sub) => el("div", { class: "card" }, el("div", { class: "k" }, k), el("div", { class: "v" }, v), sub ? el("div", { class: "mute" }, sub) : null);
 function table(cols, rows) {
@@ -206,6 +231,7 @@ const VIEWS = {
       ["Plan", (r) => r.plan === "pro" && new Date(r.pro_until) > new Date() ? { t: "Pro until " + new Date(r.pro_until).toLocaleDateString(), cls: "ok" } : "Free"],
       ["Verified", (r) => r.confirmed ? "Yes" : { t: "No", cls: "bad" }], ["2-step", (r) => r.mfa ? "On" : "Off"],
       ["AI (30d)", (r) => fmtN(r.ai_calls_30d)], ["Sync", (r) => fmtB(r.sync_bytes)], ["Status", (r) => r.banned ? { t: "Banned", cls: "bad" } : "OK"],
+      ["", (r) => { const b = el("button", null, "Manage"); b.addEventListener("click", () => manage(r, holder)); return b; }],
     ], data.rows));
     draw(d);
     const q = el("input", { type: "search", placeholder: "Search email…", maxlength: "100" });
