@@ -21,6 +21,7 @@ jobs:
 
       - name: Configure (arm64-v8a, core + imgproc + photo only)
         run: |
+          set -o pipefail
           NDK="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}"
           echo "NDK: $NDK"
           cmake -S opencv -B build -G Ninja \
@@ -33,10 +34,12 @@ jobs:
             -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=OFF \
             -DWITH_OPENCL=OFF -DWITH_IPP=OFF -DWITH_ITT=OFF -DWITH_TBB=OFF -DWITH_PROTOBUF=OFF -DCV_TRACE=OFF \
             -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--exclude-libs,ALL"
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--exclude-libs,ALL" 2>&1 | tee cfg.txt
 
       - name: Build
-        run: cmake --build build -j"$(nproc)" 2>&1 | tail -40
+        run: |
+          set -o pipefail
+          cmake --build build -j"$(nproc)" 2>&1 | tee build.txt | tail -40
 
       - name: Find, strip and compare with the full library
         run: |
@@ -67,7 +70,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          { echo "slim OpenCV step output:"; echo '```'; tail -c 6000 diag.txt 2>/dev/null; echo '```'; } > diag.md
+          {
+            echo "slim OpenCV step output:"; echo '```'
+            echo "--- configure summary"; grep -A28 'OpenCV modules' cfg.txt 2>/dev/null | head -40
+            echo "--- java section"; grep -B1 -A14 '^--   Java:' cfg.txt 2>/dev/null | head -24
+            echo "--- java/android lines"; grep -i -E 'java|android' cfg.txt 2>/dev/null | grep -i -E 'disabled|skip|not|no |unavailable|error|warn' | head -15
+            echo "--- built libraries"; find build -name '*.so' 2>/dev/null | head; find build -name '*.a' 2>/dev/null | head -12
+            echo "--- step output"; tail -c 2500 diag.txt 2>/dev/null
+            echo '```'
+          } > diag.md
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@diag.md || true
 
       - name: Publish as a release asset
