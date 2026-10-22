@@ -39,13 +39,15 @@ jobs:
       - name: Build
         run: |
           set -o pipefail
-          cmake --build build -j"$(nproc)" 2>&1 | tee build.txt | tail -40
+          # Only the native library is wanted. The full target also packages OpenCV's Android Java library (an AAR), which
+          # needs every module's Java classes and fails with only three modules.
+          cmake --build build --target opencv_java -j"$(nproc)" 2>&1 | tee build.txt | tail -40
 
       - name: Find, strip and compare with the full library
         run: |
           set -eo pipefail
           exec > >(tee diag.txt) 2>&1
-          SO=$(find build -name 'libopencv_java4.so' | head -1)
+          SO=build/jni/arm64-v8a/libopencv_java4.so; [ -f "$SO" ] || SO=$(find build -name 'libopencv_java4.so' -not -path '*/intermediates/*' | head -1)
           [ -n "$SO" ] || { echo "libopencv_java4.so was not built"; find build -name '*.so' | head; exit 1; }
           NDK="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}"
           STRIP=$(find "$NDK/toolchains/llvm/prebuilt" -name llvm-strip | head -1)
