@@ -84,15 +84,21 @@ done
 ) || true
 
 # Site pages kept in this repo under site-extra/ (the admin dashboard) are copied into the site repo and its cPanel deploy list.
-if [ -d site-extra/dashboard ]; then (
+if [ -d site-extra/dashboard ]; then
   T=$(mktemp -d)
-  git clone --depth 1 "https://x-access-token:$(gh auth token)@github.com/$SITE" "$T/site"
+  TOK="${GH_TOKEN:-$(gh auth token 2>/dev/null || true)}"
+  [ -n "$TOK" ] || { echo "Site sync: no token available" >&2; exit 1; }
+  git clone --depth 1 "https://x-access-token:$TOK@github.com/$SITE" "$T/site" 2>&1 | sed "s/$TOK/***/g" || true
+  [ -d "$T/site/.git" ] || { echo "Site sync: clone of $SITE failed (output above)" >&2; exit 1; }
   mkdir -p "$T/site/dashboard" && cp site-extra/dashboard/* "$T/site/dashboard/"
-  cd "$T/site"
-  grep -q 'dashboard' .cpanel.yml 2>/dev/null || sed -i 's#^    - /bin/cp -R index.html#    - mkdir -p $DEPLOYPATH/dashboard \&\& /bin/cp -R dashboard/* $DEPLOYPATH/dashboard/\n    - /bin/cp -R index.html#' .cpanel.yml
-  git add -A
-  git diff --cached --quiet || { git -c user.name="Kelvin Codes" -c user.email="docxels@pixelslimited.ng" commit -qm "Site: admin dashboard" && git push origin HEAD; }
-) || { echo "Site sync failed (see lines above)" >&2; exit 1; }; fi
+  grep -q 'dashboard' "$T/site/.cpanel.yml" 2>/dev/null || sed -i 's#^    - /bin/cp -R index.html#    - mkdir -p $DEPLOYPATH/dashboard \&\& /bin/cp -R dashboard/* $DEPLOYPATH/dashboard/\n    - /bin/cp -R index.html#' "$T/site/.cpanel.yml"
+  git -C "$T/site" add -A
+  if ! git -C "$T/site" diff --cached --quiet; then
+    git -C "$T/site" -c user.name="Kelvin Codes" -c user.email="docxels@pixelslimited.ng" commit -qm "Site: admin dashboard" || { echo "Site sync: commit failed" >&2; exit 1; }
+    git -C "$T/site" push origin HEAD 2>&1 | sed "s/$TOK/***/g"
+    [ "${PIPESTATUS[0]}" = 0 ] || { echo "Site sync: push to $SITE refused (output above)" >&2; exit 1; }
+  fi
+fi
 
 # Last check: the public update file must be reachable (GitHub's download address can take a little while to appear).
 for i in $(seq 1 12); do
