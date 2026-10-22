@@ -84,7 +84,7 @@ done
 ) || true
 
 # Site pages kept in this repo under site-extra/ (the admin dashboard) are copied into the site repo and its cPanel deploy list.
-if [ -d site-extra/dashboard ]; then
+if [ -d site-extra/dashboard ]; then # (also copies site-extra/reset, the password-reset page)
   T=$(mktemp -d)
   TOK="${GH_TOKEN:-$(gh auth token 2>/dev/null || true)}"
   TOK=$(printf %s "$TOK" | tr -d '[:space:]') # a stray newline in the secret made git reject the URL as malformed
@@ -92,7 +92,9 @@ if [ -d site-extra/dashboard ]; then
   git clone --depth 1 "https://x-access-token:$TOK@github.com/$SITE" "$T/site" 2>&1 | sed "s/$TOK/***/g" || true
   [ -d "$T/site/.git" ] || { echo "Site sync: clone of $SITE failed (output above)" >&2; exit 1; }
   mkdir -p "$T/site/dashboard" && cp site-extra/dashboard/* "$T/site/dashboard/"
+  mkdir -p "$T/site/reset" && cp site-extra/reset/* "$T/site/reset/"
   grep -q 'dashboard' "$T/site/.cpanel.yml" 2>/dev/null || sed -i 's#^    - /bin/cp -R index.html#    - mkdir -p $DEPLOYPATH/dashboard \&\& /bin/cp -R dashboard/* $DEPLOYPATH/dashboard/\n    - /bin/cp -R index.html#' "$T/site/.cpanel.yml"
+  grep -q 'reset' "$T/site/.cpanel.yml" 2>/dev/null || sed -i 's#^    - /bin/cp -R index.html#    - mkdir -p $DEPLOYPATH/reset \&\& /bin/cp -R reset/* $DEPLOYPATH/reset/\n    - /bin/cp -R index.html#' "$T/site/.cpanel.yml"
   # Docxels logo (the pixel "D"): icons, the site header mark and the cPanel copy list.
   cp site-extra/assets/*.png "$T/site/"
   python3 - "$T/site" <<'PY'

@@ -63,6 +63,9 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
                     Text("An account lets you use the writing assistant. Your documents stay on this phone; text is sent only when you tap an assistant action.", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(email, { email = it.trim() }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(password, { password = it }, label = { Text("Password (10+ characters with upper and lower case letters and a digit to sign up)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                    TextButton(enabled = !busy && email.contains("@"), onClick = {
+                        run { cloud.requestPasswordReset(email); note = "If that email has an account, a reset link is on its way. Open it on any device, choose a new password, then sign in here." }
+                    }) { Text("Forgot password?") }
                 } else {
                     Text(s.email, style = MaterialTheme.typography.titleMedium)
                     val p = plan
@@ -76,7 +79,7 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
                     if (plan?.pro == false) Text("After paying, come back here; Pro turns on within a minute.", style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick = { cloud.signOut(); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
                 }
-                note?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                note?.let { Text(it, color = if (it.startsWith("If that email")) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         },
         confirmButton = {

@@ -95,6 +95,13 @@ class Cloud(context: Context) {
         store(s); return true
     }
 
+    /** Emails a password-reset link that opens the Docxels reset page. Always looks successful so nobody can probe which emails have accounts. */
+    suspend fun requestPasswordReset(email: String) {
+        val (code, text) = call("POST", "/auth/v1/recover?redirect_to=" + java.net.URLEncoder.encode("https://docxels.pixelslimited.ng/reset/", "UTF-8"), JSONObject().put("email", email), null)
+        if (code == 429) throw CloudException("Too many requests. Wait a minute and try again.")
+        if (code >= 500) throw CloudException(friendly(text))
+    }
+
     suspend fun signIn(email: String, password: String) {
         val (code, text) = call("POST", "/auth/v1/token?grant_type=password", JSONObject().put("email", email).put("password", password), null)
         if (code !in 200..299) throw CloudException(friendly(text))
