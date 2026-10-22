@@ -25,6 +25,24 @@
     tog.addEventListener("click", () => { const on = input.type === "password"; input.type = on ? "text" : "password"; tog.textContent = on ? "Hide" : "Show"; tog.setAttribute("aria-label", on ? "Hide password" : "Show password"); });
     return { box: h("div", { class: "pwrow" }, input, tog), input };
   }
+  const RULES = [["10 or more characters", (p) => p.length >= 10], ["An upper case letter", (p) => /[A-Z]/.test(p)], ["A lower case letter", (p) => /[a-z]/.test(p)], ["A digit", (p) => /\d/.test(p)]];
+  function meter(input) {
+    const wrap = h("div", { class: "pwmeter", "aria-live": "polite" });
+    const bars = h("div", { class: "bars" }, ...[0, 1, 2, 3].map(() => h("span", {})));
+    const label = h("div", { class: "mute" }, "Password strength: nothing typed yet");
+    const list = RULES.map(([t]) => h("div", {}, ""));
+    wrap.append(bars, label, ...list);
+    const update = () => {
+      const p = input.value, met = RULES.filter(([, f]) => f(p)).length;
+      const level = !p ? 0 : met === 4 && (p.length >= 14 || /[^A-Za-z0-9]/.test(p)) ? 4 : Math.min(met, 3);
+      const name = !p ? "nothing typed yet" : level <= 1 ? "Weak" : level === 2 ? "Fair" : level === 3 ? "Good" : "Strong";
+      label.textContent = "Password strength: " + name;
+      [...bars.children].forEach((b, i) => { b.className = p && i < Math.max(level, 1) ? "on l" + Math.max(level, 1) : ""; });
+      RULES.forEach(([t, f], i) => { const ok = f(p); list[i].textContent = (ok ? "\u2713  " : "\u25CB  ") + t; list[i].className = ok ? "okmsg" : "mute"; });
+    };
+    input.addEventListener("input", update); update();
+    return wrap;
+  }
   function strong(p) { return p.length >= 10 && /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p); }
 
   function form() {
@@ -43,7 +61,7 @@
       } catch (e) { msg.textContent = e.message; go.disabled = false; }
     });
     box(h("h1", {}, "Choose a new password"),
-      h("label", { for: "pw" }, "New password"), f1.box,
+      h("label", { for: "pw" }, "New password"), f1.box, meter(pw),
       h("label", { for: "pw2" }, "Repeat it"), f2.box, msg, go);
   }
 

@@ -2,6 +2,7 @@ package com.docscan.app.ui.cloud
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,7 +60,7 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text(if (session == null) "Your Docxels account" else "Account") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val s = session
                 if (s == null) {
                     Text("An account lets you use the writing assistant. Your documents stay on this phone; text is sent only when you tap an assistant action.", style = MaterialTheme.typography.bodySmall)
@@ -68,7 +69,8 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
                         OutlinedTextField(last, { last = it.take(30) }, label = { Text("Last name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     }
                     OutlinedTextField(email, { email = it.trim() }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    com.docscan.app.ui.PasswordField(password, { password = it }, if (creating) "Password (10+ characters, with upper and lower case letters and a digit)" else "Password", Modifier.fillMaxWidth())
+                    com.docscan.app.ui.PasswordField(password, { password = it }, "Password", Modifier.fillMaxWidth())
+                    if (creating) com.docscan.app.ui.PasswordStrength(password)
                     if (!creating) TextButton(enabled = !busy && email.contains("@"), onClick = {
                         run { cloud.requestPasswordReset(email); note = "If that email has an account, a reset link is on its way. Open it on any device, choose a new password, then sign in here." }
                     }) { Text("Forgot password?") }
@@ -93,7 +95,7 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            if (session == null && creating) Button(enabled = !busy && email.contains("@") && first.isNotBlank() && last.isNotBlank() && password.length >= 10 && password.any { it.isUpperCase() } && password.any { it.isLowerCase() } && password.any { it.isDigit() }, onClick = {
+            if (session == null && creating) Button(enabled = !busy && email.contains("@") && first.isNotBlank() && last.isNotBlank() && com.docscan.app.ui.PasswordPolicy.ok(password), onClick = {
                 run {
                     if (cloud.signUp(email, password, first, last)) onDismiss()
                     else note = "Check your email and tap the link to confirm, then sign in."
