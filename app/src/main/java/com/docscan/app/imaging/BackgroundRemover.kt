@@ -303,22 +303,28 @@ object BackgroundRemover {
     private var session: ai.onnxruntime.OrtSession? = null
     private var sessionFailed = false
 
-    /** Gives the remover access to the bundled subject model. */
+    /** Gives the remover access to the downloaded subject model (see CutOutModel). */
     fun init(context: android.content.Context) { appContext = context.applicationContext }
+
+    /** Forget a failed or missing model so the next cut looks for it again (after a download). */
+    @Synchronized
+    fun reload() { session?.close(); session = null; sessionFailed = false }
 
     @Synchronized
     private fun modelSession(): ai.onnxruntime.OrtSession? {
         session?.let { return it }
         if (sessionFailed) return null
         val ctx = appContext ?: return null
+        val file = com.docscan.app.update.CutOutModel.file(ctx)
+        if (!file.isFile) return null
         return runCatching {
-            val bytes = ctx.assets.open("models/u2netp.onnx").use { it.readBytes() }
+            val bytes = file.readBytes()
             ai.onnxruntime.OrtEnvironment.getEnvironment().createSession(bytes)
         }.onFailure { sessionFailed = true }.getOrNull()?.also { session = it }
     }
 
     /**
-     * How strongly each pixel (at the working size) belongs to the main subject, 0 to 1, from the bundled U^2-Net-P
+     * How strongly each pixel (at the working size) belongs to the main subject, 0 to 1, from the downloaded U^2-Net-P
      * model. Null when the model is unavailable or finds nothing believable. Blocks, so call it off the main thread.
      */
     private fun subjectPrior(rgb: Mat, w: Int, h: Int): FloatArray? = runCatching {

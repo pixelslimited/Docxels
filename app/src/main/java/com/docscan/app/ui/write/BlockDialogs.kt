@@ -532,6 +532,8 @@ fun ImageEditorDialog(
     var busy by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val cutGate = rememberCutOutGate()
+    cutGate.Dialog()
     val thumb: Bitmap? = remember(cur) {
         val o = BitmapFactory.Options().apply { inSampleSize = 4 }
         BitmapFactory.decodeByteArray(cur.bytes, 0, cur.bytes.size, o)
@@ -564,7 +566,7 @@ fun ImageEditorDialog(
                 }
                 SizeControls(wTw, hTw, maxOf(contentWidthTwips * 2, initial.widthTwips), maxOf(contentWidthTwips * 3, initial.heightTwips), { w, h -> wTw = w; hTw = h })
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(enabled = !busy, onClick = {
+                    OutlinedButton(enabled = !busy, onClick = { cutGate.run {
                         busy = true
                         note = null
                         scope.launch {
@@ -588,7 +590,7 @@ fun ImageEditorDialog(
                             result.onSuccess { cur = cur.copy(bytes = it, extension = "png") }
                                 .onFailure { note = "Couldn't remove the background from this picture." }
                         }
-                    }) { Text(if (busy) "Working…" else "Remove background") }
+                    } }) { Text(if (busy) "Working…" else "Remove background") }
                     OutlinedButton(enabled = !busy, onClick = {
                         scope.launch {
                             val turned = withContext(Dispatchers.Default) { runCatching { rotateQuarterTurn(build()) }.getOrNull() }

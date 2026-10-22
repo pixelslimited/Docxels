@@ -242,6 +242,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var pageHost by remember { mutableStateOf<PageHost?>(null) }
     // The floating quick tools: shown after scrolling up a little, a tap on the page or a selection; hidden when scrolling down.
     val snackbar = remember { SnackbarHostState() }
+    val cutGate = rememberCutOutGate()
+    cutGate.Dialog()
     // Dictate: the phone's own speech recogniser types what is said at the cursor. Read aloud: its own voice speaks the text.
     val speech = remember { ReadAloud(context) }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { speech.shutdown() } }
@@ -611,7 +613,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                                 add(ToolAction(Icons.Default.Crop, "Crop") { cropFor = idx })
                                 add(ToolAction(Icons.Default.AutoFixHigh, "Remove background") {
                                     val img = (controller.blockAt(idx) as? Block.Image)?.image
-                                    if (img != null) scope.launch {
+                                    if (img != null) cutGate.run { scope.launch {
                                         val note = launch { snackbar.showSnackbar("Removing the background…", duration = androidx.compose.material3.SnackbarDuration.Indefinite) }
                                         val cut = withContext(Dispatchers.Default) { removePictureBackground(img) }
                                         note.cancel()
@@ -623,7 +625,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                                             val tight = withContext(Dispatchers.Default) { removePictureBackground(img, strict = true) }
                                             if (tight != null) controller.replaceBlock(idx, Block.Image(tight)) else snackbar.showSnackbar("Couldn't isolate just the subject.")
                                         }
-                                    }
+                                    } }
                                 })
                                 add(ToolAction(Icons.Default.RotateRight, "Turn 90 degrees") {
                                     (controller.blockAt(idx) as? Block.Image)?.let { b -> rotateQuarterTurn(b.image)?.let { controller.replaceBlock(idx, Block.Image(it)) } }

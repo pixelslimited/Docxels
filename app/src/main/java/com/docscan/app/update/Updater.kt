@@ -9,8 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.security.MessageDigest
 
 /**
@@ -172,34 +170,7 @@ class Updater(private val context: Context) {
         context.startActivity(i)
     }
 
-    /** Opens an HTTPS connection, following up to 5 redirects, each of which must stay on an allowed host. */
-    private fun open(start: String): ConnResult {
-        var url = start
-        repeat(6) {
-            val u = URL(url)
-            require(u.protocol == "https" && UpdateInfo.hostAllowed(u.host)) { "Blocked address" }
-            val c = u.openConnection() as HttpURLConnection
-            c.instanceFollowRedirects = false
-            c.connectTimeout = 15_000
-            c.readTimeout = 30_000
-            c.setRequestProperty("User-Agent", "Docxels-updater")
-            when (val code = c.responseCode) {
-                200 -> return ConnResult(c.inputStream, c.contentLengthLong, c)
-                301, 302, 303, 307, 308 -> {
-                    url = URL(u, c.getHeaderField("Location") ?: error("Bad redirect")).toString()
-                    c.disconnect()
-                }
-                else -> { c.disconnect(); error("The update server answered $code.") }
-            }
-        }
-        error("Too many redirects")
-    }
-
-    private class ConnResult(val stream: InputStream, val length: Long, val conn: HttpURLConnection) : AutoCloseable {
-        operator fun component1() = stream
-        operator fun component2() = length
-        override fun close() { runCatching { stream.close() }; conn.disconnect() }
-    }
+    private fun open(start: String) = Https.open(start)
 
     private fun readLimited(s: InputStream, max: Int): ByteArray {
         val out = java.io.ByteArrayOutputStream()

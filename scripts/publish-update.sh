@@ -64,6 +64,12 @@ for i in 1 2 3 4 5; do
   sleep 5
 done
 
+# The Remove background helper model is downloaded by the app on demand (update/CutOutModel.kt). It never changes, so it
+# is uploaded once to its own release and left alone afterwards.
+if ! gh release view models --repo "$SITE" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx u2netp.onnx; then
+  gh release view models --repo "$SITE" >/dev/null 2>&1 || gh release create models --repo "$SITE" --title "Models" --notes "Helper models the app downloads on demand." --latest=false
+  gh release upload models models/u2netp.onnx --repo "$SITE" --clobber
+fi
 # Keep this build (and the last few) so the next release can make patches from them.
 cp "$APK" "Docxels-$CODE.apk"
 gh release view history --repo "$SITE" >/dev/null 2>&1 || gh release create history --repo "$SITE" --title "Build history" --notes "Older builds, used only to make small update patches." --latest=false
