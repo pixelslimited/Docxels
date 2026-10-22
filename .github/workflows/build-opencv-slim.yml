@@ -88,7 +88,20 @@ jobs:
       - name: Publish as a release asset
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          gh release delete "opencv-slim-$CV" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "opencv-slim-$CV" libopencv_java4.so --title "Slim OpenCV $CV (arm64-v8a)" \
-            --notes "core, imgproc and photo only; built by .github/workflows/build-opencv-slim.yml" --prerelease --latest=false
+          set -o pipefail
+          {
+            gh release delete "opencv-slim-$CV" --yes --cleanup-tag || true
+            gh release create "opencv-slim-$CV" libopencv_java4.so --target "${{ github.sha }}" \
+              --title "Slim OpenCV $CV (arm64-v8a)" \
+              --notes "core, imgproc and photo only; built by .github/workflows/build-opencv-slim.yml" --prerelease --latest=false
+          } 2>&1 | tee pub.txt
+
+      - name: Post the publish result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo "slim OpenCV publish output:"; echo '```'; tail -c 3000 pub.txt 2>/dev/null; echo '```'; } > pub.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@pub.md || true
