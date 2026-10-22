@@ -1,0 +1,30 @@
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14161a;--mute:#5b6270;--line:#dfe3ea;--acc:#1a56db;--bad:#b42318;--ok:#067647}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1013;--card:#171a1f;--ink:#eceef2;--mute:#9aa3b2;--line:#2a2f37;--acc:#7aa2ff;--bad:#ff8a80;--ok:#5fd3a0}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.pad{padding:16px;max-width:1200px;margin:0 auto}
+h1{font-size:1.5rem;margin:0}h2{font-size:1.125rem;margin:24px 0 8px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+button,input{font:inherit;color:inherit}
+button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+button.on,button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+input{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+.box{max-width:420px;margin:12vh auto 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
+.box label{display:block;margin:12px 0 4px;color:var(--mute)}
+.box button{margin-top:16px;width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card .k{color:var(--mute)}.card .v{font-size:1.625rem;font-weight:650}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-weight:600}
+.bad{color:var(--bad)}.ok{color:var(--ok)}.mute{color:var(--mute)}
+.err{color:var(--bad);margin-top:12px}
+.qr{display:block;margin:12px auto;width:200px;height:200px;background:#fff;border-radius:8px}
+code{word-break:break-all}
+.chart{width:100%;height:120px}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.row input{max-width:320px}

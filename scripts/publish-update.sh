@@ -83,6 +83,17 @@ done
   fi
 ) || true
 
+# Site pages kept in this repo under site-extra/ (the admin dashboard) are copied into the site repo and its cPanel deploy list.
+if [ -d site-extra/dashboard ]; then (
+  T=$(mktemp -d)
+  git clone --depth 1 "https://x-access-token:$(gh auth token)@github.com/$SITE" "$T/site" >/dev/null 2>&1 || exit 0
+  mkdir -p "$T/site/dashboard" && cp site-extra/dashboard/* "$T/site/dashboard/"
+  cd "$T/site"
+  grep -q 'dashboard' .cpanel.yml 2>/dev/null || sed -i 's#^    - /bin/cp -R index.html#    - mkdir -p $DEPLOYPATH/dashboard \&\& /bin/cp -R dashboard/* $DEPLOYPATH/dashboard/\n    - /bin/cp -R index.html#' .cpanel.yml
+  git add -A
+  git diff --cached --quiet || { git -c user.name="Kelvin Codes" -c user.email="docxels@pixelslimited.ng" commit -qm "Site: admin dashboard" && git push -q origin HEAD || true; }
+) || true; fi
+
 # Last check: the public update file must be reachable (GitHub's download address can take a little while to appear).
 for i in $(seq 1 12); do
   if curl -fsSL "$BASE/update.json" | grep -q "\"versionCode\":$CODE"; then echo "update.json for build $CODE is live"; exit 0; fi
