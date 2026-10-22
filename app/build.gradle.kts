@@ -70,7 +70,9 @@ android {
         // in Docxels uses (PDF passwords use the ordinary algorithms); leaving them out saves about 4 MB in the APK.
         resources { excludes += listOf("/META-INF/{AL2.0,LGPL2.1}", "/org/bouncycastle/pqc/**") }
         // Compress native libraries inside the APK (much smaller download than the uncompressed default).
-        jniLibs { useLegacyPackaging = true }
+        // The slim OpenCV library (see build-apk.yml) is copied into src/main/jniLibs by CI; when it is there it wins over
+        // the full one inside the OpenCV package.
+        jniLibs { useLegacyPackaging = true; pickFirsts += "**/libopencv_java4.so" }
     }
 }
 
