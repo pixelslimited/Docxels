@@ -40,7 +40,8 @@ jobs:
 
       - name: Find, strip and compare with the full library
         run: |
-          set -e
+          set -eo pipefail
+          exec > >(tee diag.txt) 2>&1
           SO=$(find build -name 'libopencv_java4.so' | head -1)
           [ -n "$SO" ] || { echo "libopencv_java4.so was not built"; find build -name '*.so' | head; exit 1; }
           NDK="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}"
@@ -59,6 +60,15 @@ jobs:
           wc -l want.txt have.txt
           comm -23 want.txt have.txt > missing.txt
           if [ -s missing.txt ]; then echo "Missing native functions:"; head -50 missing.txt; exit 1; fi
+
+      # Job logs are not readable from the session that maintains this repo, so the result is also posted as a comment.
+      - name: Post the result as a commit comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo "slim OpenCV step output:"; echo '```'; tail -c 6000 diag.txt 2>/dev/null; echo '```'; } > diag.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@diag.md || true
 
       - name: Publish as a release asset
         env:
