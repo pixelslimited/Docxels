@@ -87,6 +87,7 @@ done
 if [ -d site-extra/dashboard ]; then
   T=$(mktemp -d)
   TOK="${GH_TOKEN:-$(gh auth token 2>/dev/null || true)}"
+  TOK=$(printf %s "$TOK" | tr -d '[:space:]') # a stray newline in the secret made git reject the URL as malformed
   [ -n "$TOK" ] || { echo "Site sync: no token available" >&2; exit 1; }
   git clone --depth 1 "https://x-access-token:$TOK@github.com/$SITE" "$T/site" 2>&1 | sed "s/$TOK/***/g" || true
   [ -d "$T/site/.git" ] || { echo "Site sync: clone of $SITE failed (output above)" >&2; exit 1; }

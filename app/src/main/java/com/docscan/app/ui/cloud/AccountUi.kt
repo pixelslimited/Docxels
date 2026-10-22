@@ -62,7 +62,7 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
                 if (s == null) {
                     Text("An account lets you use the writing assistant. Your documents stay on this phone; text is sent only when you tap an assistant action.", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(email, { email = it.trim() }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(password, { password = it }, label = { Text("Password (8 or more characters)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(password, { password = it }, label = { Text("Password (10+ characters with upper and lower case letters and a digit to sign up)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
                 } else {
                     Text(s.email, style = MaterialTheme.typography.titleMedium)
                     val p = plan
@@ -86,7 +86,7 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
             else TextButton(onClick = onDismiss) { Text("Done") }
         },
         dismissButton = {
-            if (session == null) TextButton(enabled = !busy && email.contains("@") && password.length >= 8, onClick = {
+            if (session == null) TextButton(enabled = !busy && email.contains("@") && password.length >= 10 && password.any { it.isUpperCase() } && password.any { it.isLowerCase() } && password.any { it.isDigit() }, onClick = {
                 run {
                     if (cloud.signUp(email, password)) onDismiss()
                     else note = "Check your email and tap the link to confirm, then sign in."
