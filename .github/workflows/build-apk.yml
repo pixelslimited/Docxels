@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     # Notes, plans and store text do not change the app, so they do not need a build.
-    paths-ignore: ['**/*.md', 'docs/**', 'store/**']
+    paths-ignore: ['**/*.md', 'docs/**', 'store/**', '.github/workflows/build-opencv-slim.yml']
   workflow_dispatch:
 
 # One build at a time: two builds publishing together delete each other's release and fail. A newer waiting build
