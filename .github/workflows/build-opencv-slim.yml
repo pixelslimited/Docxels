@@ -70,12 +70,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set +e +o pipefail
           {
             echo "slim OpenCV step output:"; echo '```'
             echo "--- configure summary"; grep -A28 'OpenCV modules' cfg.txt 2>/dev/null | head -40
             echo "--- java section"; grep -B1 -A14 '^--   Java:' cfg.txt 2>/dev/null | head -24
             echo "--- java/android lines"; grep -i -E 'java|android' cfg.txt 2>/dev/null | grep -i -E 'disabled|skip|not|no |unavailable|error|warn' | head -15
             echo "--- built libraries"; find build -name '*.so' 2>/dev/null | head; find build -name '*.a' 2>/dev/null | head -12
+            echo "--- build output (last lines)"; grep -n -i -E "error|undefined|fatal|FAILED" build.txt 2>/dev/null | head -25; tail -n 25 build.txt 2>/dev/null
             echo "--- step output"; tail -c 2500 diag.txt 2>/dev/null
             echo '```'
           } > diag.md
