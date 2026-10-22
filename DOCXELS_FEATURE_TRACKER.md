@@ -381,3 +381,4 @@ Visual Basic, macros, XML mapping pane, COM add-ins, Get Add-ins, 3D models, Sma
 | Sign-out message | IMPLEMENTED — NOT VERIFIED | Account dialog, Sign out: a "Logged out. See you back soon!" message. |
 | PDF dark view keeps colours | IMPLEMENTED — NOT VERIFIED | `imaging/NightPdf.kt` flips only greys; logos, coloured text and highlights keep their colour, and text on a highlight stays readable. Not seen on a phone; very dark coloured text is lightened slightly. |
 | Show/hide password everywhere | IMPLEMENTED — NOT VERIFIED | App (`ui/PasswordField.kt`: sign-in, PDF unlock, PDF protect), admin dashboard login and the reset page. |
+| First and last name at sign-up | IMPLEMENTED — NOT VERIFIED | "Create account" now asks for first and last name (saved with the account); sign-in is unchanged. Sign in with Google is NOT built: it needs the Google Web client ID (and secret in Supabase). |

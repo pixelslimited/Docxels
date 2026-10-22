@@ -94,8 +94,11 @@ class Cloud(context: Context) {
     }.getOrDefault("").ifEmpty { "Something went wrong. Try again." }
 
     /** Creates an account. Returns true if signed in at once, false if the person must confirm their email first. */
-    suspend fun signUp(email: String, password: String): Boolean {
-        val (code, text) = call("POST", "/auth/v1/signup", JSONObject().put("email", email).put("password", password), null)
+    suspend fun signUp(email: String, password: String, first: String, last: String): Boolean {
+        fun clean(v: String) = v.trim().replace(Regex("\\s+"), " ").take(30)
+        if (clean(first).isEmpty() || clean(last).isEmpty()) throw CloudException("Enter both your first and your last name.")
+        val data = JSONObject().put("first_name", clean(first)).put("last_name", clean(last))
+        val (code, text) = call("POST", "/auth/v1/signup", JSONObject().put("email", email).put("password", password).put("data", data), null)
         if (code !in 200..299) throw CloudException(friendly(text))
         val s = parseSession(text, email) ?: return false
         store(s); return true

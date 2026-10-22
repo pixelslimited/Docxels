@@ -35,6 +35,9 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var creating by remember { mutableStateOf(false) }
+    var first by remember { mutableStateOf("") }
+    var last by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
     var plan by remember { mutableStateOf<Plan?>(null) }
@@ -60,9 +63,13 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
                 val s = session
                 if (s == null) {
                     Text("An account lets you use the writing assistant. Your documents stay on this phone; text is sent only when you tap an assistant action.", style = MaterialTheme.typography.bodySmall)
+                    if (creating) {
+                        OutlinedTextField(first, { first = it.take(30) }, label = { Text("First name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(last, { last = it.take(30) }, label = { Text("Last name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
                     OutlinedTextField(email, { email = it.trim() }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    com.docscan.app.ui.PasswordField(password, { password = it }, "Password (10+ characters with upper and lower case letters and a digit to sign up)", Modifier.fillMaxWidth())
-                    TextButton(enabled = !busy && email.contains("@"), onClick = {
+                    com.docscan.app.ui.PasswordField(password, { password = it }, if (creating) "Password (10+ characters, with upper and lower case letters and a digit)" else "Password", Modifier.fillMaxWidth())
+                    if (!creating) TextButton(enabled = !busy && email.contains("@"), onClick = {
                         run { cloud.requestPasswordReset(email); note = "If that email has an account, a reset link is on its way. Open it on any device, choose a new password, then sign in here." }
                     }) { Text("Forgot password?") }
                 } else {
@@ -86,18 +93,19 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            if (session == null) Button(enabled = !busy && email.contains("@") && password.length >= 8, onClick = {
+            if (session == null && creating) Button(enabled = !busy && email.contains("@") && first.isNotBlank() && last.isNotBlank() && password.length >= 10 && password.any { it.isUpperCase() } && password.any { it.isLowerCase() } && password.any { it.isDigit() }, onClick = {
+                run {
+                    if (cloud.signUp(email, password, first, last)) onDismiss()
+                    else note = "Check your email and tap the link to confirm, then sign in."
+                }
+            }) { Text("Create account") }
+            else if (session == null) Button(enabled = !busy && email.contains("@") && password.length >= 8, onClick = {
                 run { cloud.signIn(email, password); onDismiss() }
             }) { Text("Sign in") }
             else TextButton(onClick = onDismiss) { Text("Done") }
         },
         dismissButton = {
-            if (session == null) TextButton(enabled = !busy && email.contains("@") && password.length >= 10 && password.any { it.isUpperCase() } && password.any { it.isLowerCase() } && password.any { it.isDigit() }, onClick = {
-                run {
-                    if (cloud.signUp(email, password)) onDismiss()
-                    else note = "Check your email and tap the link to confirm, then sign in."
-                }
-            }) { Text("Create account") }
+            if (session == null) TextButton(enabled = !busy, onClick = { creating = !creating; note = null }) { Text(if (creating) "I have an account" else "Create account") }
         },
     )
 }
