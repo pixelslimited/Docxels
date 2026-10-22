@@ -41,6 +41,7 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
     var last by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
+    var sentTo by remember { mutableStateOf<String?>(null) }
     var plan by remember { mutableStateOf<Plan?>(null) }
 
     LaunchedEffect(session?.email) {
@@ -58,11 +59,20 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (session == null) "Your Docxels account" else "Account") },
+        title = { Text(if (session != null) "Account" else if (sentTo != null) "Account created" else "Your Docxels account") },
         text = {
             Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val s = session
-                if (s == null) {
+                val sent = sentTo
+                if (s == null && sent != null) {
+                    Text("Check your email", style = MaterialTheme.typography.titleMedium)
+                    Text("We sent a confirmation link to $sent. Open the email and tap the link, then come back here and sign in.", style = MaterialTheme.typography.bodyMedium)
+                    Text("Nothing in your inbox after a minute? Look in Spam or Promotions, or send it again.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = {
+                        runCatching { context.startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_EMAIL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                            .onFailure { note = "No email app was found. Open your email another way." }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Open my email app") }
+                } else if (s == null) {
                     Text("An account lets you use the writing assistant. Your documents stay on this phone; text is sent only when you tap an assistant action.", style = MaterialTheme.typography.bodySmall)
                     if (creating) {
                         OutlinedTextField(first, { first = it.take(30) }, label = { Text("First name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -91,14 +101,17 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
                         onDismiss()
                     }, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
                 }
-                note?.let { Text(it, color = if (it.startsWith("If that email")) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                note?.let { Text(it, color = if (it.startsWith("If that email") || it.startsWith("Sent again")) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         },
         confirmButton = {
-            if (session == null && creating) Button(enabled = !busy && email.contains("@") && first.isNotBlank() && last.isNotBlank() && com.docscan.app.ui.PasswordPolicy.ok(password), onClick = {
+            if (session == null && sentTo != null) Button(onClick = { sentTo = null; creating = false; note = null }) { Text("Back to sign in") }
+            else if (session == null && creating) Button(enabled = !busy && email.contains("@") && first.isNotBlank() && last.isNotBlank() && com.docscan.app.ui.PasswordPolicy.ok(password), onClick = {
                 run {
-                    if (cloud.signUp(email, password, first, last)) onDismiss()
-                    else note = "Check your email and tap the link to confirm, then sign in."
+                    if (cloud.signUp(email, password, first, last)) {
+                        android.widget.Toast.makeText(context, "Account created. Welcome to Docxels!", android.widget.Toast.LENGTH_LONG).show()
+                        onDismiss()
+                    } else { sentTo = email; password = "" }
                 }
             }) { Text("Create account") }
             else if (session == null) Button(enabled = !busy && email.contains("@") && password.length >= 8, onClick = {
@@ -107,7 +120,11 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
             else TextButton(onClick = onDismiss) { Text("Done") }
         },
         dismissButton = {
-            if (session == null) TextButton(enabled = !busy, onClick = { creating = !creating; note = null }) { Text(if (creating) "I have an account" else "Create account") }
+            val sent = sentTo
+            if (session == null && sent != null) TextButton(enabled = !busy, onClick = {
+                run { cloud.resendConfirmation(sent); note = "Sent again to $sent." }
+            }) { Text("Send again") }
+            else if (session == null) TextButton(enabled = !busy, onClick = { creating = !creating; note = null }) { Text(if (creating) "I have an account" else "Create account") }
         },
     )
 }

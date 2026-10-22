@@ -104,6 +104,13 @@ class Cloud(context: Context) {
         store(s); return true
     }
 
+    /** Sends the confirmation email again (same answer whether or not the address is registered). */
+    suspend fun resendConfirmation(email: String) {
+        val (code, text) = call("POST", "/auth/v1/resend", JSONObject().put("type", "signup").put("email", email), null)
+        if (code == 429) throw CloudException("Please wait a minute before asking for another email.")
+        if (code >= 500) throw CloudException(friendly(text))
+    }
+
     /** Emails a password-reset link that opens the Docxels reset page. Always looks successful so nobody can probe which emails have accounts. */
     suspend fun requestPasswordReset(email: String) {
         val (code, text) = call("POST", "/auth/v1/recover?redirect_to=" + java.net.URLEncoder.encode("https://docxels.pixelslimited.ng/reset/", "UTF-8"), JSONObject().put("email", email), null)
