@@ -64,6 +64,7 @@ class AppContainer(context: Context) {
     val searchIndex = com.docscan.app.data.SearchIndex(context)
     val pdfs = com.docscan.app.data.PdfStore(context)
     val cloud = com.docscan.app.cloud.Cloud(context)
+    val announcements = com.docscan.app.cloud.Announcements(context)
     val exportStatus = com.docscan.app.export.ExportStatus()
     private val appCache = context.cacheDir
     /** Scratch folder for page thumbnails. */

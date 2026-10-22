@@ -135,3 +135,13 @@ tbody tr:last-child td{border-bottom:0}
   .g-2,.g-3{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){.side{transition:none}}
+
+select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+textarea{resize:vertical}
+.fld{display:grid;gap:4px}.fld.row{display:flex;align-items:center;gap:10px}.fld.row input{width:auto}
+.fld small{font-size:1rem}
+.thumb{width:100%;max-height:190px;object-fit:cover;border-radius:10px;margin-bottom:10px;background:var(--hover)}
+.rowgap{margin-top:10px}
+.drawer.wide{width:min(520px,100%)}
+.pv{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:8px;justify-items:start}
+.pv h3,.pv p{margin:0}

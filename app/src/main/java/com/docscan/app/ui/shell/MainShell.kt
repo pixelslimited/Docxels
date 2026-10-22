@@ -179,6 +179,7 @@ fun MainShell(
         bottomBar = { BottomBar(tab, onSelect = { tab = it }) },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
+            com.docscan.app.ui.announce.AnnouncementHost(container, onOpenUpdates = { tab = Tab.SETTINGS })
             when (tab) {
                 Tab.HOME -> HomeScreen(
                     items = items,

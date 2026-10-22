@@ -14,8 +14,9 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * The only networking in Docxels. It runs only when the user taps "Check for updates" or "Download and install",
- * sends nothing about the user or their documents, and only talks to the hosts in [UpdateInfo.hostAllowed].
+ * Update networking. It runs when the user taps "Check for updates" or "Download and install", and for the once-a-day
+ * notice that a newer build exists (unless the person turned announcements off). It sends nothing about the user or
+ * their documents, and only talks to the hosts in [UpdateInfo.hostAllowed].
  */
 class Updater(private val context: Context) {
     private val dir get() = File(context.cacheDir, "updates").apply { mkdirs() }

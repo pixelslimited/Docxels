@@ -66,6 +66,11 @@ class UiPrefs(context: Context) {
         get() = prefs.getBoolean("export_a4", true)
         set(v) = prefs.edit().putBoolean("export_a4", v).apply()
 
+    /** Lets the app check once a day for messages from Docxels and for a newer version, and show them as pop-ups. On by default. */
+    var announcements: Boolean
+        get() = prefs.getBoolean("announcements", true)
+        set(v) = prefs.edit().putBoolean("announcements", v).apply()
+
     /** The short welcome shown on a fresh install has been seen (or was skipped for people who already use the app). */
     var introSeen: Boolean
         get() = prefs.getBoolean("intro_seen", false)

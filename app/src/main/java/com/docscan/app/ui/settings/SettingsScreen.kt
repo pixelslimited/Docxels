@@ -253,6 +253,12 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
 
             Section("App updates")
             UpdatePanel()
+            var announce by remember { mutableStateOf(container.ui.announcements) }
+            ToggleRow(
+                "Announcements and update notices",
+                "Once a day Docxels checks for news and new versions and shows them as a pop-up. Nothing about you or your documents is sent. Turn off to stay fully offline.",
+                announce,
+            ) { announce = it; container.ui.announcements = it }
 
             }
 

@@ -40,7 +40,7 @@ const ICONS = {
   down: "M12 3v12m0 0l-4-4m4 4l4-4M4 21h16", shield: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z", list: "M4 6h16M4 12h16M4 18h10",
   refresh: "M20 11a8 8 0 1 0-2 5.5M20 4v7h-7", menu: "M4 6h16M4 12h16M4 18h16", moon: "M21 13a9 9 0 1 1-10-10 7 7 0 0 0 10 10z",
   out: "M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M16 8l4 4-4 4M20 12H9", x: "M6 6l12 12M18 6L6 18", doc: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7",
-  dl: "M12 4v11m0 0l-4-4m4 4l4-4M5 20h14",
+  dl: "M12 4v11m0 0l-4-4m4 4l4-4M5 20h14", bell: "M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0",
 };
 function icon(name) { return sv("svg", { class: "ic", viewBox: "0 0 24 24", "aria-hidden": "true" }, sv("path", { d: ICONS[name] })); }
 const show = (...n) => { redraws.clear(); app.replaceChildren(...n); };
@@ -91,7 +91,7 @@ async function api(section, extra) {
     try { keep(await gotrue("token?grant_type=refresh_token", { refresh_token: S.refresh })); r = await call(); } catch (e) { /* fall through */ }
   }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const err = new Error(j.error || "failed"); err.code = j.error; err.status = r.status; throw err; }
+  if (!r.ok) { const err = new Error(j.error || "failed"); err.code = j.error; err.detail = j.message; err.status = r.status; throw err; }
   return j;
 }
 
@@ -282,8 +282,9 @@ function csv(name, head, rows) {
 
 /* ---------- shell ---------- */
 const NAV = [["Monitor", [["overview", "Overview", "home"], ["users", "Users", "users"], ["payments", "Payments", "card"], ["ai", "AI usage", "spark"], ["sync", "Cloud sync", "cloud"], ["releases", "Releases", "down"]]],
+  ["Engage", [["messages", "Messages", "bell"]]],
   ["Protect", [["security", "Security", "shield"], ["audit", "Audit log", "list"]]]];
-const TITLES = { overview: "Overview", users: "Users", payments: "Payments", ai: "AI usage", sync: "Cloud sync", releases: "Releases", security: "Security", audit: "Audit log" };
+const TITLES = { overview: "Overview", users: "Users", payments: "Payments", ai: "AI usage", sync: "Cloud sync", releases: "Releases", messages: "Messages", security: "Security", audit: "Audit log" };
 function shell() {
   const root = el("div", { class: "app" });
   const side = el("aside", { class: "side" }, brand());
@@ -445,6 +446,29 @@ const VIEWS = {
       el("p", { class: "mute" }, "The app collects no analytics, so these are download counts only, not installs or versions in use."),
     ];
   },
+  async messages() {
+    let data = await api("", { action: "announce_list" });
+    const holder = el("div", { class: "grid g-2" });
+    const reload = async () => { data = await api("", { action: "announce_list" }); draw(); };
+    const state = (r) => !r.active ? badge("Off") : new Date(r.starts_at) > new Date() ? badge("Scheduled", "info") : r.ends_at && new Date(r.ends_at) < new Date() ? badge("Ended") : badge("Live", "ok");
+    const draw = () => holder.replaceChildren(...(data.rows.length ? data.rows.map((r) => {
+      const edit = el("button", { class: "btn" }, "Edit"); edit.addEventListener("click", () => composer(r, reload));
+      const tog = el("button", { class: "btn" }, r.active ? "Switch off" : "Switch on");
+      tog.addEventListener("click", async () => { await saveRow(r, { active: !r.active }); await reload(); });
+      const del = el("button", { class: "btn danger" }, "Delete"); del.addEventListener("click", async () => { if (r.kind === "welcome") return; if (confirmAsk("Delete this message?")) { await api("", { action: "announce_delete", id: r.id }); await reload(); } });
+      return el("div", { class: "card" },
+        r.image_path ? el("img", { class: "thumb", alt: "", src: imgUrl(r.image_path) }) : null,
+        el("h2", null, el("span", null, r.title), el("span", null, r.kind === "welcome" ? badge("Welcome", "info") : null, " ", state(r))),
+        el("p", { class: "mute" }, r.body.length > 160 ? r.body.slice(0, 160) + "…" : r.body),
+        el("div", { class: "mute" }, `For ${r.audience === "all" ? "everyone" : r.audience === "pro" ? "Pro members" : "free users"} · from ${fmtD(r.starts_at)}${r.ends_at ? " to " + fmtD(r.ends_at) : ""}`),
+        el("div", { class: "toolbar rowgap" }, edit, tog, r.kind === "welcome" ? null : del));
+    }) : [el("p", { class: "mute" }, "No messages yet.")]));
+    const nw = el("button", { class: "btn primary" }, icon("bell"), "New message"); nw.addEventListener("click", () => composer(null, reload));
+    const presets = el("div", { class: "chips" }, PRESETS.map((p) => { const c = el("button", { class: "chip" }, p[0]); c.addEventListener("click", () => composer({ title: p[1], body: p[2], audience: "all", active: true }, reload)); return c; }));
+    draw();
+    return [el("div", { class: "toolbar" }, nw, el("span", { class: "mute" }, "or start from:"), presets),
+      el("p", { class: "mute" }, "Messages appear as a pop-up in the app, once per person, the next time it opens (the app checks at most once a day, and only if the person kept announcements on). The welcome message shows once to each new user."), holder];
+  },
   async security() {
     const d = await api("security");
     const checks = [
@@ -479,6 +503,72 @@ const VIEWS = {
     return [el("div", { class: "toolbar" }, chips, el("span", { class: "mute" }, `${fmtN(data.failed_24h)} denied in the last 24 h`)), holder];
   },
 };
+
+/* ---------- messages ---------- */
+const PRESETS = [
+  ["Happy Sallah", "Happy Sallah!", "Wishing you and your family joy, peace and blessings this Sallah. Thank you for using Docxels."],
+  ["Eid Mubarak", "Eid Mubarak!", "May this Eid bring you happiness and peace. From all of us at Docxels."],
+  ["Merry Christmas", "Merry Christmas!", "Wishing you a joyful Christmas and a bright year ahead. Thank you for being part of Docxels."],
+  ["Happy New Year", "Happy New Year!", "Thank you for a great year. Here's to a new year of simpler, faster documents."],
+  ["Ramadan Kareem", "Ramadan Kareem", "Wishing you a blessed month of Ramadan from everyone at Docxels."],
+  ["Independence Day", "Happy Independence Day!", "Happy Independence Day, Nigeria. Thank you for building with Docxels."],
+];
+const imgUrl = (p) => SB + "/storage/v1/object/public/announcements/" + p;
+function confirmAsk(t) { return window.confirm(t); }
+async function saveRow(r, patch) {
+  const m = { ...r, ...patch };
+  return api("", { action: "announce_save", id: r.id, title: m.title, body: m.body, audience: m.audience, button_label: m.button_label, button_url: m.button_url, starts_at: m.starts_at, ends_at: m.ends_at, active: m.active });
+}
+const toLocal = (s) => { if (!s) return ""; const d = new Date(s); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+function field(label, input, hint) { return el("label", { class: "fld" }, el("span", null, label), input, hint ? el("small", { class: "mute" }, hint) : null); }
+function composer(row, done) {
+  const r = row || { active: true, audience: "all" };
+  const title = el("input", { maxlength: "80", value: r.title || "" });
+  const body = el("textarea", { maxlength: "600", rows: "5" }); body.value = r.body || "";
+  const audience = el("select", null, [["all", "Everyone"], ["free", "Free users only"], ["pro", "Pro members only"]].map(([v, l]) => { const o = el("option", { value: v }, l); if (v === r.audience) o.selected = true; return o; }));
+  const bl = el("input", { maxlength: "30", value: r.button_label || "", placeholder: "e.g. Learn more" });
+  const bu = el("input", { type: "url", maxlength: "300", value: r.button_url || "", placeholder: "https://…" });
+  const st = el("input", { type: "datetime-local", value: toLocal(r.starts_at) });
+  const en = el("input", { type: "datetime-local", value: toLocal(r.ends_at) });
+  const act = el("input", { type: "checkbox" }); act.checked = r.active !== false;
+  const file = el("input", { type: "file", accept: "image/png,image/jpeg" });
+  let removeImg = false, blobUrl = "";
+  const pimg = el("img", { class: "thumb", alt: "" }); const ptitle = el("h3"); const pbody = el("p"); const pbtn = el("span", { class: "btn primary" });
+  const paint = () => {
+    ptitle.textContent = title.value || "Title"; pbody.textContent = body.value || "Your message"; pbtn.textContent = bl.value || "Open"; pbtn.style.display = bu.value ? "inline-flex" : "none";
+    const src = blobUrl || (!removeImg && r.image_path ? imgUrl(r.image_path) : ""); if (src) { pimg.src = src; pimg.style.display = "block"; } else { pimg.removeAttribute("src"); pimg.style.display = "none"; }
+  };
+  [title, body, bl, bu].forEach((i) => i.addEventListener("input", paint));
+  file.addEventListener("change", () => {
+    const f = file.files[0]; if (blobUrl) URL.revokeObjectURL(blobUrl); blobUrl = "";
+    if (f) { if (f.size > 900000) { msg.className = "err"; msg.textContent = "The image must be under 900 KB."; file.value = ""; } else blobUrl = URL.createObjectURL(f); }
+    paint();
+  });
+  const msg = el("div", { class: "mute" });
+  const rm = el("button", { class: "btn", type: "button" }, "Remove picture"); rm.addEventListener("click", () => { removeImg = true; file.value = ""; blobUrl = ""; paint(); });
+  const close = () => { overlay.remove(); drawer.remove(); if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  const save = el("button", { class: "btn primary" }, "Save");
+  save.addEventListener("click", async () => {
+    save.disabled = true; msg.className = "mute"; msg.textContent = "Saving…";
+    try {
+      let b64 = ""; const f = file.files[0];
+      if (f) b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(",")[1]); fr.onerror = no; fr.readAsDataURL(f); });
+      await api("", { action: "announce_save", id: r.id, title: title.value, body: body.value, audience: audience.value, button_label: bl.value, button_url: bu.value,
+        starts_at: st.value ? new Date(st.value).toISOString() : null, ends_at: en.value ? new Date(en.value).toISOString() : null, active: act.checked, image_b64: b64 || undefined, remove_image: removeImg });
+      close(); await done();
+    } catch (x) { msg.className = "err"; msg.textContent = x.code === "invalid" ? (x.detail || "Check the fields.") : "Could not save."; save.disabled = false; }
+  });
+  const x = el("button", { class: "btn iconbtn", "aria-label": "Close" }, icon("x")); x.addEventListener("click", close);
+  const overlay = el("div", { class: "overlay" }); overlay.addEventListener("click", close);
+  const drawer = el("aside", { class: "drawer wide" },
+    el("div", { class: "cellu" }, el("h3", { class: "grow" }, row && row.id ? "Edit message" : "New message"), x),
+    field("Title", title), field("Message", body, "Up to 600 characters."), field("Picture (PNG or JPG, under 900 KB)", file, "Wide images (about 1000 × 500) look best."), rm,
+    field("Who sees it", audience), field("Button text (optional)", bl), field("Button link (optional, https only)", bu),
+    field("Show from", st, "Leave empty to start now."), field("Show until", en, "Leave empty to keep it showing."),
+    el("label", { class: "fld row" }, act, el("span", null, "Switched on")),
+    el("h3", null, "Preview"), el("div", { class: "pv" }, pimg, ptitle, pbody, pbtn), save, msg);
+  document.body.append(overlay, drawer); paint();
+}
 
 /* ---------- user drawer ---------- */
 function manage(u, done) {

@@ -20,7 +20,7 @@ object FirstRunIntro {
     val STEPS: List<Pair<String, String>> = listOf(
         "Scan paper into documents" to "Point the camera at a page. Docxels straightens it, cleans it up and reads the words, all on this phone.",
         "Turn files into Word, PDF or images" to "Open a PDF or Word file, or share a scan, and save it in the format you need. Word files keep their fonts, headers and pictures.",
-        "Your documents stay private" to "Everything is encrypted on this phone and nothing is uploaded. You can turn on an app lock, or erase everything, in Settings.",
+        "Your documents stay private" to "Everything is encrypted on this phone and nothing is uploaded. You can turn on an app lock, or erase everything, in Settings. Once a day Docxels checks for news and updates; you can switch that off there too.",
     )
 
     /** True on a fresh install that hasn't seen the intro; false once seen or when the app was installed before this feature. */

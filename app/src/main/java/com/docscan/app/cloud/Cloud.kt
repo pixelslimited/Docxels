@@ -29,7 +29,8 @@ data class WritingIssue(val start: Int, val end: Int, val kind: String, val mess
 
 /**
  * Talks to the Docxels backend, and only when the person signs in, uses an assistant action, or upgrades.
- * Document text leaves the phone only for the action they tapped, and nothing is sent in the background.
+ * Document text leaves the phone only for the action they tapped. The only background request is the anonymous
+ * once-a-day news check in [Announcements].
  */
 class Cloud(context: Context) {
     private val file = File(context.filesDir, "cloud.session")
