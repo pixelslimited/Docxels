@@ -1,0 +1,69 @@
+name: Build slim OpenCV
+
+# Run by hand (Actions, Run workflow) when the OpenCV version changes. Docxels uses only the core, imgproc and photo
+# modules, but the published OpenCV Android library ships every module (about 7.8 MB of native code). This builds just
+# the three modules we use, checks that every native function the app's OpenCV classes need is still exported, and
+# publishes the result as a release asset that the app build picks up.
+on:
+  workflow_dispatch:
+
+jobs:
+  slim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    env:
+      CV: "4.9.0"
+    steps:
+      - name: Get OpenCV sources
+        run: git clone --depth 1 --branch "$CV" https://github.com/opencv/opencv.git
+
+      - name: Configure (arm64-v8a, core + imgproc + photo only)
+        run: |
+          NDK="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}"
+          echo "NDK: $NDK"
+          cmake -S opencv -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 -DANDROID_STL=c++_static \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_LIST=core,imgproc,photo,java_bindings_generator,java \
+            -DBUILD_JAVA=ON -DBUILD_opencv_java=ON -DBUILD_ANDROID_PROJECTS=OFF -DBUILD_ANDROID_EXAMPLES=OFF \
+            -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_DOCS=OFF -DBUILD_EXAMPLES=OFF \
+            -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=OFF \
+            -DWITH_OPENCL=OFF -DWITH_IPP=OFF -DWITH_ITT=OFF -DWITH_TBB=OFF -DWITH_PROTOBUF=OFF -DCV_TRACE=OFF \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--exclude-libs,ALL"
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)" 2>&1 | tail -40
+
+      - name: Find, strip and compare with the full library
+        run: |
+          set -e
+          SO=$(find build -name 'libopencv_java4.so' | head -1)
+          [ -n "$SO" ] || { echo "libopencv_java4.so was not built"; find build -name '*.so' | head; exit 1; }
+          NDK="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}"
+          STRIP=$(find "$NDK/toolchains/llvm/prebuilt" -name llvm-strip | head -1)
+          NM=$(find "$NDK/toolchains/llvm/prebuilt" -name llvm-nm | head -1)
+          cp "$SO" libopencv_java4.so && "$STRIP" --strip-unneeded libopencv_java4.so
+          ls -l libopencv_java4.so
+          # The published library, for comparison.
+          curl -fsSL -o opencv.aar "https://repo1.maven.org/maven2/org/opencv/opencv/$CV/opencv-$CV.aar"
+          unzip -o -q opencv.aar 'jni/arm64-v8a/libopencv_java4.so' -d full
+          ls -l full/jni/arm64-v8a/libopencv_java4.so
+          # Every native function of the classes Docxels uses (core, imgproc, photo, android Utils) must still be there.
+          pat='Java_org_opencv_(core|imgproc|photo|android)_'
+          "$NM" -D --defined-only full/jni/arm64-v8a/libopencv_java4.so | awk '{print $3}' | grep -E "$pat" | sort -u > want.txt
+          "$NM" -D --defined-only libopencv_java4.so | awk '{print $3}' | grep -E "$pat" | sort -u > have.txt
+          wc -l want.txt have.txt
+          comm -23 want.txt have.txt > missing.txt
+          if [ -s missing.txt ]; then echo "Missing native functions:"; head -50 missing.txt; exit 1; fi
+
+      - name: Publish as a release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "opencv-slim-$CV" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "opencv-slim-$CV" libopencv_java4.so --title "Slim OpenCV $CV (arm64-v8a)" \
+            --notes "core, imgproc and photo only; built by .github/workflows/build-opencv-slim.yml" --prerelease --latest=false
