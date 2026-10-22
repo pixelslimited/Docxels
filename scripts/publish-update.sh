@@ -92,9 +92,11 @@ if [ -d site-extra/dashboard ]; then # (also copies site-extra/reset, the passwo
   git clone --depth 1 "https://x-access-token:$TOK@github.com/$SITE" "$T/site" 2>&1 | sed "s/$TOK/***/g" || true
   [ -d "$T/site/.git" ] || { echo "Site sync: clone of $SITE failed (output above)" >&2; exit 1; }
   mkdir -p "$T/site/dashboard" && cp site-extra/dashboard/* "$T/site/dashboard/"
-  mkdir -p "$T/site/reset" && cp site-extra/reset/* "$T/site/reset/"
+  for d in reset confirmed; do [ -d "site-extra/$d" ] && mkdir -p "$T/site/$d" && cp site-extra/$d/* "$T/site/$d/"; done
   grep -q 'dashboard' "$T/site/.cpanel.yml" 2>/dev/null || sed -i 's#^    - /bin/cp -R index.html#    - mkdir -p $DEPLOYPATH/dashboard \&\& /bin/cp -R dashboard/* $DEPLOYPATH/dashboard/\n    - /bin/cp -R index.html#' "$T/site/.cpanel.yml"
-  grep -q 'reset' "$T/site/.cpanel.yml" 2>/dev/null || sed -i 's#^    - /bin/cp -R index.html#    - mkdir -p $DEPLOYPATH/reset \&\& /bin/cp -R reset/* $DEPLOYPATH/reset/\n    - /bin/cp -R index.html#' "$T/site/.cpanel.yml"
+  for d in reset confirmed; do
+    grep -q "$d/" "$T/site/.cpanel.yml" 2>/dev/null || sed -i "s#^    - /bin/cp -R index.html#    - mkdir -p \$DEPLOYPATH/$d \&\& /bin/cp -R $d/* \$DEPLOYPATH/$d/\n    - /bin/cp -R index.html#" "$T/site/.cpanel.yml"
+  done
   # Docxels logo (the pixel "D"): icons, the site header mark and the cPanel copy list.
   cp site-extra/assets/*.png "$T/site/"
   python3 - "$T/site" <<'PY'

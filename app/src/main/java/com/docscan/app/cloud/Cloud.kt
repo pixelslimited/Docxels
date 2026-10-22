@@ -35,6 +35,7 @@ data class WritingIssue(val start: Int, val end: Int, val kind: String, val mess
  * once-a-day news check in [Announcements].
  */
 class Cloud(context: Context) {
+    private val CONFIRMED_URL = java.net.URLEncoder.encode("https://docxels.pixelslimited.ng/confirmed/", "UTF-8")
     private val file = File(context.filesDir, "cloud.session")
     private val _session = MutableStateFlow<Session?>(null)
     val session: StateFlow<Session?> = _session
@@ -98,7 +99,7 @@ class Cloud(context: Context) {
         fun clean(v: String) = v.trim().replace(Regex("\\s+"), " ").take(30)
         if (clean(first).isEmpty() || clean(last).isEmpty()) throw CloudException("Enter both your first and your last name.")
         val data = JSONObject().put("first_name", clean(first)).put("last_name", clean(last))
-        val (code, text) = call("POST", "/auth/v1/signup", JSONObject().put("email", email).put("password", password).put("data", data), null)
+        val (code, text) = call("POST", "/auth/v1/signup?redirect_to=$CONFIRMED_URL", JSONObject().put("email", email).put("password", password).put("data", data), null)
         if (code !in 200..299) throw CloudException(friendly(text))
         val s = parseSession(text, email) ?: return false
         store(s); return true
@@ -106,7 +107,7 @@ class Cloud(context: Context) {
 
     /** Sends the confirmation email again (same answer whether or not the address is registered). */
     suspend fun resendConfirmation(email: String) {
-        val (code, text) = call("POST", "/auth/v1/resend", JSONObject().put("type", "signup").put("email", email), null)
+        val (code, text) = call("POST", "/auth/v1/resend?redirect_to=$CONFIRMED_URL", JSONObject().put("type", "signup").put("email", email), null)
         if (code == 429) throw CloudException("Please wait a minute before asking for another email.")
         if (code >= 500) throw CloudException(friendly(text))
     }
