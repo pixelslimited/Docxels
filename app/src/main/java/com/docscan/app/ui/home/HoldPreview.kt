@@ -1,7 +1,12 @@
 package com.docscan.app.ui.home
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.withFrameNanos
 import kotlin.math.abs
 import kotlin.math.pow
@@ -68,8 +73,8 @@ fun HoldPreview(item: LibraryItem, scrub: () -> Float) {
     }
     var index by remember { mutableIntStateOf((item.meta.lastPage - 1).coerceAtLeast(0)) }
     LaunchedEffect(pages.size) {
-        // Finger near where the hold began: the pages turn by themselves. Slid up: towards the start of the document;
-        // slid down: towards its end. The further from where it began, the faster (it stops at the first and last page).
+        // Finger near where the hold began: the pages turn by themselves. Slid left: towards the start of the document;
+        // slid right: towards its end. The further from where it began, the faster (it stops at the first and last page).
         var position = index.toFloat()
         var autoClock = 0L
         var last = withFrameNanos { it }
@@ -99,7 +104,16 @@ fun HoldPreview(item: LibraryItem, scrub: () -> Float) {
             Text(item.title, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
                 if (pages.isEmpty()) CircularProgressIndicator(color = Color.White)
-                else Crossfade(index.coerceAtMost(pages.lastIndex), animationSpec = tween(100), label = "holdPage") { i ->
+                else AnimatedContent(
+                    index.coerceAtMost(pages.lastIndex),
+                    transitionSpec = {
+                        // Pages slide sideways, forward from the right and backward from the left.
+                        val forward = targetState > initialState
+                        (slideInHorizontally(tween(140)) { if (forward) it else -it } + fadeIn(tween(140))) togetherWith
+                            (slideOutHorizontally(tween(140)) { if (forward) -it else it } + fadeOut(tween(140)))
+                    },
+                    label = "holdPage",
+                ) { i ->
                     Image(
                         pages[i].asImageBitmap(), contentDescription = "Page ${i + 1} of ${item.title}", contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(Color.White),
@@ -111,7 +125,7 @@ fun HoldPreview(item: LibraryItem, scrub: () -> Float) {
                 color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                "Keep holding and slide up for the start, down for the end",
+                "Keep holding and slide left for the start, right for the end",
                 color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall,
             )
         }

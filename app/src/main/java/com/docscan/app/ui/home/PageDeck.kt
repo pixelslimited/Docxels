@@ -151,7 +151,7 @@ fun rememberDeckState(): DeckState {
 
 /**
  * The document's first pages as a living deck: the front page keeps turning over to show the next one, drag it any way
- * to revolve it (down or sideways, upside down included), tap to send the real pages flying far across the screen, hold to preview the whole document until the finger lifts (and slide up or down while holding to scrub to its start or end). Pure Compose, no extra libraries.
+ * to revolve it (down or sideways, upside down included), tap to send the real pages flying far across the screen, hold to preview the whole document until the finger lifts (and slide left or right while holding to scrub to its start or end). Pure Compose, no extra libraries.
  */
 @Composable
 fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modifier, state: DeckState = rememberDeckState(), onHold: (Boolean) -> Unit = {}, onScrub: (Float) -> Unit = {}) {
@@ -205,12 +205,12 @@ fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modi
                         }
                         undecided == null -> {
                             holdNow(true)
-                            val originY = down.position.y
+                            val originX = down.position.x
                             while (true) {
                                 val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
                                 if (change.changedToUp()) break
                                 change.consume()
-                                scrubNow((change.position.y - originY) / density)
+                                scrubNow((change.position.x - originX) / density)
                             }
                             scrubNow(0f)
                             holdNow(false)
