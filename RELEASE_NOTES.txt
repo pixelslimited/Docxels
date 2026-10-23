@@ -57,3 +57,5 @@
 *|FREE|Duplicate a page|A new button on each page in a document makes a copy right after it.
 *|FREE|Smaller exports|Choose Small, Medium or Best picture size when you export a PDF or images.
 *|FIX|Lighter PDFs|Exported PDFs are now much smaller. Page pictures are saved as JPEG and the default size is Medium.
+*|FIX|Better automatic scans|Cleaner colour and black-and-white copies with no settings needed, and the page is found more reliably next to hands and other papers.
+

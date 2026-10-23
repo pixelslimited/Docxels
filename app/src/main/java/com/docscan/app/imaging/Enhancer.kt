@@ -11,7 +11,7 @@ import kotlin.math.min
 
 enum class DocMode(val label: String) {
     ORIGINAL("Original"),
-    COLOR("Color"),
+    COLOR("Auto color"),
     GRAYSCALE("Gray"),
     BLACK_WHITE("B&W copy"),
 }
@@ -38,6 +38,10 @@ data class EnhanceSettings(
 
 /** Document clean-up filters. Every function returns a new Mat and never modifies its input. */
 object Enhancer {
+    /**
+     * Looks are automatic: shadows, uneven light, glare and the paper colour are handled without any settings.
+     * The settings only add the user's own touches (brightness, contrast, sharpen, noise, mirror).
+     */
     fun apply(rgb: Mat, s: EnhanceSettings): Mat {
         var cur = rgb.clone()
         fun swap(next: Mat) {
@@ -45,17 +49,14 @@ object Enhancer {
             cur = next
         }
 
-        if (s.glare) swap(reduceGlare(cur))
+        if (s.mode != DocMode.ORIGINAL) swap(reduceGlare(cur))
         if (s.denoise) swap(denoise(cur))
-        // The photocopy filter estimates the paper itself, so the shadow step is only for the other looks.
-        if (s.removeShadows && s.mode != DocMode.BLACK_WHITE) swap(flattenIllumination(cur))
         when (s.mode) {
             DocMode.ORIGINAL -> Unit
-            DocMode.COLOR -> swap(enhanceColor(cur))
-            DocMode.GRAYSCALE -> swap(toGrayRgb(cur))
-            DocMode.BLACK_WHITE -> swap(binarize(cur, s.brightness))
+            DocMode.COLOR -> swap(autoColor(cur, s.removeShadows))
+            DocMode.GRAYSCALE -> swap(toGrayRgb(autoColor(cur, s.removeShadows)))
+            DocMode.BLACK_WHITE -> swap(binarize(autoColor(cur, s.removeShadows), s.brightness))
         }
-        if (s.autoLevels && s.mode != DocMode.BLACK_WHITE) swap(autoLevels(cur))
         if (s.mode != DocMode.BLACK_WHITE && (s.brightness != 0 || s.contrast != 1f)) {
             swap(brightnessContrast(cur, s.brightness, s.contrast))
         }
@@ -140,73 +141,68 @@ object Enhancer {
     }
 
     /**
-     * Divides the lightness channel by a blurred "paper" estimate. Shadows and uneven light disappear,
-     * while the colour channels are left untouched so inks and coloured paper keep their real colours.
+     * Estimates the paper (its colour and the light falling on it) per channel: a closing removes the thin ink strokes,
+     * a median and a blur smooth what is left. Returned at the size of [rgb], 8-bit.
      */
-    fun flattenIllumination(rgb: Mat): Mat {
-        val lab = Mat()
-        Imgproc.cvtColor(rgb, lab, Imgproc.COLOR_RGB2Lab)
-        val channels = ArrayList<Mat>()
-        Core.split(lab, channels)
-        val lightness = channels[0]
-
-        val small8 = Mat()
-        Imgproc.resize(lightness, small8, Size(), 0.125, 0.125, Imgproc.INTER_AREA)
+    private fun paperEstimate(rgb: Mat): Mat {
+        val scale = 400.0 / max(rgb.cols(), rgb.rows())
         val small = Mat()
-        small8.convertTo(small, CvType.CV_32F)
-        // The max filter must be wider than thin text but not so wide that it ignores real shadows.
-        var k = (min(small.cols(), small.rows()) * 0.12).toInt().coerceAtLeast(7)
+        Imgproc.resize(rgb, small, Size(), scale, scale, Imgproc.INTER_AREA)
+        var k = (max(small.cols(), small.rows()) * 0.03).toInt().coerceAtLeast(7)
         if (k % 2 == 0) k += 1
-        Imgproc.dilate(small, small, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(k.toDouble(), k.toDouble())))
-        Imgproc.GaussianBlur(small, small, Size(0.0, 0.0), k / 2.5)
-        val background = Mat()
-        Imgproc.resize(small, background, lightness.size(), 0.0, 0.0, Imgproc.INTER_CUBIC)
-        // Floor the paper estimate: large dark areas (colour bands, photos, logos) must keep their colour
-        // instead of being "corrected" to white, while ordinary shadows are still lifted.
-        val paperLevel = Core.minMaxLoc(small).maxVal
-        Core.max(background, Scalar.all(max(60.0, 0.6 * paperLevel)), background)
+        val closed = Mat()
+        Imgproc.morphologyEx(small, closed, Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(k.toDouble(), k.toDouble())))
+        val median = Mat()
+        Imgproc.medianBlur(closed, median, k)
+        Imgproc.GaussianBlur(median, median, Size(0.0, 0.0), k / 2.0)
+        val full = Mat()
+        Imgproc.resize(median, full, rgb.size(), 0.0, 0.0, Imgproc.INTER_CUBIC)
+        listOf(small, closed, median).forEach { it.release() }
+        return full
+    }
 
-        val lightness32 = Mat()
-        lightness.convertTo(lightness32, CvType.CV_32F)
-        val ratio = Mat()
-        Core.divide(lightness32, background, ratio, 255.0)
-        val flattened = Mat()
-        ratio.convertTo(flattened, CvType.CV_8U)
-        flattened.copyTo(channels[0])
-
-        val merged = Mat()
-        Core.merge(channels, merged)
+    /**
+     * The automatic "scanner" look: the paper estimate is divided out, so shadows, uneven light and the colour cast of the
+     * room disappear and paper turns white while inks keep their colour; a gentle curve then deepens the ink and a light
+     * sharpening crisps the text. With [flatten] off only the curve and sharpening are applied.
+     */
+    fun autoColor(rgb: Mat, flatten: Boolean = true): Mat {
+        val flat = Mat()
+        if (flatten) {
+            val paper = paperEstimate(rgb)
+            // Floor the estimate so large dark areas (photos, colour bands) are not "corrected" to white.
+            Core.max(paper, Scalar.all(30.0), paper)
+            // 8-bit divide: out = rgb * 255 / paper. Paper sits near 240 after that, so it is stretched to pure white below.
+            Core.divide(rgb, paper, flat, 255.0)
+            paper.release()
+        } else {
+            rgb.copyTo(flat)
+        }
+        val lut = Mat(1, 256, CvType.CV_8U)
+        val table = ByteArray(256) { i ->
+            val v = min(1.0, i * (255.0 / 240.0) / 255.0)
+            (255.0 * Math.pow(v, 1.6)).toInt().coerceIn(0, 255).toByte()
+        }
+        lut.put(0, 0, table)
+        val curved = Mat()
+        Core.LUT(flat, lut, curved)
+        val blur = Mat()
+        Imgproc.GaussianBlur(curved, blur, Size(0.0, 0.0), 1.2)
         val out = Mat()
-        Imgproc.cvtColor(merged, out, Imgproc.COLOR_Lab2RGB)
-
-        listOf(lab, small8, small, background, lightness32, ratio, flattened, merged).forEach { it.release() }
-        channels.forEach { it.release() }
+        Core.addWeighted(curved, 1.5, blur, -0.5, 0.0, out)
+        listOf(flat, lut, curved, blur).forEach { it.release() }
+        whitenEdge(out)
         return out
     }
 
-    /** Gentle contrast + sharpening on lightness only, so colours are enhanced but not changed. */
-    fun enhanceColor(rgb: Mat): Mat {
-        val lab = Mat()
-        Imgproc.cvtColor(rgb, lab, Imgproc.COLOR_RGB2Lab)
-        val channels = ArrayList<Mat>()
-        Core.split(lab, channels)
-        val clahe = Imgproc.createCLAHE(1.5, Size(8.0, 8.0))
-        val boosted = Mat()
-        clahe.apply(channels[0], boosted)
-        boosted.copyTo(channels[0])
-        val merged = Mat()
-        Core.merge(channels, merged)
-        val balanced = Mat()
-        Imgproc.cvtColor(merged, balanced, Imgproc.COLOR_Lab2RGB)
-
-        val blur = Mat()
-        Imgproc.GaussianBlur(balanced, blur, Size(0.0, 0.0), 2.0)
-        val sharpened = Mat()
-        Core.addWeighted(balanced, 1.35, blur, -0.35, 0.0, sharpened)
-
-        listOf(lab, boosted, merged, balanced, blur).forEach { it.release() }
-        channels.forEach { it.release() }
-        return sharpened
+    /** The outermost strip is page edge and desk, never content: paint it paper white. */
+    private fun whitenEdge(img: Mat) {
+        val b = max(2, (min(img.cols(), img.rows()) * 0.008).toInt())
+        val white = Scalar.all(255.0)
+        img.submat(0, b, 0, img.cols()).setTo(white)
+        img.submat(img.rows() - b, img.rows(), 0, img.cols()).setTo(white)
+        img.submat(0, img.rows(), 0, b).setTo(white)
+        img.submat(0, img.rows(), img.cols() - b, img.cols()).setTo(white)
     }
 
     fun toGrayRgb(rgb: Mat): Mat {
@@ -219,43 +215,21 @@ object Enhancer {
     }
 
     /**
-     * Photocopy look: pure white paper, solid black ink, no speckle, no shadows or page-edge dark lines.
-     * The paper brightness is estimated per area and divided out, so a shaded corner is cut exactly like
-     * a bright one. Large dark areas (bands, stamps) stay solid black, like on a real copier.
-     * [brightness] (-100..100) moves the cut: positive = lighter copy (fainter marks disappear).
+     * Photocopy look from an already flattened page ([autoColor] output): pure white paper, solid black ink, no speckle.
+     * Specks smaller than a printed dot are dropped, and big dark shapes touching the page edge (a thumb, the desk) are
+     * removed. [brightness] (-100..100) moves the cut: positive = lighter copy (fainter marks disappear).
      */
-    fun binarize(rgb: Mat, brightness: Int = 0): Mat {
+    fun binarize(flat: Mat, brightness: Int = 0): Mat {
         val gray = Mat()
-        Imgproc.cvtColor(rgb, gray, Imgproc.COLOR_RGB2GRAY)
-        val g32 = Mat()
-        gray.convertTo(g32, CvType.CV_32F)
-
-        val small = Mat()
-        Imgproc.resize(g32, small, Size(), 0.125, 0.125, Imgproc.INTER_AREA)
-        var k = (min(small.cols(), small.rows()) * 0.06).toInt().coerceAtLeast(7)
-        if (k % 2 == 0) k += 1
-        Imgproc.dilate(small, small, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(k.toDouble(), k.toDouble())))
-        Imgproc.GaussianBlur(small, small, Size(0.0, 0.0), k / 2.5)
-        val paperLevel = Core.minMaxLoc(small).maxVal
-        val background = Mat()
-        Imgproc.resize(small, background, g32.size(), 0.0, 0.0, Imgproc.INTER_CUBIC)
-        Core.max(background, Scalar.all(max(40.0, 0.6 * paperLevel)), background)
-
-        // 1.0 = paper. Scaled so paper sits at 200 in an 8-bit image.
-        val ratio = Mat()
-        Core.divide(g32, background, ratio, 200.0)
-        val r8 = Mat()
-        ratio.convertTo(r8, CvType.CV_8U)
-
-        val scratch = Mat()
-        val otsu = Imgproc.threshold(r8, scratch, 0.0, 255.0, Imgproc.THRESH_BINARY or Imgproc.THRESH_OTSU)
-        val cut = (otsu.coerceIn(110.0, 175.0) + brightness * 0.4).coerceIn(60.0, 200.0)
+        Imgproc.cvtColor(flat, gray, Imgproc.COLOR_RGB2GRAY)
         // A touch of blur before the cut makes strokes solid instead of jagged.
-        Imgproc.GaussianBlur(r8, r8, Size(0.0, 0.0), 0.8)
+        Imgproc.GaussianBlur(gray, gray, Size(0.0, 0.0), 0.7)
+        val scratch = Mat()
+        val otsu = Imgproc.threshold(gray, scratch, 0.0, 255.0, Imgproc.THRESH_BINARY or Imgproc.THRESH_OTSU)
+        val cut = (otsu.coerceIn(120.0, 200.0) + brightness * 0.4).coerceIn(60.0, 220.0)
         val ink = Mat()
-        Imgproc.threshold(r8, ink, cut, 255.0, Imgproc.THRESH_BINARY_INV)
+        Imgproc.threshold(gray, ink, cut, 255.0, Imgproc.THRESH_BINARY_INV)
 
-        // Drop specks (dust, sensor noise) smaller than a printed dot.
         val w = ink.cols()
         val h = ink.rows()
         val labels = Mat()
@@ -265,14 +239,23 @@ object Enhancer {
         val statData = IntArray(count * 5)
         stats.get(0, 0, statData)
         val minArea = max(6, (10.0 * (w / 2000.0) * (w / 2000.0)).toInt())
-        val keep = BooleanArray(count) { it > 0 && statData[it * 5 + Imgproc.CC_STAT_AREA] >= minArea }
+        val bigArea = w.toDouble() * h * 0.01
+        val keep = BooleanArray(count)
+        for (i in 1 until count) {
+            val area = statData[i * 5 + Imgproc.CC_STAT_AREA]
+            val left = statData[i * 5 + Imgproc.CC_STAT_LEFT]
+            val top = statData[i * 5 + Imgproc.CC_STAT_TOP]
+            val boxW = statData[i * 5 + Imgproc.CC_STAT_WIDTH]
+            val boxH = statData[i * 5 + Imgproc.CC_STAT_HEIGHT]
+            val touchesEdge = left == 0 || top == 0 || left + boxW >= w || top + boxH >= h
+            keep[i] = area >= minArea && !(touchesEdge && area > bigArea)
+        }
         val labelData = IntArray(w * h)
         labels.get(0, 0, labelData)
         val pixels = ByteArray(w * h)
         for (i in pixels.indices) pixels[i] = if (keep[labelData[i]]) 0.toByte() else 255.toByte()
 
-        // The outermost strip is page edge and table shadow, never content.
-        val border = max(2, (min(w, h) * 0.006).toInt())
+        val border = max(2, (min(w, h) * 0.008).toInt())
         for (y in 0 until h) {
             val inBand = y < border || y >= h - border
             for (x in 0 until w) {
@@ -283,40 +266,7 @@ object Enhancer {
         bw.put(0, 0, pixels)
         val out = Mat()
         Imgproc.cvtColor(bw, out, Imgproc.COLOR_GRAY2RGB)
-        listOf(gray, g32, small, background, ratio, r8, scratch, ink, labels, stats, centroids, bw).forEach { it.release() }
-        return out
-    }
-
-    /** Linear levels stretch from the 1st to 99th brightness percentile, applied equally to all channels. */
-    fun autoLevels(rgb: Mat): Mat {
-        val gray = Mat()
-        Imgproc.cvtColor(rgb, gray, Imgproc.COLOR_RGB2GRAY)
-        val small = Mat()
-        val factor = min(1.0, 256.0 / max(gray.cols(), gray.rows()))
-        Imgproc.resize(gray, small, Size(), factor, factor, Imgproc.INTER_AREA)
-        val pixels = ByteArray(small.total().toInt())
-        small.get(0, 0, pixels)
-        gray.release()
-        small.release()
-
-        val histogram = IntArray(256)
-        for (b in pixels) histogram[b.toInt() and 0xFF]++
-        val total = pixels.size
-        fun percentile(p: Double): Int {
-            var cumulative = 0
-            for (i in 0..255) {
-                cumulative += histogram[i]
-                if (cumulative >= total * p) return i
-            }
-            return 255
-        }
-        // Never stretch too aggressively: keep real mid-tones and avoid blowing out photographs.
-        val low = min(percentile(0.01), 90)
-        val high = max(percentile(0.99), 160)
-        if (high - low < 40) return rgb.clone()
-        val alpha = 255.0 / (high - low)
-        val out = Mat()
-        rgb.convertTo(out, -1, alpha, -low * alpha)
+        listOf(gray, scratch, ink, labels, stats, centroids, bw).forEach { it.release() }
         return out
     }
 

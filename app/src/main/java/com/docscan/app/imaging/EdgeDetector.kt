@@ -51,6 +51,15 @@ object EdgeDetector {
         Imgproc.cvtColor(small, gray, Imgproc.COLOR_RGB2GRAY)
         Imgproc.GaussianBlur(gray, gray, Size(5.0, 5.0), 0.0)
 
+        // Strategy 0 (preferred): the page is the bright, colourless area. This ignores a coloured desk, hands and a second
+        // page lying behind, which fooled the edge-based strategies below.
+        val paper = runCatching { paperCandidates(small, gray, w, h) }.getOrDefault(emptyList())
+        if (paper.isNotEmpty()) {
+            small.release()
+            gray.release()
+            return paper.maxByOrNull { it.score }?.quad
+        }
+
         val candidates = ArrayList<Candidate>()
         val mean = Core.mean(gray).`val`[0]
         val lowAuto = max(10.0, 0.33 * mean)
@@ -88,6 +97,71 @@ object EdgeDetector {
         small.release()
         gray.release()
         return candidates.maxByOrNull { it.score }?.quad
+    }
+
+    /**
+     * Paper = clearly bright (relative to the middle of the frame), not strongly blue and not strongly coloured. Strong
+     * edges are cut out first so a page lying on another page stays separate; the big pieces are then joined back across
+     * those thin cut lines and outlined.
+     */
+    private fun paperCandidates(small: Mat, gray: Mat, w: Int, h: Int): List<Candidate> {
+        val hsv = Mat()
+        Imgproc.cvtColor(small, hsv, Imgproc.COLOR_RGB2HSV)
+        val ch = ArrayList<Mat>()
+        Core.split(hsv, ch)
+        val centre = Mat()
+        gray.submat(org.opencv.core.Rect(w / 4, h / 4, w / 2, h / 2)).copyTo(centre)
+        val bytes = ByteArray(centre.total().toInt())
+        centre.get(0, 0, bytes)
+        val histogram = IntArray(256)
+        for (b in bytes) histogram[b.toInt() and 0xFF]++
+        var running = 0
+        var ref = 255
+        for (i in 0..255) {
+            running += histogram[i]
+            if (running >= bytes.size * 0.9) { ref = i; break }
+        }
+
+        val bright = Mat()
+        Imgproc.threshold(gray, bright, 0.55 * ref, 255.0, Imgproc.THRESH_BINARY)
+        val lowSat = Mat()
+        Imgproc.threshold(ch[1], lowSat, 110.0, 255.0, Imgproc.THRESH_BINARY_INV)
+        val satHigh = Mat()
+        Imgproc.threshold(ch[1], satHigh, 45.0, 255.0, Imgproc.THRESH_BINARY)
+        val hueBlue = Mat()
+        Core.inRange(ch[0], Scalar(85.0), Scalar(135.0), hueBlue)
+        val blue = Mat()
+        Core.bitwise_and(hueBlue, satHigh, blue)
+        val notBlue = Mat()
+        Core.bitwise_not(blue, notBlue)
+        val mask = Mat()
+        Core.bitwise_and(bright, lowSat, mask)
+        Core.bitwise_and(mask, notBlue, mask)
+
+        val edges = Mat()
+        Imgproc.Canny(gray, edges, 25.0, 70.0)
+        Imgproc.dilate(edges, edges, Mat.ones(3, 3, CvType.CV_8U))
+        mask.setTo(Scalar(0.0), edges)
+        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, Mat.ones(5, 5, CvType.CV_8U))
+
+        val labels = Mat()
+        val stats = Mat()
+        val centroids = Mat()
+        val count = Imgproc.connectedComponentsWithStats(mask, labels, stats, centroids, 4, CvType.CV_32S)
+        val statData = IntArray(count * 5)
+        stats.get(0, 0, statData)
+        val keep = Mat.zeros(mask.size(), CvType.CV_8UC1)
+        val piece = Mat()
+        for (i in 1 until count) {
+            if (statData[i * 5 + Imgproc.CC_STAT_AREA] < 0.02 * w * h) continue
+            Core.inRange(labels, Scalar(i.toDouble()), Scalar(i.toDouble()), piece)
+            Core.bitwise_or(keep, piece, keep)
+        }
+        Imgproc.morphologyEx(keep, keep, Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(21.0, 21.0)))
+        val result = candidatesFrom(keep, w, h)
+        listOf(hsv, centre, bright, lowSat, satHigh, hueBlue, blue, notBlue, mask, edges, labels, stats, centroids, keep, piece).forEach { it.release() }
+        ch.forEach { it.release() }
+        return result
     }
 
     private fun candidatesFrom(binary: Mat, w: Int, h: Int): List<Candidate> {

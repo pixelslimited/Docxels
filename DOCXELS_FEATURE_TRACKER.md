@@ -408,3 +408,7 @@ Visual Basic, macros, XML mapping pane, COM add-ins, Get Add-ins, 3D models, Sma
 | TXT export of scanned text | ALREADY BUILT | Export sheet > TXT (OCR). |
 | Not built yet from the list | OPEN | QR and barcode detection, handwriting removal, colour tags and batch rotation, ZIP export, favourites and collections, Send to PC, shareable links, cloud drives other than the existing sync. |
 
+
+| Automatic scanner look (v2) | IMPLEMENTED — NOT VERIFIED | Enhancer.autoColor divides out a per-channel paper estimate (shadows, colour cast), curve + light sharpen, white edge strip; B&W is cut from that flattened page, drops specks and big dark shapes touching the edge. Prototyped in OpenCV on a real folded, hand-held test photo; Kotlin port not run on a phone. |
+| Page detection by paper colour | IMPLEMENTED — NOT VERIFIED | EdgeDetector.paperCandidates: bright, non-blue, low-saturation area with strong edges cut out; falls back to the older edge strategies. |
+| Enhance tab simplified | IMPLEMENTED — NOT VERIFIED | Looks are automatic; noise, mirror, sharpen, brightness, contrast sit under Fine-tune. |
