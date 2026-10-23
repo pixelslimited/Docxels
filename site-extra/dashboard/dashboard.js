@@ -37,6 +37,7 @@ function sv(tag, attrs, ...kids) {
 const ICONS = {
   home: "M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z", users: "M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM4 21a8 8 0 0 1 16 0",
   card: "M2 6h20v12H2zM2 10h20", spark: "M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5z", cloud: "M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1 0 9z",
+  phone: "M8 3h8a1 1 0 011 1v16a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1zM11 18h2",
   down: "M12 3v12m0 0l-4-4m4 4l4-4M4 21h16", shield: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z", list: "M4 6h16M4 12h16M4 18h10",
   refresh: "M20 11a8 8 0 1 0-2 5.5M20 4v7h-7", menu: "M4 6h16M4 12h16M4 18h16", moon: "M21 13a9 9 0 1 1-10-10 7 7 0 0 0 10 10z",
   out: "M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M16 8l4 4-4 4M20 12H9", x: "M6 6l12 12M18 6L6 18", doc: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7",
@@ -288,10 +289,10 @@ function csv(name, head, rows) {
 }
 
 /* ---------- shell ---------- */
-const NAV = [["Monitor", [["overview", "Overview", "home"], ["users", "Users", "users"], ["payments", "Payments", "card"], ["ai", "AI usage", "spark"], ["sync", "Cloud sync", "cloud"], ["releases", "Releases", "down"]]],
+const NAV = [["Monitor", [["overview", "Overview", "home"], ["users", "Users", "users"], ["payments", "Payments", "card"], ["ai", "AI usage", "spark"], ["sync", "Cloud sync", "cloud"], ["releases", "Releases", "down"], ["versions", "App versions", "phone"]]],
   ["Engage", [["messages", "Messages", "bell"]]],
   ["Protect", [["security", "Security", "shield"], ["audit", "Audit log", "list"]]]];
-const TITLES = { overview: "Overview", users: "Users", payments: "Payments", ai: "AI usage", sync: "Cloud sync", releases: "Releases", messages: "Messages", security: "Security", audit: "Audit log" };
+const TITLES = { overview: "Overview", users: "Users", payments: "Payments", ai: "AI usage", sync: "Cloud sync", releases: "Releases", versions: "App versions", messages: "Messages", security: "Security", audit: "Audit log" };
 function shell() {
   const root = el("div", { class: "app" });
   const side = el("aside", { class: "side" }, brand());
@@ -461,7 +462,20 @@ const VIEWS = {
       el("div", { class: "grid g-kpi" }, kpi("Total downloads", fmtN(sum(rows, (r) => r.value)), "across listed releases", null, "c5", "down"), kpi("Releases", fmtN(d.releases.length), "most recent", null, "c1", "doc")),
       card("Downloads per release", hbars(rows, fmtN, "c5")),
       table([["Release", (r) => r.tag], ["Published", (r) => fmtD(r.published_at)], ["Downloads", (r) => fmtN(sum(r.assets, (a) => a.downloads))], ["Files", (r) => r.assets.map((a) => a.name + " (" + fmtB(a.size) + ")").join(", ")]], d.releases),
-      el("p", { class: "mute" }, "The app collects no analytics, so these are download counts only, not installs or versions in use."),
+      el("p", { class: "mute" }, "These are download counts only. Installs and versions in use are on the App versions page."),
+    ];
+  },
+  async versions() {
+    const d = await api("versions");
+    const rows = d.by_version.map((r) => ({ label: "Build " + r.version_code, value: Number(r.installs) }));
+    return [
+      el("div", { class: "grid g-kpi" },
+        kpi("Phones seen", fmtN(d.installs_total), "since counting began", null, "c1", "phone"),
+        kpi("Active, last 7 days", fmtN(d.active_7d), "opened the app", null, "c5", "phone"),
+        kpi("Active, last 30 days", fmtN(d.active_30d), "opened the app", null, "c2", "phone"),
+        kpi("New, last 7 days", fmtN(d.new_7d), "first seen", null, "c3", "phone")),
+      card("Builds in use (last 30 days)", rows.length ? hbars(rows, fmtN, "c1") : el("p", { class: "mute" }, "No phones have reported yet. Counts start when people install a build that includes the daily check.")),
+      el("p", { class: "mute" }, "Each phone sends a random install code and its build number about once a day, only when Announcements and update notices is on in Settings. There is no name, email, device id or document data. Phones that turned the switch off are not counted, so treat the numbers as a floor."),
     ];
   },
   async messages() {

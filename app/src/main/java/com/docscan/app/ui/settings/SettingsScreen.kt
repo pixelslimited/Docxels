@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,8 +56,12 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
+/** Where a pop-up button wants Settings to open. */
+enum class SettingsGoal { UPDATE, PROFILE }
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
+fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null, goal: SettingsGoal? = null, onGoalHandled: () -> Unit = {}) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     val security = container.security
@@ -88,6 +93,8 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             }
 
             var tab by remember { mutableIntStateOf(0) }
+            // A pop-up button ("Update now", "Open Profile") lands here: open App settings and scroll to the right place.
+            androidx.compose.runtime.LaunchedEffect(goal) { if (goal != null) tab = 1 }
             androidx.compose.material3.TabRow(selectedTabIndex = tab, containerColor = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.padding(top = 8.dp)) {
                 listOf("Resources", "App settings", "About").forEachIndexed { i, label ->
                     androidx.compose.material3.Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label, maxLines = 1) })
@@ -249,7 +256,11 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             val cloudSession by container.cloud.session.collectAsState()
             val planNow by container.cloud.planState.collectAsState()
             androidx.compose.runtime.LaunchedEffect(cloudSession?.email) { container.cloud.refreshPlan() }
-            ProfileEditor(container.cloud, cloudSession, planNow)
+            val profileAt = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+            androidx.compose.runtime.LaunchedEffect(goal, tab) {
+                if (goal == SettingsGoal.PROFILE && tab == 1) { kotlinx.coroutines.delay(350); profileAt.bringIntoView(); onGoalHandled() }
+            }
+            Box(Modifier.bringIntoViewRequester(profileAt)) { ProfileEditor(container.cloud, cloudSession, planNow) }
 
             Section("Account")
             var accountOpen by remember { mutableStateOf(false) }
@@ -257,11 +268,15 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             if (accountOpen) com.docscan.app.ui.cloud.AccountDialog(container.cloud) { accountOpen = false }
 
             Section("App updates")
-            UpdatePanel()
+            val updateAt = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+            androidx.compose.runtime.LaunchedEffect(goal, tab) {
+                if (goal == SettingsGoal.UPDATE && tab == 1) { kotlinx.coroutines.delay(350); updateAt.bringIntoView(); onGoalHandled() }
+            }
+            Box(Modifier.bringIntoViewRequester(updateAt)) { UpdatePanel(autoStart = goal == SettingsGoal.UPDATE) }
             var announce by remember { mutableStateOf(container.ui.announcements) }
             ToggleRow(
                 "Announcements and update notices",
-                "Once a day Docxels checks for news and new versions and shows them as a pop-up. Nothing about you or your documents is sent. Turn off to stay fully offline.",
+                "Once a day Docxels checks for news and new versions and shows them as a pop-up. It sends only a random install code and the app build number, so we can see which versions are in use. No name, email or documents. Turn off to stay fully offline.",
                 announce,
             ) { announce = it; container.ui.announcements = it }
 

@@ -27,7 +27,7 @@ data class Announcement(
  * the app asks the server for the live messages. The request is anonymous: it carries the public key only, no account,
  * no device id and nothing about documents. Messages are cached so nothing is fetched again until the next check.
  */
-class Announcements(context: Context) {
+class Announcements(private val context: Context) {
     private val prefs = context.getSharedPreferences("docxels_announce", Context.MODE_PRIVATE)
     private val imageDir = File(context.cacheDir, "announce").apply { mkdirs() }
 
@@ -58,8 +58,33 @@ class Announcements(context: Context) {
 
     fun checked() = prefs.edit().putLong("last_check", System.currentTimeMillis()).apply()
 
+    /** A random code made on first use. It is not linked to an account, a device or a document. */
+    private fun installId(): String =
+        prefs.getString("install_id", null) ?: java.util.UUID.randomUUID().toString().also { prefs.edit().putString("install_id", it).apply() }
+
+    /**
+     * Tells the Docxels server which build is installed, with the random install code, so the owner can see which
+     * versions are in use. Runs with the daily check and obeys the same Settings switch. Failures are ignored.
+     */
+    private fun ping() {
+        runCatching {
+            val code = context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode.toInt()
+            val c = URL(CloudConfig.URL + "/rest/v1/rpc/ping_install").openConnection() as HttpURLConnection
+            try {
+                c.requestMethod = "POST"; c.doOutput = true
+                c.connectTimeout = 15000; c.readTimeout = 20000
+                c.setRequestProperty("apikey", CloudConfig.PUBLISHABLE_KEY)
+                c.setRequestProperty("Authorization", "Bearer " + CloudConfig.PUBLISHABLE_KEY)
+                c.setRequestProperty("Content-Type", "application/json")
+                c.outputStream.use { it.write(org.json.JSONObject().put("p_install", installId()).put("p_version", code).toString().toByteArray()) }
+                c.responseCode
+            } finally { c.disconnect() }
+        }
+    }
+
     /** Fetches the live messages and caches them. Returns false if offline or the answer was not understood. */
     suspend fun refresh(): Boolean = withContext(Dispatchers.IO) {
+        ping()
         runCatching {
             val q = "/rest/v1/announcements?select=id,kind,title,body,image_path,button_label,button_url,audience&order=created_at.desc&limit=10"
             val c = URL(CloudConfig.URL + q).openConnection() as HttpURLConnection

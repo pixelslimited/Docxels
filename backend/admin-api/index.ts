@@ -141,6 +141,12 @@ Deno.serve(async (req) => {
   }
   const section = String(body.section ?? "");
   if (section === "releases") { await log(ip, "view:releases", true, who); return reply(200, await releases()); }
+  if (section === "versions") {
+    const { data: v, error: ve } = await admin.rpc("admin_versions");
+    if (ve) { await log(ip, "error:versions", false, who, { code: ve.code }); return reply(500, { error: "server" }); }
+    await log(ip, "view:versions", true, who);
+    return reply(200, v);
+  }
   if (section === "trends") {
     const { data: t, error: te } = await admin.rpc("admin_trends");
     if (te) { await log(ip, "error:trends", false, who, { code: te.code }); return reply(500, { error: "server" }); }

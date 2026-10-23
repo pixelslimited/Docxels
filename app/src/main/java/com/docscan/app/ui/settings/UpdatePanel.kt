@@ -41,7 +41,7 @@ private sealed interface UpdateState {
 }
 
 @Composable
-fun UpdatePanel() {
+fun UpdatePanel(autoStart: Boolean = false, onAutoStarted: () -> Unit = {}) {
     val context = LocalContext.current
     val updater = remember { Updater(context.applicationContext) }
     val scope = rememberCoroutineScope()
@@ -57,13 +57,32 @@ fun UpdatePanel() {
         }
     }
 
-    fun download(info: UpdateInfo) {
+    fun download(info: UpdateInfo, thenInstall: Boolean = false) {
         state = UpdateState.Downloading(info, 0f)
         scope.launch {
             state = runCatching { updater.download(info) { p -> state = UpdateState.Downloading(info, p) } }.fold(
-                onSuccess = { UpdateState.Ready(info, it) },
+                onSuccess = { apk ->
+                    // Opened from the "Update now" pop-up: go straight on to the installer (Android may first ask for permission).
+                    if (thenInstall && updater.ensureInstallPermission()) updater.install(apk)
+                    UpdateState.Ready(info, apk)
+                },
                 onFailure = { UpdateState.Failed(it.message?.takeIf { m -> m.startsWith("The download") } ?: "The download failed. Try again.") },
             )
+        }
+    }
+
+    // Opened from the "Update now" pop-up: check, download and hand over to the installer without further taps.
+    androidx.compose.runtime.LaunchedEffect(autoStart) {
+        if (!autoStart || state !is UpdateState.Idle) return@LaunchedEffect
+        onAutoStarted()
+        state = UpdateState.Checking
+        // In the panel's own scope so that Settings clearing its request cannot cancel the work.
+        scope.launch {
+            val info = runCatching { updater.check() }.getOrElse {
+                state = UpdateState.Failed("Could not check. Make sure you are online and try again.")
+                return@launch
+            }
+            if (info == null) state = UpdateState.UpToDate else download(info, thenInstall = true)
         }
     }
 

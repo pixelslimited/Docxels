@@ -40,7 +40,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -121,6 +120,7 @@ fun MainShell(
     val busy by vm.busy.collectAsState()
     val message by vm.message.collectAsState()
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    var settingsGoal by remember { mutableStateOf<com.docscan.app.ui.settings.SettingsGoal?>(null) }
     var importSheet by remember { mutableStateOf(false) }
     var templateSheet by remember { mutableStateOf(false) }
     var invoiceMaker by remember { mutableStateOf(false) }
@@ -179,7 +179,7 @@ fun MainShell(
         bottomBar = { BottomBar(tab, onSelect = { tab = it }) },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
-            com.docscan.app.ui.announce.AnnouncementHost(container, onOpenUpdates = { tab = Tab.SETTINGS }, onOpenProfile = { tab = Tab.SETTINGS })
+            com.docscan.app.ui.announce.AnnouncementHost(container, onOpenUpdates = { settingsGoal = com.docscan.app.ui.settings.SettingsGoal.UPDATE; tab = Tab.SETTINGS }, onOpenProfile = { settingsGoal = com.docscan.app.ui.settings.SettingsGoal.PROFILE; tab = Tab.SETTINGS })
             when (tab) {
                 Tab.HOME -> if (!loaded) com.docscan.app.ui.HomeSkeleton() else HomeScreen(
                     items = items,
@@ -216,7 +216,7 @@ fun MainShell(
                     },
                 )
                 Tab.TOOLS -> ToolsScreen(actions)
-                Tab.SETTINGS -> SettingsScreen(container = container)
+                Tab.SETTINGS -> SettingsScreen(container = container, goal = settingsGoal, onGoalHandled = { settingsGoal = null })
             }
         }
     }
@@ -225,7 +225,7 @@ fun MainShell(
     }
 
     if (templateSheet) {
-        ModalBottomSheet(onDismissRequest = { templateSheet = false }, scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)) {
+        com.docscan.app.ui.CenteredSheet({ templateSheet = false }) {
             Column(Modifier.padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
                 Text("Templates", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 com.docscan.app.core.word.Templates.all.forEach { t ->
@@ -264,8 +264,8 @@ fun MainShell(
     }
 
     if (importSheet) {
-        ModalBottomSheet(onDismissRequest = { importSheet = false }, scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)) {
-            Column(Modifier.padding(bottom = 24.dp)) {
+        com.docscan.app.ui.CenteredSheet({ importSheet = false }) {
+            Column(Modifier.padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
                 Text("Import", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 SheetRow(Icons.Default.PhotoLibrary, "Photos from gallery", "Becomes a scan you can clean up and export") {
                     importSheet = false

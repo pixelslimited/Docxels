@@ -132,8 +132,8 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
             onDismiss = { pendingBytes = null })
     }
     acting?.let { item ->
-        androidx.compose.material3.ModalBottomSheet(onDismissRequest = { acting = null }, scrimColor = Color.Black.copy(alpha = 0.7f)) {
-            Column(Modifier.padding(bottom = 24.dp)) {
+        com.docscan.app.ui.CenteredSheet({ acting = null }) {
+            Column(Modifier.padding(bottom = 24.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                 Text(item.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
                 @Composable
                 fun Act(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, danger: Boolean = false, run: () -> Unit) {

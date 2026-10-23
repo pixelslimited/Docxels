@@ -15,7 +15,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -105,7 +104,7 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
         Act("Account and plan", "Sign out or upgrade") { account = true },
     )
 
-    ModalBottomSheet(onDismissRequest = onDismiss, scrimColor = Color.Black.copy(alpha = 0.7f)) {
+    com.docscan.app.ui.CenteredSheet(onDismiss) {
         Column(Modifier.padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
             Text("Assistant", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             Text(

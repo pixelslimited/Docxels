@@ -409,7 +409,7 @@ private fun ItemActionsSheet(item: LibraryItem, menu: RowMenu, onOpen: (() -> Un
         menu.onSharePdf?.let { acts += Act("Share as PDF", Icons.Default.Share, run = it) }
         acts += Act("Move to Trash", Icons.Default.Delete, danger = true, run = menu.onDelete)
     }
-    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)) {
+    com.docscan.app.ui.CenteredSheet(onDismiss) {
         Column(Modifier.padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
             Text(item.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             Text("${friendlyDate(item.modified)} · ${item.detail}", style = MaterialTheme.typography.bodySmall,

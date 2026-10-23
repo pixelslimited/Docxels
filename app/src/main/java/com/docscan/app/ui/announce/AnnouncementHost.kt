@@ -101,7 +101,7 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit, onOpenP
         )
         is Pending.NewVersion -> MessageDialog(
             title = "A new version is ready",
-            body = "Docxels ${p.info.versionName} is available. Open Settings, then App updates, to install it.",
+            body = "Docxels ${p.info.versionName} is available. Tap Update now: Docxels downloads it, checks it and opens the installer. Your documents are kept.",
             image = null, button = "Update now",
             onButton = { manager.noticedUpdate = p.info.versionCode; update = null; pending = null; onOpenUpdates() },
             onClose = { manager.noticedUpdate = p.info.versionCode; update = null; pending = null },
