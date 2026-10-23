@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -54,7 +55,11 @@ fun CropEditor(
     onCommit: (List<Pt>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var local by remember(corners) { mutableStateOf(corners) }
+    // One state object for the whole life of the editor. (Keying it on [corners] created a new state after every commit
+    // while the long-lived gesture block kept writing to the old one, so the handles froze until the tab was changed.)
+    var local by remember { mutableStateOf(corners) }
+    var dragging by remember { mutableStateOf(false) }
+    LaunchedEffect(corners) { if (!dragging) local = corners }
     val latestLocal by rememberUpdatedState(local)
     val latestCorners by rememberUpdatedState(corners)
     val latestCommit by rememberUpdatedState(onCommit)
@@ -82,14 +87,17 @@ fun CropEditor(
                         val handles = handlePositions()
                         val nearest = handles.indices.minByOrNull { hypot(handles[it].x - start.x, handles[it].y - start.y) } ?: -1
                         active = if (nearest >= 0 && hypot(handles[nearest].x - start.x, handles[nearest].y - start.y) <= touchRadius) nearest else -1
+                        dragging = active >= 0
                     },
                     onDragEnd = {
                         active = -1
                         if (Geometry.isConvexQuad(latestLocal)) latestCommit(latestLocal) else local = latestCorners
+                        dragging = false
                     },
                     onDragCancel = {
                         active = -1
                         local = latestCorners
+                        dragging = false
                     },
                 ) { change, drag ->
                     change.consume()
