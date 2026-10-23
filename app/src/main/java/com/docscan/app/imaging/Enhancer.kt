@@ -195,14 +195,68 @@ object Enhancer {
         return out
     }
 
-    /** The outermost strip is page edge and desk, never content: paint it paper white. */
+    /**
+     * Finishes the paper so it reads as one clean sheet: pale, low-colour pixels are pulled to pure white (soft ramp, so
+     * the cream and grey patches left by shadow and object clean-up match the rest of the page); in the outer band, where
+     * the page meets the desk, anything light and colourless goes white too; the very outermost strip is painted white.
+     * Dark text and strongly coloured ink are never touched.
+     */
     private fun whitenEdge(img: Mat) {
+        val gray = Mat()
+        Imgproc.cvtColor(img, gray, Imgproc.COLOR_RGB2GRAY)
+        val channels = ArrayList<Mat>()
+        Core.split(img, channels)
+        val hi = Mat()
+        val lo = Mat()
+        Core.max(channels[0], channels[1], hi)
+        Core.max(hi, channels[2], hi)
+        Core.min(channels[0], channels[1], lo)
+        Core.min(lo, channels[2], lo)
+        val chroma = Mat()
+        Core.subtract(hi, lo, chroma)
+
+        // Weight 0 below grey level 200, 1 from 232 up, and fading out with colour (full at chroma 30, none at 60).
+        val g32 = Mat()
+        val c32 = Mat()
+        gray.convertTo(g32, CvType.CV_32F, 1.0 / 32.0, -200.0 / 32.0)
+        chroma.convertTo(c32, CvType.CV_32F, -1.0 / 30.0, 2.0)
+        for (m in listOf(g32, c32)) {
+            Core.max(m, Scalar.all(0.0), m)
+            Core.min(m, Scalar.all(1.0), m)
+        }
+        val t = Mat()
+        Core.multiply(g32, c32, t)
+        val t3 = Mat()
+        Core.merge(listOf(t, t, t), t3)
+        val f = Mat()
+        img.convertTo(f, CvType.CV_32F)
+        val toWhite = Mat()
+        Core.subtract(Scalar.all(255.0), f, toWhite)
+        Core.multiply(toWhite, t3, toWhite)
+        Core.add(f, toWhite, f)
+        f.convertTo(img, CvType.CV_8U)
+
+        // Outer band: light and colourless (grey strips, torn fringes) goes white.
+        Imgproc.cvtColor(img, gray, Imgproc.COLOR_RGB2GRAY)
+        val band = max(3, (min(img.cols(), img.rows()) * 0.07).toInt())
+        val inBand = Mat(img.rows(), img.cols(), CvType.CV_8UC1, Scalar.all(255.0))
+        inBand.submat(band, img.rows() - band, band, img.cols() - band).setTo(Scalar.all(0.0))
+        val light = Mat()
+        val plain = Mat()
+        Core.compare(gray, Scalar.all(120.0), light, Core.CMP_GT)
+        Core.compare(chroma, Scalar.all(45.0), plain, Core.CMP_LT)
+        Core.bitwise_and(light, plain, light)
+        Core.bitwise_and(light, inBand, light)
+        img.setTo(Scalar.all(255.0), light)
+
         val b = max(2, (min(img.cols(), img.rows()) * 0.008).toInt())
         val white = Scalar.all(255.0)
         img.submat(0, b, 0, img.cols()).setTo(white)
         img.submat(img.rows() - b, img.rows(), 0, img.cols()).setTo(white)
         img.submat(0, img.rows(), 0, b).setTo(white)
         img.submat(0, img.rows(), img.cols() - b, img.cols()).setTo(white)
+        channels.forEach { it.release() }
+        listOf(gray, hi, lo, chroma, g32, c32, t, t3, f, toWhite, inBand, light, plain).forEach { it.release() }
     }
 
     fun toGrayRgb(rgb: Mat): Mat {

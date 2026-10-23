@@ -410,6 +410,7 @@ Visual Basic, macros, XML mapping pane, COM add-ins, Get Add-ins, 3D models, Sma
 
 
 | Automatic scanner look (v2) | IMPLEMENTED — NOT VERIFIED | Enhancer.autoColor divides out a per-channel paper estimate (shadows, colour cast), curve + light sharpen, white edge strip; B&W is cut from that flattened page, drops specks and big dark shapes touching the edge. Prototyped in OpenCV on a real folded, hand-held test photo; Kotlin port not run on a phone. |
+| Clean paper edges | IMPLEMENTED — NOT VERIFIED | After Auto color, pale low-colour pixels are soft-snapped to pure white (so cream/grey fill patches match the page), light colourless leftovers in the outer 7% band go white, outer strip white. Dark text and coloured ink untouched. Prototyped on a screenshot of a real result; Kotlin not run on a phone. Broken frame lines where clean-up erased them are NOT repaired (cause of that erasure not verified). |
 | Page detection by paper colour | IMPLEMENTED — NOT VERIFIED | EdgeDetector.paperCandidates: bright, non-blue, low-saturation area with strong edges cut out; falls back to the older edge strategies. |
 | Enhance tab simplified | IMPLEMENTED — NOT VERIFIED | Looks are automatic; noise, mirror, sharpen, brightness, contrast sit under Fine-tune. |
 | Crop handles freeze after each adjustment | FIX IMPLEMENTED — NOT VERIFIED | Cause found in code: the editor state was re-created after every commit while the gesture block kept writing to the old one. Now one state for the editor, synced from the page when not dragging. |
