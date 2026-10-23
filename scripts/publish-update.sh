@@ -132,7 +132,9 @@ PY
 fi
 
 # Last check: the public update file must be reachable (GitHub's download address can take a little while to appear).
-for i in $(seq 1 12); do
+# Checked for up to 3 minutes: GitHub's download address was seen taking longer than one minute to show a build that was in
+# fact published (builds 317 and 328 failed only this check; their update.json was live afterwards).
+for i in $(seq 1 36); do
   if curl -fsSL "$BASE/update.json" | grep -q "\"versionCode\":$CODE"; then echo "update.json for build $CODE is live"; exit 0; fi
   sleep 5
 done
