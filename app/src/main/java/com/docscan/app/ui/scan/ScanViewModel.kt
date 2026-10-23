@@ -37,6 +37,9 @@ enum class ScanMode(val label: String) {
     SPREAD("2 pages"),
 }
 
+/** What the camera screen is doing with the photo just taken: a label and how far along it is (0 to 1). */
+data class ScanProgress(val label: String, val fraction: Float)
+
 data class CaptureOptions(val mode: ScanMode = ScanMode.DOCUMENT, val removeFingers: Boolean = false)
 
 class ScanViewModel(private val container: AppContainer, val docId: String) : ViewModel() {
@@ -55,24 +58,42 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
     private val _pending = MutableStateFlow(0)
     val pending: StateFlow<Int> = _pending
 
+    private val _progress = MutableStateFlow<ScanProgress?>(null)
+    val progress: StateFlow<ScanProgress?> = _progress
+
+    private fun step(label: String, fraction: Float) { _progress.value = ScanProgress(label, fraction) }
+
+    /** Clears the progress bar once nothing is left to do. */
+    private fun settle() { if (_pending.value == 0) _progress.value = null }
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
     /** One photo is processed at a time, in the order taken, so pages are always added in order. */
     private val queue = Mutex()
 
+    /**
+     * Clean-up and straightening of a saved page run here, one page at a time, so the next photo can be read and
+     * saved while the previous page is still being polished instead of waiting for it.
+     */
+    private val polishQueue = Mutex()
+
     /** A freshly captured photo: normalise it, find the page edges and add it to the document. */
     fun addCapture(file: File, options: CaptureOptions) {
         _pending.update { it + 1 }
+        step("Reading the photo", 0.08f)
         viewModelScope.launch {
+            var saved: List<PageEntity> = emptyList()
             queue.withLock {
                 runCatching {
                     val bitmap = withContext(Dispatchers.IO) { ImageIO.decodeFile(file, MAX_SIDE) } ?: error("Unreadable photo")
-                    addBitmap(bitmap, options)
+                    saved = addBitmap(bitmap, options)
                 }.onFailure { _message.value = "Could not save the photo. Please try again." }
             }
             file.delete()
+            polish(saved, options)
             _pending.update { it - 1 }
+            settle()
         }
     }
 
@@ -81,39 +102,53 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
         _pending.update { it + 1 }
         viewModelScope.launch {
             var failed = 0
+            val saved = mutableListOf<PageEntity>()
             queue.withLock {
-                for (uri in uris) {
+                for ((n, uri) in uris.withIndex()) {
+                    step("Importing image ${n + 1} of ${uris.size}", 0.1f + 0.5f * n / uris.size)
                     runCatching {
                         val bitmap = withContext(Dispatchers.IO) { ImageIO.decodeUri(context, uri, MAX_SIDE) } ?: error("Unreadable image")
-                        addBitmap(bitmap, options)
+                        saved += addBitmap(bitmap, options)
                     }.onFailure { failed++ }
                 }
             }
             if (failed > 0) _message.value = "$failed image(s) could not be imported."
+            polish(saved, options)
             _pending.update { it - 1 }
+            settle()
         }
     }
 
-    private suspend fun addBitmap(bitmap: Bitmap, options: CaptureOptions) {
+    /** Finds the page edges and stores the page(s). Returns what was stored, still to be polished by [polish]. */
+    private suspend fun addBitmap(bitmap: Bitmap, options: CaptureOptions): List<PageEntity> {
+        step("Finding the page edges", 0.3f)
         val corners = withContext(Dispatchers.Default) { EdgeDetector.detect(bitmap) } ?: Geometry.DefaultCorners
         if (options.mode == ScanMode.SPREAD) {
             val halves = withContext(Dispatchers.Default) { runCatching { SpreadSplitter.split(bitmap, corners) }.getOrNull() }
             if (halves != null) {
                 bitmap.recycle()
-                for (half in halves) {
-                    val page = repo.addPage(docId, half, Geometry.FullImage)
-                    half.recycle()
-                    if (options.removeFingers) autoClean(page)
-                    autoRotate(page.id)
-                }
-                return
+                step("Saving the pages", 0.55f)
+                return halves.map { half -> repo.addPage(docId, half, Geometry.FullImage).also { half.recycle() } }
             }
             _message.value = "Turn the phone sideways so both pages fit. Saved as one page this time."
         }
+        step("Saving the page", 0.55f)
         val page = repo.addPage(docId, bitmap, corners)
         bitmap.recycle()
-        if (options.removeFingers) autoClean(page)
-        autoRotate(page.id)
+        return listOf(page)
+    }
+
+    /** Removes fingers (if switched on) and turns each saved page upright, after the next photo has been freed to go. */
+    private suspend fun polish(pages: List<PageEntity>, options: CaptureOptions) {
+        if (pages.isEmpty()) return
+        polishQueue.withLock {
+            for (page in pages) {
+                if (options.removeFingers) { step("Cleaning the page", 0.75f); autoClean(page) }
+                step("Straightening the text", 0.9f)
+                autoRotate(page.id)
+            }
+            step("Done", 1f)
+        }
     }
 
     /** Turns a freshly added page upright by reading its text. Works from the stored page so the clean-up result is kept. */

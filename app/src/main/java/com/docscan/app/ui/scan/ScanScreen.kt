@@ -154,6 +154,7 @@ fun ScanScreen(
     val pageCount by vm.pageCount.collectAsState()
     val lastPage by vm.lastPage.collectAsState()
     val pending by vm.pending.collectAsState()
+    val progress by vm.progress.collectAsState()
     val message by vm.message.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val accent = MaterialTheme.colorScheme.secondary
@@ -410,15 +411,22 @@ fun ScanScreen(
             Text("$countdown", color = Color.White, fontSize = 96.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
         }
 
-        if (pending > 0) {
-            Row(
-                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 64.dp)
-                    .clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // After every capture: what is happening and how far along it is, so it is obvious the photo is being worked on.
+        progress?.takeIf { pending > 0 }?.let { p ->
+            val shownFraction by androidx.compose.animation.core.animateFloatAsState(p.fraction, label = "scanProgress")
+            Column(
+                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 112.dp)
+                    .clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(alpha = 0.62f)).padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CircularProgressIndicator(Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
-                Text("Processing $pending", color = Color.White, fontSize = 12.sp)
+                Text(if (pending > 1) "${p.label} · $pending waiting" else p.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { shownFraction },
+                    modifier = Modifier.width(200.dp).height(5.dp).clip(CircleShape),
+                    color = accent,
+                    trackColor = Color.White.copy(alpha = 0.25f),
+                )
             }
         }
 
