@@ -65,7 +65,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.docscan.app.core.Pt
+import com.docscan.app.core.Geometry
 import com.docscan.app.data.PageEntity
+import com.docscan.app.ui.swipeTabs
 import com.docscan.app.data.cornerList
 import com.docscan.app.data.settings
 import com.docscan.app.export.ShareHelper
@@ -122,7 +124,8 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
             if (current == null) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             } else {
-                Column(Modifier.fillMaxSize()) {
+                // Crop is dragged sideways everywhere (handles), so swiping between tabs starts on Enhance and Table.
+                Column(Modifier.fillMaxSize().swipeTabs(tab, TABS.size, enabled = tab != 0) { tab = it }) {
                     TabRow(selectedTabIndex = tab) {
                         TABS.forEachIndexed { i, title -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) }) }
                     }
@@ -186,6 +189,12 @@ private fun PreviewImage(bitmap: Bitmap?, modifier: Modifier = Modifier) {
     }
 }
 
+private fun turnedCopy(source: Bitmap, degrees: Int): Bitmap {
+    if (degrees % 360 == 0) return source
+    val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+}
+
 @Composable
 private fun CropTab(vm: EditViewModel, page: PageEntity, source: Bitmap?) {
     Column(Modifier.fillMaxSize()) {
@@ -193,7 +202,16 @@ private fun CropTab(vm: EditViewModel, page: PageEntity, source: Bitmap?) {
             if (source == null) {
                 CircularProgressIndicator()
             } else {
-                CropEditor(bitmap = source, corners = page.cornerList(), onCommit = vm::setCorners)
+                // Shown the way the page is turned, so the rotate button visibly turns it here too. The corners are
+                // stored on the un-rotated photo, so they are turned for display and turned back when committed.
+                val turn = page.rotation
+                val shown = remember(source, turn) { turnedCopy(source, turn) }
+                val shownCorners = remember(page.corners, turn) { page.cornerList().map { Geometry.rotate(it, turn) } }
+                CropEditor(
+                    bitmap = shown,
+                    corners = shownCorners,
+                    onCommit = { moved -> vm.setCorners(moved.map { Geometry.unrotate(it, turn) }) },
+                )
             }
         }
         Text(

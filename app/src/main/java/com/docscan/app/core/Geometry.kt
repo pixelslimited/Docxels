@@ -111,4 +111,12 @@ object Geometry {
         270 -> Pt(1f - p.y, p.x)
         else -> p
     }
+
+    /** The reverse of [unrotate]: where a normalized point of the un-rotated image lands after a clockwise turn. */
+    fun rotate(p: Pt, rotation: Int): Pt = when (((rotation % 360) + 360) % 360) {
+        90 -> Pt(1f - p.y, p.x)
+        180 -> Pt(1f - p.x, 1f - p.y)
+        270 -> Pt(p.y, 1f - p.x)
+        else -> p
+    }
 }

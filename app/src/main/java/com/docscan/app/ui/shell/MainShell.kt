@@ -76,6 +76,7 @@ import com.docscan.app.ui.home.HomeScreen
 import com.docscan.app.ui.library.DocumentsScreen
 import com.docscan.app.ui.settings.SettingsScreen
 import com.docscan.app.ui.theme.DocxelsTheme
+import com.docscan.app.ui.swipeTabs
 import com.docscan.app.ui.tools.ToolsScreen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -180,7 +181,7 @@ fun MainShell(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = { BottomBar(tab, onSelect = { tab = it }) },
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
+        Box(Modifier.padding(padding).fillMaxSize().swipeTabs(tab.ordinal, Tab.entries.size) { tab = Tab.entries[it] }) {
             com.docscan.app.ui.announce.AnnouncementHost(container, onOpenUpdates = { settingsGoal = com.docscan.app.ui.settings.SettingsGoal.UPDATE; tab = Tab.SETTINGS }, onOpenProfile = { settingsGoal = com.docscan.app.ui.settings.SettingsGoal.PROFILE; tab = Tab.SETTINGS })
             when (tab) {
                 Tab.HOME -> if (!loaded) com.docscan.app.ui.HomeSkeleton() else HomeScreen(

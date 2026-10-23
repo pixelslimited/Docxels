@@ -57,20 +57,46 @@ class PageArranger(private val renderer: PageRenderer, private val ocr: OcrEngin
     private fun uprightHeight(bitmap: Bitmap, rotation: Int) =
         if (rotation % 180 == 0) bitmap.height else bitmap.width
 
-    /** Tries the four rotations when the upright reading finds little text, and keeps the best one. */
+    /**
+     * Which way the page must be turned (clockwise, 0/90/180/270) to read upright. Text read the wrong way round comes
+     * out as little, low-confidence rubbish, so each turn is scored by its letters and digits weighted by the
+     * recogniser's confidence. A page that already reads well is left alone without trying the other turns.
+     */
+    suspend fun uprightRotation(bitmap: Bitmap): Int = bestOrientation(bitmap).first
+
+    private fun score(text: Text): Double =
+        text.textBlocks.flatMap { it.lines }.sumOf { line -> line.text.count { c -> c.isLetterOrDigit() } * (line.confidence.toDouble().takeIf { it > 0.0 } ?: 0.5) }
+
+    private fun readsWell(text: Text): Boolean {
+        val lines = text.textBlocks.flatMap { it.lines }
+        val chars = lines.sumOf { line -> line.text.count { c -> c.isLetterOrDigit() } }
+        if (chars < 40) return false
+        return score(text) / chars >= 0.8
+    }
+
     private suspend fun bestOrientation(bitmap: Bitmap): Pair<Int, Text> {
         val upright = ocr.recognize(bitmap, 0)
-        if (upright.text.length >= 40) return 0 to upright
+        if (readsWell(upright)) return 0 to upright
         var bestRotation = 0
         var best = upright
+        var bestScore = score(upright)
         for (rotation in listOf(90, 180, 270)) {
             val candidate = ocr.recognize(bitmap, rotation)
-            if (candidate.text.length > best.text.length * 1.5 + 10) {
+            val s = score(candidate)
+            // A turn must clearly beat the upright reading, otherwise a page with little text would flip at random.
+            if (s > bestScore * 1.5 + 15) {
                 best = candidate
+                bestScore = s
                 bestRotation = rotation
             }
         }
         return bestRotation to best
+    }
+
+    /** Turn needed for [page] as it stands now (its stored rotation is included in what is read). */
+    suspend fun orientationOf(page: PageEntity): Int {
+        val bitmap = renderer.render(page, 900)
+        return try { bestOrientation(bitmap).first } finally { bitmap.recycle() }
     }
 
     /** Looks for a lone number in the footer (preferred) or header band of the page. */

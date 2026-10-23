@@ -74,3 +74,6 @@
 *|FREE|Cleaner paper edges|Grey strips, cream patches and torn fringes around the page now turn paper white.
 *|FREE|QR and barcode reader|Tools, Scan: point the camera at a code, then open, copy or share it. Can read a picture too.
 *|FREE|Scan credit|Exported scan pages carry a small "Scanned with Docxels by Pixels" line with the logos, bottom-left.
+*|FREE|Auto-rotate|New scans turn upright by themselves when the page has readable text.
+*|FIX|Rotate on the edges screen|The Crop tab now turns the photo when you press rotate.
+*|FREE|Swipe between tabs|Swipe left or right to change tab on the main screens, Settings and Edit.

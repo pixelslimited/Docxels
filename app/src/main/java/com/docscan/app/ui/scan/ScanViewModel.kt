@@ -104,6 +104,7 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
                     val page = repo.addPage(docId, half, Geometry.FullImage)
                     half.recycle()
                     if (options.removeFingers) autoClean(page)
+                    autoRotate(page.id)
                 }
                 return
             }
@@ -112,6 +113,18 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
         val page = repo.addPage(docId, bitmap, corners)
         bitmap.recycle()
         if (options.removeFingers) autoClean(page)
+        autoRotate(page.id)
+    }
+
+    /** Turns a freshly added page upright by reading its text. Works from the stored page so the clean-up result is kept. */
+    private suspend fun autoRotate(pageId: String) {
+        withContext(Dispatchers.Default) {
+            runCatching {
+                val fresh = repo.page(pageId) ?: return@runCatching
+                val turn = container.arranger.orientationOf(fresh)
+                if (turn != 0) repo.rotate(fresh, turn)
+            }
+        }
     }
 
     /** Removes fingers, objects, staples and folded corners from a freshly added page (if any are found). */

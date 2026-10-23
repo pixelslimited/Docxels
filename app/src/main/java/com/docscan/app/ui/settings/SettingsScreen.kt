@@ -37,6 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
+import com.docscan.app.ui.swipeTabs
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,13 +79,14 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null, goal: 
     androidx.compose.runtime.LaunchedEffect(Unit) { usage = withContext(Dispatchers.IO) { storageSummary(context) } }
 
     fun say(text: String) = scope.launch { snackbar.showSnackbar(text) }
+    var tab by remember { mutableIntStateOf(0) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { inner ->
         Column(
-            Modifier.fillMaxSize().padding(inner).statusBarsPadding().verticalScroll(rememberScrollState())
+            Modifier.fillMaxSize().padding(inner).statusBarsPadding().swipeTabs(tab, 3) { tab = it }.verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -92,7 +94,6 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null, goal: 
                 Text("Settings", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = if (onBack == null) 12.dp else 0.dp))
             }
 
-            var tab by remember { mutableIntStateOf(0) }
             // A pop-up button ("Update now", "Open Profile") lands here: open App settings and scroll to the right place.
             androidx.compose.runtime.LaunchedEffect(goal) { if (goal != null) tab = 1 }
             androidx.compose.material3.TabRow(selectedTabIndex = tab, containerColor = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.padding(top = 8.dp)) {
