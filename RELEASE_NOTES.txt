@@ -85,3 +85,4 @@
 *|FIX|Open from other apps|A Word, PDF or text file opened from another app now opens straight into editing or viewing.
 *|FREE|Hold to preview|Hold the pages on Continue where you stopped to see the whole document flip by; slide up for the start or down for the end, faster the further you slide; let go and it goes away. Tap still sends the pages flying, higher than before.
 *|FREE|Resize tables|Drag the corner handle of a table to make it bigger or smaller, like in Word. The sides widen or heighten it.
+*|FREE|Open with Docxels|Docxels now only offers to open PDF, Word (.docx) and text (.txt) files from other apps.
