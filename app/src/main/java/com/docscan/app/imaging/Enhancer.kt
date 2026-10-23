@@ -26,6 +26,14 @@ data class EnhanceSettings(
     val removeShadows: Boolean = true,
     /** Stretches levels so paper becomes white and ink dark. */
     val autoLevels: Boolean = true,
+    /** Smooths grain from dim light. */
+    val denoise: Boolean = false,
+    /** 0..100: sharpens to reduce mild blur. */
+    val sharpen: Int = 0,
+    /** Fills small blown-out highlights (flash, glossy paper). */
+    val glare: Boolean = false,
+    /** Flips the finished page left to right. */
+    val mirror: Boolean = false,
 )
 
 /** Document clean-up filters. Every function returns a new Mat and never modifies its input. */
@@ -37,6 +45,8 @@ object Enhancer {
             cur = next
         }
 
+        if (s.glare) swap(reduceGlare(cur))
+        if (s.denoise) swap(denoise(cur))
         // The photocopy filter estimates the paper itself, so the shadow step is only for the other looks.
         if (s.removeShadows && s.mode != DocMode.BLACK_WHITE) swap(flattenIllumination(cur))
         when (s.mode) {
@@ -49,7 +59,84 @@ object Enhancer {
         if (s.mode != DocMode.BLACK_WHITE && (s.brightness != 0 || s.contrast != 1f)) {
             swap(brightnessContrast(cur, s.brightness, s.contrast))
         }
+        if (s.sharpen > 0 && s.mode != DocMode.BLACK_WHITE) swap(sharpen(cur, s.sharpen))
+        if (s.mirror) Core.flip(cur, cur, 1)
         return cur
+    }
+
+    /** Smooths camera grain while keeping letter edges (non-local means, small window so it stays quick on a phone). */
+    fun denoise(rgb: Mat): Mat {
+        val out = Mat()
+        org.opencv.photo.Photo.fastNlMeansDenoisingColored(rgb, out, 5f, 5f, 5, 13)
+        return out
+    }
+
+    /** Unsharp mask: [amount] 1..100 adds up to 1.5x of the difference to a blurred copy. Reduces mild blur; it cannot rebuild a badly blurred photo. */
+    fun sharpen(rgb: Mat, amount: Int): Mat {
+        val k = amount.coerceIn(0, 100) / 100.0 * 1.5
+        val blur = Mat()
+        Imgproc.GaussianBlur(rgb, blur, Size(0.0, 0.0), 1.6)
+        val out = Mat()
+        Core.addWeighted(rgb, 1.0 + k, blur, -k, 0.0, out)
+        blur.release()
+        return out
+    }
+
+    /**
+     * Fills small, completely blown-out spots (every channel at the top of the range) that sit inside darker paper, such as a
+     * flash reflection on glossy paper or a laminated card. Large white areas and the paper itself are left alone, and
+     * whatever lay under strong glare is gone for good: the spot is filled from its surroundings, not recovered.
+     */
+    fun reduceGlare(rgb: Mat): Mat {
+        val min3 = Mat()
+        val channels = ArrayList<Mat>()
+        Core.split(rgb, channels)
+        Core.min(channels[0], channels[1], min3)
+        Core.min(min3, channels[2], min3)
+        channels.forEach { it.release() }
+        val clipped = Mat()
+        Imgproc.threshold(min3, clipped, 250.0, 255.0, Imgproc.THRESH_BINARY)
+        min3.release()
+        // Only spots with a clearly darker ring around them count; open white paper has no such ring.
+        val ringKernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(15.0, 15.0))
+        val wider = Mat()
+        Imgproc.dilate(clipped, wider, ringKernel)
+        val ring = Mat()
+        Core.subtract(wider, clipped, ring)
+        val labels = Mat()
+        val stats = Mat()
+        val centroids = Mat()
+        val count = Imgproc.connectedComponentsWithStats(clipped, labels, stats, centroids, 8)
+        val total = rgb.rows().toDouble() * rgb.cols()
+        val mask = Mat.zeros(clipped.size(), CvType.CV_8U)
+        val gray = Mat()
+        Imgproc.cvtColor(rgb, gray, Imgproc.COLOR_RGB2GRAY)
+        for (i in 1 until count) {
+            val area = stats.get(i, Imgproc.CC_STAT_AREA)[0]
+            if (area < total * 0.0002 || area > total * 0.04) continue
+            val x = stats.get(i, Imgproc.CC_STAT_LEFT)[0].toInt()
+            val y = stats.get(i, Imgproc.CC_STAT_TOP)[0].toInt()
+            val w = stats.get(i, Imgproc.CC_STAT_WIDTH)[0].toInt()
+            val h = stats.get(i, Imgproc.CC_STAT_HEIGHT)[0].toInt()
+            val pad = 8
+            val box = org.opencv.core.Rect(
+                (x - pad).coerceAtLeast(0), (y - pad).coerceAtLeast(0),
+                (w + 2 * pad).coerceAtMost(rgb.cols() - (x - pad).coerceAtLeast(0)),
+                (h + 2 * pad).coerceAtMost(rgb.rows() - (y - pad).coerceAtLeast(0)),
+            )
+            val ringMean = Core.mean(gray.submat(box), ring.submat(box)).`val`[0]
+            if (ringMean < 225.0) Core.bitwise_or(mask.submat(box), clipped.submat(box), mask.submat(box))
+        }
+        val result: Mat
+        if (Core.countNonZero(mask) == 0) {
+            result = rgb.clone()
+        } else {
+            Imgproc.dilate(mask, mask, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(7.0, 7.0)))
+            result = Mat()
+            org.opencv.photo.Photo.inpaint(rgb, mask, result, 5.0, org.opencv.photo.Photo.INPAINT_TELEA)
+        }
+        listOf(clipped, wider, ring, labels, stats, centroids, mask, gray).forEach { it.release() }
+        return result
     }
 
     /**

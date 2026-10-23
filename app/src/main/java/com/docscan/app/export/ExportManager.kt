@@ -41,8 +41,17 @@ enum class DocFormat(val label: String) {
     PNG("Image (PNG)"),
 }
 
+/** How large exported page pictures are (longer side in pixels). Smaller sizes make smaller files for email and WhatsApp. */
+enum class ImageSize(val label: String, val side: Int) {
+    SMALL("Small", 1200),
+    MEDIUM("Medium", 1800),
+    BEST("Best", 2400),
+}
+
 data class ExportOptions(
     val format: DocFormat = DocFormat.PDF,
+    /** PDF and image export: picture size. */
+    val size: ImageSize = ImageSize.BEST,
     /** PDF only: fit pages onto A4 sheets instead of using the scan's own proportions. */
     val a4: Boolean = true,
     /** PDF only: also put the recognised text under the picture so the PDF can be searched and copied from (runs OCR; slower). */
@@ -65,22 +74,22 @@ class ExportManager(
         require(pages.isNotEmpty()) { "There are no pages to export" }
         val base = safeName(name)
         return when (options.format) {
-            DocFormat.PDF -> ExportResult(listOf(if (options.idCard) idCardPdf(pages, base) else pdf(pages, base, options.a4, options.searchable)), Mime.PDF)
+            DocFormat.PDF -> ExportResult(listOf(if (options.idCard) idCardPdf(pages, base) else pdf(pages, base, options.a4, options.searchable, options.size.side)), Mime.PDF)
             // Word is always recognised, editable text (OCR); page pictures are what PDF and image export are for.
             DocFormat.WORD -> ExportResult(listOf(wordText(pages, base)), Mime.DOCX)
             DocFormat.TXT -> ExportResult(listOf(textFile(pages, base)), Mime.TXT)
-            DocFormat.JPEG -> ExportResult(images(pages, base, png = false), Mime.JPEG)
-            DocFormat.PNG -> ExportResult(images(pages, base, png = true), Mime.PNG)
+            DocFormat.JPEG -> ExportResult(images(pages, base, png = false, side = options.size.side), Mime.JPEG)
+            DocFormat.PNG -> ExportResult(images(pages, base, png = true, side = options.size.side), Mime.PNG)
         }
     }
 
-    private suspend fun pdf(pages: List<PageEntity>, base: String, a4: Boolean, searchable: Boolean = false): File =
+    private suspend fun pdf(pages: List<PageEntity>, base: String, a4: Boolean, searchable: Boolean = false, side: Int = EXPORT_SIDE): File =
         withContext(Dispatchers.IO) {
             val file = File(dir, "$base.pdf")
             val document = PdfDocument()
             try {
                 pages.forEachIndexed { index, page ->
-                    val bitmap = renderer.render(page, EXPORT_SIDE)
+                    val bitmap = renderer.render(page, side)
                     val text = if (searchable) runCatching { ocr.recognize(bitmap) }.getOrNull() else null
                     drawPdfPage(document, bitmap, index + 1, a4, text)
                     bitmap.recycle()
@@ -187,10 +196,10 @@ class ExportManager(
             File(dir, "$base.txt").also { it.writeText(text.toString(), Charsets.UTF_8) }
         }
 
-    private suspend fun images(pages: List<PageEntity>, base: String, png: Boolean): List<File> =
+    private suspend fun images(pages: List<PageEntity>, base: String, png: Boolean, side: Int = EXPORT_SIDE): List<File> =
         withContext(Dispatchers.IO) {
             pages.mapIndexed { index, page ->
-                val bitmap = renderer.render(page, EXPORT_SIDE)
+                val bitmap = renderer.render(page, side)
                 val file = File(dir, "${base}_${index + 1}.${if (png) "png" else "jpg"}")
                 FileOutputStream(file).use {
                     bitmap.compress(if (png) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 92, it)

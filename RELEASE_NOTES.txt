@@ -52,3 +52,8 @@
 *|FREE|Update now works|The new-version pop-up now opens App updates and starts downloading by itself. Open Profile also takes you straight to Profile.
 *|FREE|Centred pop-ups|Menus that slid up from the bottom now open as pop-ups in the middle of the screen.
 *|FREE|Anonymous statistics|Once a day, with the announcements check, Docxels sends a random code, build, Android version, phone model, which tools were used and error codes. No name, email, documents or file names. Switch it off in Settings.
+*|FREE|Camera options|Flash now has Auto. Add a grid to line pages up, a 3 or 10 second timer, and use the volume keys as the shutter.
+*|FREE|Better scan clean-up|New options in Edit page: reduce noise, sharpen, reduce glare spots and mirror.
+*|FREE|Duplicate a page|A new button on each page in a document makes a copy right after it.
+*|FREE|Smaller exports|Choose Small, Medium or Best picture size when you export a PDF or images.
+

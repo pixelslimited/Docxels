@@ -173,6 +173,7 @@ private fun EnhanceTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
     val settings = page.settings()
     var brightness by remember(settings.brightness) { mutableFloatStateOf(settings.brightness.toFloat()) }
     var contrast by remember(settings.contrast) { mutableFloatStateOf(settings.contrast) }
+    var sharpen by remember(settings.sharpen) { mutableFloatStateOf(settings.sharpen.toFloat()) }
 
     Column(Modifier.fillMaxSize()) {
         PreviewImage(preview, Modifier.weight(1f).fillMaxWidth().padding(8.dp))
@@ -188,6 +189,16 @@ private fun EnhanceTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
             }
             SwitchRow("Remove shadows and uneven light", settings.removeShadows) { vm.setSettings(settings.copy(removeShadows = it)) }
             SwitchRow("Auto brightness and contrast", settings.autoLevels) { vm.setSettings(settings.copy(autoLevels = it)) }
+            SwitchRow("Reduce noise (grain from dim light)", settings.denoise) { vm.setSettings(settings.copy(denoise = it)) }
+            SwitchRow("Reduce glare spots (flash on glossy paper)", settings.glare) { vm.setSettings(settings.copy(glare = it)) }
+            SwitchRow("Mirror (flip left to right)", settings.mirror) { vm.setSettings(settings.copy(mirror = it)) }
+            Text("Sharpen (reduces mild blur)  ${sharpen.roundToInt()}", style = MaterialTheme.typography.labelMedium)
+            Slider(
+                value = sharpen,
+                onValueChange = { sharpen = it },
+                onValueChangeFinished = { vm.setSettings(settings.copy(sharpen = sharpen.roundToInt())) },
+                valueRange = 0f..100f,
+            )
             Text("Brightness  ${brightness.roundToInt()}", style = MaterialTheme.typography.labelMedium)
             Slider(
                 value = brightness,
@@ -204,7 +215,7 @@ private fun EnhanceTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
-                    onClick = { vm.setSettings(settings.copy(brightness = 0, contrast = 1f)) },
+                    onClick = { vm.setSettings(settings.copy(brightness = 0, contrast = 1f, sharpen = 0)) },
                     modifier = Modifier.weight(1f),
                 ) { Text("Reset sliders") }
                 Button(onClick = { vm.applyLookToAll(settings) }, modifier = Modifier.weight(1f)) { Text("Apply to all pages") }

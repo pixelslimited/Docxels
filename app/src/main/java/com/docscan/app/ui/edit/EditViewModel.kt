@@ -170,7 +170,8 @@ class EditViewModel(
         viewModelScope.launch {
             _busyLabel.value = "Removing…"
             // The preview shows the page after rotation, the mask is applied before it: undo the rotation.
-            val unrotated = strokes.map { stroke -> stroke.map { Geometry.unrotate(it, p.rotation) } }
+            // The finished page may also be mirrored (applied last), so undo that first.
+            val unrotated = strokes.map { stroke -> stroke.map { pt -> Geometry.unrotate(if (p.mirror) Pt(1f - pt.x, pt.y) else pt, p.rotation) } }
             val outcome = clean(p) { base -> HandRemover.maskFromStrokes(base.cols(), base.rows(), unrotated, radiusFraction) }
             finishClean(p, outcome, "Removed.", "Nothing to remove.")
         }

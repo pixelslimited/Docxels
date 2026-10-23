@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -163,6 +164,7 @@ fun DocumentScreen(
                                 onEarlier = { vm.move(page.id, -1) },
                                 onLater = { vm.move(page.id, 1) },
                                 onRotate = { vm.rotate(page) },
+                                onDuplicate = { vm.duplicate(page) },
                                 onDelete = { deleting = page },
                             )
                         }
@@ -218,6 +220,7 @@ private fun PageCard(
     onEarlier: () -> Unit,
     onLater: () -> Unit,
     onRotate: () -> Unit,
+    onDuplicate: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
@@ -228,6 +231,7 @@ private fun PageCard(
                 Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Move page earlier")
             }
             IconButton(onClick = onRotate) { Icon(Icons.Default.RotateRight, contentDescription = "Rotate page") }
+            IconButton(onClick = onDuplicate) { Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate page") }
             IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete page") }
             IconButton(onClick = onLater, enabled = index < count - 1) {
                 Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Move page later")
@@ -253,6 +257,14 @@ private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean
                         onClick = { options = options.copy(format = format) },
                         label = { Text(format.label) },
                     )
+                }
+            }
+            if (options.format == DocFormat.PDF || options.format == DocFormat.JPEG || options.format == DocFormat.PNG) {
+                Text("Picture size", style = MaterialTheme.typography.labelLarge)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.docscan.app.export.ImageSize.entries.forEach { size ->
+                        FilterChip(selected = options.size == size, onClick = { options = options.copy(size = size) }, label = { Text(size.label) })
+                    }
                 }
             }
             when (options.format) {

@@ -54,6 +54,14 @@ data class PageEntity(
     val autoLevels: Boolean = true,
     /** File name of the hand-removed, already straightened image, if the user cleaned this page. */
     val cleanedPath: String? = null,
+    /** Smooths grain from dim light (database version 2). */
+    val denoise: Boolean = false,
+    /** 0..100 sharpening that reduces mild blur (database version 2). */
+    val sharpen: Int = 0,
+    /** Fills small blown-out highlights from a flash or glossy paper (database version 2). */
+    val glare: Boolean = false,
+    /** Flips the page left to right (database version 2). */
+    val mirror: Boolean = false,
 )
 
 fun PageEntity.cornerList(): List<Pt> = Geometry.decode(corners) ?: Geometry.DefaultCorners
@@ -64,6 +72,10 @@ fun PageEntity.settings(): EnhanceSettings = EnhanceSettings(
     contrast = contrast,
     removeShadows = removeShadows,
     autoLevels = autoLevels,
+    denoise = denoise,
+    sharpen = sharpen,
+    glare = glare,
+    mirror = mirror,
 )
 
 fun PageEntity.withSettings(s: EnhanceSettings): PageEntity = copy(
@@ -72,6 +84,10 @@ fun PageEntity.withSettings(s: EnhanceSettings): PageEntity = copy(
     contrast = s.contrast,
     removeShadows = s.removeShadows,
     autoLevels = s.autoLevels,
+    denoise = s.denoise,
+    sharpen = s.sharpen,
+    glare = s.glare,
+    mirror = s.mirror,
 )
 
 data class PageCount(val documentId: String, val pageCount: Int)
@@ -151,7 +167,17 @@ interface DocumentDao {
     suspend fun setPosition(id: String, position: Int)
 }
 
-@Database(entities = [DocumentEntity::class, PageEntity::class], version = 1, exportSchema = false)
+@Database(entities = [DocumentEntity::class, PageEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun documentDao(): DocumentDao
+}
+
+/** Version 1 to 2: four more per-page picture options. Existing pages keep every setting and get the options switched off. */
+val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE pages ADD COLUMN denoise INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE pages ADD COLUMN sharpen INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE pages ADD COLUMN glare INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE pages ADD COLUMN mirror INTEGER NOT NULL DEFAULT 0")
+    }
 }

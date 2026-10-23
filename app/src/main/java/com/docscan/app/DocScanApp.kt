@@ -59,7 +59,7 @@ class DocScanApp : Application() {
 /** Hand-wired dependencies. A DI framework would add weight without benefit at this app's size. */
 class AppContainer(context: Context) {
     val fileStore = FileStore(context)
-    private val database = Room.databaseBuilder(context, AppDatabase::class.java, "docscan.db").build()
+    private val database = Room.databaseBuilder(context, AppDatabase::class.java, "docscan.db").addMigrations(com.docscan.app.data.MIGRATION_1_2).build()
     val repository = DocumentRepository(database, fileStore)
     val renderer = PageRenderer(fileStore)
     val ocr = OcrEngine()

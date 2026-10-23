@@ -52,6 +52,10 @@ class DocumentViewModel(private val container: AppContainer, private val docId: 
         viewModelScope.launch { repo.rotate(page, 90) }
     }
 
+    fun duplicate(page: PageEntity) {
+        viewModelScope.launch { runCatching { repo.duplicatePage(page) }.onFailure { com.docscan.app.cloud.Analytics.error("duplicate_page_failed") } }
+    }
+
     fun delete(page: PageEntity) {
         viewModelScope.launch { repo.deletePage(page) }
     }

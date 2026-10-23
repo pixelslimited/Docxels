@@ -60,6 +60,13 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.FlashAuto
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -146,7 +153,14 @@ fun ScanScreen(vm: ScanViewModel, onDone: () -> Unit, onBack: () -> Unit) {
     var mode by remember { mutableStateOf(ScanMode.DOCUMENT) }
     var autoCapture by remember { mutableStateOf(false) }
     var removeFingers by remember { mutableStateOf(false) }
-    var flashOn by remember { mutableStateOf(false) }
+    // 0 off, 1 auto, 2 on
+    var flashMode by remember { mutableIntStateOf(0) }
+    var showGrid by remember { mutableStateOf(false) }
+    // Self-timer for the shutter button and the volume keys: 0 off, else seconds.
+    var timer by remember { mutableIntStateOf(0) }
+    var countdown by remember { mutableIntStateOf(0) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     var liveQuad by remember { mutableStateOf<LiveQuad?>(null) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var shotRequest by remember { mutableIntStateOf(0) }
@@ -179,8 +193,12 @@ fun ScanScreen(vm: ScanViewModel, onDone: () -> Unit, onBack: () -> Unit) {
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(Unit) { onDispose { analysisExecutor.shutdown() } }
 
-    LaunchedEffect(flashOn) {
-        imageCapture.flashMode = if (flashOn) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
+    LaunchedEffect(flashMode) {
+        imageCapture.flashMode = when (flashMode) {
+            2 -> ImageCapture.FLASH_MODE_ON
+            1 -> ImageCapture.FLASH_MODE_AUTO
+            else -> ImageCapture.FLASH_MODE_OFF
+        }
     }
 
     LaunchedEffect(hasPermission) {
@@ -247,7 +265,7 @@ fun ScanScreen(vm: ScanViewModel, onDone: () -> Unit, onBack: () -> Unit) {
         onDispose { runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() } }
     }
 
-    fun capture() {
+    fun shoot() {
         if (capturing) return
         capturing = true
         val file = File.createTempFile("capture", ".jpg", context.cacheDir)
@@ -269,17 +287,49 @@ fun ScanScreen(vm: ScanViewModel, onDone: () -> Unit, onBack: () -> Unit) {
         )
     }
 
+    /** Shutter button and volume keys: honours the self-timer. Automatic shots go straight to [shoot]. */
+    fun capture() {
+        if (capturing || countdown > 0) return
+        if (timer > 0) {
+            scope.launch {
+                for (left in timer downTo 1) { countdown = left; kotlinx.coroutines.delay(1000) }
+                countdown = 0
+                shoot()
+            }
+        } else shoot()
+    }
+
     LaunchedEffect(shotRequest) {
         if (shotRequest > 0 && autoCapture) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            capture()
+            shoot()
         }
     }
+    LaunchedEffect(hasPermission) { if (hasPermission) runCatching { keyFocus.requestFocus() } }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        Modifier.fillMaxSize().background(Color.Black)
+            .focusRequester(keyFocus).focusable()
+            // The volume keys work as the shutter, like on a phone camera.
+            .onPreviewKeyEvent { e ->
+                val volume = e.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
+                    e.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN
+                if (volume && hasPermission) {
+                    if (e.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN && e.nativeKeyEvent.repeatCount == 0) capture()
+                    true
+                } else false
+            },
+    ) {
         if (hasPermission) {
             AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
             QuadOverlay(liveQuad, accent, Modifier.fillMaxSize())
+            if (showGrid) androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val line = Color.White.copy(alpha = 0.35f)
+                for (i in 1..2) {
+                    drawLine(line, Offset(size.width * i / 3f, 0f), Offset(size.width * i / 3f, size.height), strokeWidth = 1.5f)
+                    drawLine(line, Offset(0f, size.height * i / 3f), Offset(size.width, size.height * i / 3f), strokeWidth = 1.5f)
+                }
+            }
         } else {
             Column(
                 Modifier.align(Alignment.Center).padding(32.dp),
@@ -317,9 +367,36 @@ fun ScanScreen(vm: ScanViewModel, onDone: () -> Unit, onBack: () -> Unit) {
             Box(Modifier.weight(1f))
             Switch("Auto", autoCapture, accent) { autoCapture = !autoCapture }
             Switch("Fingers", removeFingers, accent) { removeFingers = !removeFingers }
-            GlassButton(onClick = { flashOn = !flashOn }, description = if (flashOn) "Flash on" else "Flash off") {
-                Icon(if (flashOn) Icons.Default.FlashOn else Icons.Default.FlashOff, contentDescription = null, tint = Color.White)
+            GlassButton(
+                onClick = { flashMode = (flashMode + 1) % 3 },
+                description = when (flashMode) { 2 -> "Flash on"; 1 -> "Flash auto"; else -> "Flash off" },
+            ) {
+                Icon(
+                    when (flashMode) { 2 -> Icons.Default.FlashOn; 1 -> Icons.Default.FlashAuto; else -> Icons.Default.FlashOff },
+                    contentDescription = null, tint = Color.White,
+                )
             }
+        }
+
+        // Second row of camera options: alignment grid and self-timer.
+        Row(
+            Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 60.dp, end = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            GlassButton(onClick = { showGrid = !showGrid }, description = if (showGrid) "Grid on" else "Grid off") {
+                Icon(Icons.Default.GridOn, contentDescription = null, tint = if (showGrid) accent else Color.White)
+            }
+            GlassButton(
+                onClick = { timer = when (timer) { 0 -> 3; 3 -> 10; else -> 0 } },
+                description = if (timer == 0) "Timer off" else "Timer $timer seconds",
+            ) {
+                if (timer == 0) Icon(Icons.Default.Timer, contentDescription = null, tint = Color.White)
+                else Text("${timer}s", color = accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        if (countdown > 0) {
+            Text("$countdown", color = Color.White, fontSize = 96.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
         }
 
         if (pending > 0) {

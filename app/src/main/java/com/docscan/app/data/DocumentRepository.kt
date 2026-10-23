@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.docscan.app.security.SecureFiles
 import java.util.UUID
 
 /** Single source of truth for documents and pages (database rows + image files). */
@@ -107,6 +108,29 @@ class DocumentRepository(
         dao.deletePage(page)
         setOrder(dao.getPages(page.documentId).map { it.id })
         dao.touch(page.documentId, System.currentTimeMillis())
+    }
+
+    /** Copies [page] (picture files and every setting) and puts the copy right after it. */
+    suspend fun duplicatePage(page: PageEntity): PageEntity {
+        val id = UUID.randomUUID().toString()
+        val copy = withContext(Dispatchers.IO) {
+            fun copyFile(name: String, newName: String): Boolean {
+                val bytes = SecureFiles.read(store.file(page.documentId, name)) ?: return false
+                SecureFiles.write(store.file(page.documentId, newName), bytes)
+                return true
+            }
+            val source = "$id.jpg"
+            if (!copyFile(page.sourcePath, source)) error("Page image is missing")
+            val cleaned = page.cleanedPath?.let { c -> "${id}_clean.jpg".takeIf { copyFile(c, it) } }
+            page.copy(id = id, sourcePath = source, cleanedPath = cleaned)
+        }
+        dao.insertPage(copy)
+        val ids = dao.getPages(page.documentId).map { it.id }.toMutableList()
+        ids.remove(id)
+        ids.add(ids.indexOf(page.id) + 1, id)
+        setOrder(ids)
+        dao.touch(page.documentId, System.currentTimeMillis())
+        return copy
     }
 
     suspend fun reorder(documentId: String, orderedIds: List<String>) {
