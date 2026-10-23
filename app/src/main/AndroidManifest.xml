@@ -18,7 +18,9 @@
     <!-- Lets Docxels tell you a new version is ready. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <!-- Needed by WorkManager for the "only when online" update check. Without it WorkManager's network tracking throws at
+         start-up and closes the app. It only lets the app see whether a connection exists, nothing else. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
