@@ -84,4 +84,14 @@ class UiPrefs(context: Context) {
     var newScanFolder: String
         get() = prefs.getString("new_scan_folder", "") ?: ""
         set(v) = prefs.edit().putString("new_scan_folder", v).apply()
+
+    /** Last known Pro status (kept so exporting works offline). */
+    var knownPro: Boolean
+        get() = prefs.getBoolean("known_pro", false)
+        set(v) = prefs.edit().putBoolean("known_pro", v).apply()
+
+    /** Pro only: leave the "Scanned with Docxels by Pixels" credit off exported pages. */
+    var watermarkOff: Boolean
+        get() = prefs.getBoolean("watermark_off", false)
+        set(v) = prefs.edit().putBoolean("watermark_off", v).apply()
 }

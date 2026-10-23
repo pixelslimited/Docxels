@@ -1307,7 +1307,7 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
             val a = t.getSpanStart(chip)
             val e = t.getSpanEnd(chip)
             t.removeSpan(chip)
-            t.setSpan(BlockChipSpan(index, EditorModel.label(block), block), a, e, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            t.setSpan(BlockChipSpan(index, EditorModel.label(block), block).also { it.inherit(chip) }, a, e, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         changed()
     }

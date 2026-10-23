@@ -156,6 +156,16 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null, goal: 
             )
 
             Section("Exporting scans")
+            val proNow by container.cloud.planState.collectAsState()
+            var markOff by remember { mutableStateOf(container.ui.watermarkOff) }
+            val isPro = proNow?.pro == true || container.ui.knownPro
+            ToggleRow(
+                "Docxels credit on exported pages",
+                if (isPro) "A small \"Scanned with Docxels by Pixels\" line at the bottom right of each exported page. Switch off to leave it out."
+                else "A small \"Scanned with Docxels by Pixels\" line at the bottom right of each exported page. Docxels Pro can switch it off.",
+                checked = !(markOff && isPro),
+                enabled = isPro,
+            ) { on -> markOff = !on; container.ui.watermarkOff = !on }
             Text("The export sheet starts with this format.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             var fmt by remember { mutableStateOf(container.ui.exportFormat) }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -337,13 +347,13 @@ private fun Section(title: String) {
 }
 
 @Composable
-private fun ToggleRow(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun ToggleRow(title: String, body: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 16.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
 }
 

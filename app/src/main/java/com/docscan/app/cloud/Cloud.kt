@@ -40,6 +40,7 @@ class Cloud(context: Context) {
     private val _session = MutableStateFlow<Session?>(null)
     val session: StateFlow<Session?> = _session
 
+    private val ui = com.docscan.app.security.UiPrefs(context)
     private val _plan = MutableStateFlow<Plan?>(null)
     /** Last known plan of the signed-in person (null when signed out or not yet checked). */
     val planState: StateFlow<Plan?> = _plan
@@ -47,8 +48,8 @@ class Cloud(context: Context) {
     init { _session.value = load(); com.docscan.app.core.word.DocOwner.set(_session.value?.fullName) }
 
     suspend fun refreshPlan() {
-        if (_session.value == null) { _plan.value = null; return }
-        runCatching { plan() }.onSuccess { _plan.value = it }
+        if (_session.value == null) { _plan.value = null; ui.knownPro = false; return }
+        runCatching { plan() }.onSuccess { _plan.value = it; ui.knownPro = it.pro }
     }
 
     private fun load(): Session? = runCatching {

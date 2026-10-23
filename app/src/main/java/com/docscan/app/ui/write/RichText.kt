@@ -821,6 +821,9 @@ class BlockChipSpan(
     }
     private var tableCache: TableLayoutCache? = null
 
+    /** Takes over the finished table layout of the chip this one replaces, so unchanged rows are not laid out again. */
+    fun inherit(o: BlockChipSpan) { tableCache = o.tableCache }
+
     /** True for a table chip. */
     val isTable: Boolean get() = block is com.docscan.app.core.word.Block.Table
 
@@ -859,7 +862,15 @@ class BlockChipSpan(
             color = 0xFF1B1B1F.toInt()
         }
         val pad = 57f * k
-        for (row in t.rows) {
+        // Typing in one cell replaces only that row's object: rows that are the very same objects as in the last layout
+        // (same widths and scale) keep their finished layouts, so only the row being typed in is laid out again.
+        val prev = tableCache?.takeIf { it.k == k && it.density == density && it.table.columnWidthsTwips == t.columnWidthsTwips }
+        for ((ri, row) in t.rows.withIndex()) {
+            if (prev != null && prev.table.rows.getOrNull(ri) === row && ri < prev.rows.size) {
+                out.rows += prev.rows[ri]
+                out.heights += prev.heights[ri]
+                continue
+            }
             var col = 0
             var x = 0f
             var h = 0f
