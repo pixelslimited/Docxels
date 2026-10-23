@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -178,6 +179,15 @@ fun DocumentsScreen(
     val selecting = picked.isNotEmpty()
     androidx.activity.compose.BackHandler(enabled = selecting) { selected = emptySet() }
     fun toggle(item: LibraryItem) { selected = if (keyOf(item) in selected) selected - keyOf(item) else selected + keyOf(item) }
+    // A tap opens the document at once (Word and text in the editor, PDF in the viewer, scans as pages); the three dots
+    // (or a long press) hold everything else. Items in Trash cannot be opened, so a tap shows Restore and Delete there.
+    fun tapped(item: LibraryItem) {
+        when {
+            selecting -> toggle(item)
+            filter == Filter.TRASH -> actionsFor = item
+            else -> onOpen(item)
+        }
+    }
 
     val menuFor: (LibraryItem) -> RowMenu = { item ->
         if (filter == Filter.TRASH) RowMenu(
@@ -319,7 +329,7 @@ fun DocumentsScreen(
                 ) {
                     items(shown.size, key = { shown[it].kind.name + shown[it].id }) { idx ->
                         val item = shown[idx]
-                        LibraryTile(item, selected = keyOf(item) in selected, small = view == ViewMode.SMALL, onClick = { if (selecting) toggle(item) else actionsFor = item }, onLongClick = { toggle(item) })
+                        LibraryTile(item, selected = keyOf(item) in selected, small = view == ViewMode.SMALL, onClick = { tapped(item) }, onLongClick = { toggle(item) }, onMenu = if (selecting) null else ({ actionsFor = item }))
                     }
                 }
             } else {
@@ -328,7 +338,7 @@ fun DocumentsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(shown, key = { it.kind.name + it.id }) { item ->
-                        LibraryRow(item, selected = keyOf(item) in selected, onClick = { if (selecting) toggle(item) else actionsFor = item }, onLongClick = { toggle(item) })
+                        LibraryRow(item, selected = keyOf(item) in selected, onClick = { tapped(item) }, onLongClick = { toggle(item) }, onMenu = if (selecting) null else ({ actionsFor = item }))
                     }
                     if (showDevice) {
                         item(key = "device-head") {
@@ -444,7 +454,7 @@ class RowMenu(
 
 @Composable
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-fun LibraryRow(item: LibraryItem, onClick: () -> Unit, selected: Boolean = false, onLongClick: (() -> Unit)? = null) {
+fun LibraryRow(item: LibraryItem, onClick: () -> Unit, selected: Boolean = false, onLongClick: (() -> Unit)? = null, onMenu: (() -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().docCard().selectedOutline(selected).combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -463,6 +473,7 @@ fun LibraryRow(item: LibraryItem, onClick: () -> Unit, selected: Boolean = false
                 maxLines = 1,
             )
         }
+        if (onMenu != null) IconButton(onClick = onMenu) { Icon(Icons.Default.MoreVert, contentDescription = "More for ${item.title}") }
     }
 }
 
@@ -519,12 +530,13 @@ private fun confirmWithLock(context: android.content.Context, why: String, run: 
 
 @Composable
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-fun LibraryTile(item: LibraryItem, onClick: () -> Unit, selected: Boolean = false, small: Boolean = false, onLongClick: (() -> Unit)? = null) {
+fun LibraryTile(item: LibraryItem, onClick: () -> Unit, selected: Boolean = false, small: Boolean = false, onLongClick: (() -> Unit)? = null, onMenu: (() -> Unit)? = null) {
     Column(Modifier.fillMaxWidth().docCard().selectedOutline(selected).combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(if (small) 8.dp else 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DocBadge(item.kind)
             Box(Modifier.weight(1f))
             if (selected) Icon(Icons.Default.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            if (onMenu != null) IconButton(onClick = onMenu, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.MoreVert, contentDescription = "More for ${item.title}") }
             if (item.meta.favourite) Icon(Icons.Default.Star, contentDescription = "Favourite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         }
         Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, modifier = Modifier.padding(top = 8.dp))
