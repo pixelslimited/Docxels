@@ -761,6 +761,13 @@ class EditorController(private val baseDensity: Float, initial: List<Block>, ini
         originals = o
     }
 
+    /** The text size scale the document is laid out at now (a cell editor opened over a table must match it). */
+    fun effectiveDensity(): Float = density
+
+    /** The paragraphs typed so far, for a controller that edits a single table cell. */
+    fun cellParagraphs(): List<com.docscan.app.core.word.Paragraph> =
+        EditorModel.toBlocks(text, originals).mapNotNull { (it as? Block.Para)?.paragraph }.ifEmpty { listOf(com.docscan.app.core.word.Paragraph()) }
+
     fun attach(v: RichEditText) {
         view = v
         v.onFloatMoved = { i, b, fin -> floatMoved(i, b, fin) }

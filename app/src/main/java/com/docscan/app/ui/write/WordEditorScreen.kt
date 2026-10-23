@@ -177,7 +177,10 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
     val controller = remember { EditorController(density, initial.blocks, initial.comments).also { it.author = initial.author.takeIf { a -> a != com.docscan.app.core.word.DocOwner.LEGACY_AUTHOR } ?: com.docscan.app.core.word.DocOwner.label; it.subject = initial.subject; it.keywords = initial.keywords } }
-    val state by controller.state.collectAsState()
+    // While a table cell is being typed in it has an editor of its own, and every text tool acts on that one.
+    var cellCtl by remember { mutableStateOf<EditorController?>(null) }
+    val tc = cellCtl ?: controller
+    val state by tc.state.collectAsState()
     var fontOpen by remember { mutableStateOf(false) }
     var sizeOpen by remember { mutableStateOf(false) }
     var paraOpen by remember { mutableStateOf(false) }
@@ -252,7 +255,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     androidx.compose.runtime.LaunchedEffect(speech) { speech.onProblem = { m -> scope.launch { snackbar.showSnackbar(m) } } }
     val dictate = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.takeIf { it.isNotBlank() }
-            ?.let { controller.insertText(it.trim() + " ") }
+            ?.let { tc.insertText(it.trim() + " ") }
     }
     var myStylesOpen by remember { mutableStateOf(false) }
     var quick by remember { mutableStateOf(false) }
@@ -542,15 +545,30 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                             val cell = tb?.rows?.getOrNull(row)?.getOrNull(col)
                             if (tb != null && cell != null && !controller.isReadOnly() && editing == null) {
                                 tableCtx = Triple(idx, row, col)
-                                val d = host.resources.displayMetrics.density
-                                host.showCellEditor(rect, pad, cell.plain(), com.docscan.app.core.word.StyleDefaults.BODY_SIZE_PT * ZOOM * d,
-                                    0xFF000000.toInt() or (cell.shading ?: 0xFFFFFF)) { typed ->
-                                    val now = (controller.blockAt(idx) as? Block.Table)?.table
-                                    val old = now?.rows?.getOrNull(row)?.getOrNull(col)
-                                    if (now != null && old != null && old.plain() != typed) {
-                                        val rows = now.rows.mapIndexed { ri, r -> if (ri == row) r.mapIndexed { ci, c -> if (ci == col) c.withText(typed) else c } else r }
-                                        controller.replaceBlock(idx, Block.Table(now.copy(rows = rows)))
+                                val dens = controller.effectiveDensity()
+                                val ctl = EditorController(dens, cell.paragraphs.map { Block.Para(it) })
+                                cellCtl = ctl
+                                val bg = 0xFF000000.toInt() or (cell.shading ?: 0xFFFFFF)
+                                host.showCellEditor(rect, { ed ->
+                                    ctl.attach(ed)
+                                    ed.paint.density = dens
+                                    ed.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, com.docscan.app.core.word.StyleDefaults.BODY_SIZE_PT * ZOOM * dens)
+                                    ed.setPadding(pad.toInt(), pad.toInt(), pad.toInt(), pad.toInt())
+                                    ed.setBackgroundColor(bg)
+                                    ed.includeFontPadding = false
+                                    ed.onUserTouch = { quick = true }
+                                }) { keep ->
+                                    if (keep) {
+                                        val typed = ctl.cellParagraphs()
+                                        val now = (controller.blockAt(idx) as? Block.Table)?.table
+                                        val old = now?.rows?.getOrNull(row)?.getOrNull(col)
+                                        if (now != null && old != null && old.paragraphs != typed) {
+                                            val rows = now.rows.mapIndexed { ri, r -> if (ri == row) r.mapIndexed { ci, c -> if (ci == col) c.copy(paragraphs = typed) else c } else r }
+                                            controller.replaceBlock(idx, Block.Table(now.copy(rows = rows)))
+                                        }
                                     }
+                                    ctl.detach()
+                                    if (cellCtl === ctl) cellCtl = null
                                 }
                             } else if (editing == null) editing = idx
                         }
@@ -634,7 +652,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                         }
                     },
                     openState = ribbonOpen,
-                    c = controller,
+                    c = tc,
                     s = state,
                     status = status + if (unsaved) "  ·  Saving…" else "  ·  Saved",
                     onStatus = { statsOpen = true },
@@ -725,7 +743,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                         }
                     },
                     onNewComment = {
-                        if (controller.selectedText().isBlank()) scope.launch { snackbar.showSnackbar("Select the words you want to comment on first.") } else commentNew = true
+                        if (tc.selectedText().isBlank()) scope.launch { snackbar.showSnackbar("Select the words you want to comment on first.") } else commentNew = true
                     },
                     onComments = { commentsOpen = true },
                     onToc = {
@@ -741,7 +759,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                     onMyStyles = { myStylesOpen = true },
                 onPainter = {
                         val held = painter
-                        if (held == null) painter = controller.captureFormat() else { controller.applyFormat(held); painter = null }
+                        if (held == null) painter = tc.captureFormat() else { tc.applyFormat(held); painter = null }
                     },
                 )
             }
@@ -800,7 +818,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     if (mergeOpen) {
         MailMergeDialog(
             document = { controller.toDoc(title, page) },
-            onInsertField = { controller.insertText(it) },
+            onInsertField = { tc.insertText(it) },
             onCreate = { merged, _ ->
                 mergeOpen = false
                 scope.launch {
@@ -940,15 +958,15 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         current = state.font, recent = recentFonts.toList(),
         onPick = { f ->
             fontOpen = false
-            controller.setFont(f)
+            tc.setFont(f)
             if (f != null) { recentFonts.remove(f); recentFonts.add(0, f); while (recentFonts.size > 5) recentFonts.removeAt(5) }
         },
         onDismiss = { fontOpen = false },
     )
-    if (sizeOpen) SizeDialog(state.sizePt, onPick = { sizeOpen = false; controller.setSize(it) }, onDismiss = { sizeOpen = false })
+    if (sizeOpen) SizeDialog(state.sizePt, onPick = { sizeOpen = false; tc.setSize(it) }, onDismiss = { sizeOpen = false })
     if (paraOpen) ParagraphDialog(
-        initial = remember { controller.currentParagraph() },
-        onApply = { b, a, l, left, first -> paraOpen = false; controller.setParagraphLayout(b, a, l, left, first) },
+        initial = remember { tc.currentParagraph() },
+        onApply = { b, a, l, left, first -> paraOpen = false; tc.setParagraphLayout(b, a, l, left, first) },
         onDismiss = { paraOpen = false },
     )
     linkOpen?.let { (txt, url, range) ->
@@ -987,9 +1005,9 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         onDismiss = { commentNew = false },
     )
     if (commentsOpen) CommentsDialog(controller, onDismiss = { commentsOpen = false })
-    if (symbolOpen) SymbolDialog(onInsert = { symbolOpen = false; controller.insertText(it) }, onDismiss = { symbolOpen = false })
+    if (symbolOpen) SymbolDialog(onInsert = { symbolOpen = false; tc.insertText(it) }, onDismiss = { symbolOpen = false })
     if (choiceBuild) FormChoiceBuilder(
-        onInsert = { controller.insertText(it); choiceBuild = false },
+        onInsert = { tc.insertText(it); choiceBuild = false },
         onDismiss = { choiceBuild = false },
     )
     choicePick?.let { tok ->
@@ -1003,11 +1021,11 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         SnippetsDialog(
             store = remember { SnippetStore(ctx) },
             selectedText = controller.selectedText(),
-            onInsert = { controller.insertText(it); snippetsOpen = false },
+            onInsert = { tc.insertText(it); snippetsOpen = false },
             onDismiss = { snippetsOpen = false },
         )
     }
-    if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; controller.insertText(it) }, onDismiss = { dateOpen = false })
+    if (dateOpen) DateTimeDialog(onInsert = { dateOpen = false; tc.insertText(it) }, onDismiss = { dateOpen = false })
     if (navOpen) NavigationDialog(remember { controller.outline() }, onGo = { navOpen = false; controller.goTo(it) }, onDismiss = { navOpen = false })
     if (versionsOpen) AlertDialog(
         onDismissRequest = { versionsOpen = false },
@@ -1317,16 +1335,16 @@ private fun Ribbon(
                         enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it * 2 }) + androidx.compose.animation.fadeIn(),
                         exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it * 2 }) + androidx.compose.animation.fadeOut(),
                     ) {
-                    if (tableTools != null) Row(
-                        Modifier.fillMaxWidth().height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill).padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        tableTools.forEach { t -> Q(t.icon, t.label) { t.run() } }
-                    } else Row(
+                    Row(
                         Modifier.fillMaxWidth().height(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(pill)
                             .horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        // Typing in a table cell: the table tools come first, then the same text tools as anywhere else.
+                        if (tableTools != null) {
+                            tableTools.forEach { t -> Q(t.icon, t.label, fixed = true) { t.run() } }
+                            Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(24.dp).background(Color(0x55FFFFFF)))
+                        }
                         Q(Icons.Default.ContentPaste, "Paste", fixed = true) { c.clipboard(android.R.id.paste) }
                         Box(Modifier.width(40.dp)) {
                             Row(Modifier.fillMaxWidth()) { Q(Icons.Default.ContentCopy, "Clipboard", fixed = true) { clipMenu = true } }

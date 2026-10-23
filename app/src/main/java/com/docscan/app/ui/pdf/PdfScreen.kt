@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -527,13 +528,27 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
             var panX by remember { mutableStateOf(0f) }
             val renderScale = if (zoom > 2f) 3 else 2
             val maxPan = { z: Float -> (z - 1f) * widthPx / 2f }
+            // Zooms so the spot of the page under [centre] stays under it (sideways by the pan, up and down by the scroll position).
+            fun zoomAround(newZoom: Float, centre: androidx.compose.ui.geometry.Offset, halfWidth: Float, extraPan: Float) {
+                val k = newZoom / zoom
+                panX = (panX * k + (centre.x - halfWidth) * (1f - k) + extraPan).coerceIn(-maxPan(newZoom), maxPan(newZoom))
+                val items = state.layoutInfo.visibleItemsInfo
+                val under = items.firstOrNull { centre.y >= it.offset && centre.y < it.offset + it.size } ?: items.firstOrNull()
+                if (under != null && k != 1f && under.size > 0) {
+                    val fraction = ((centre.y - under.offset) / under.size).coerceIn(0f, 1f)
+                    state.requestScrollToItem(under.index, (fraction * under.size * k - centre.y).toInt())
+                }
+                zoom = newZoom
+            }
             LazyColumn(
                 state = state,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier
                     .pointerInput(Unit) {
-                        detectTapGestures(onDoubleTap = { if (zoom > 1.01f) { zoom = 1f; panX = 0f } else zoom = 2.5f })
+                        detectTapGestures(onDoubleTap = { at ->
+                            if (zoom > 1.01f) { zoom = 1f; panX = 0f } else zoomAround(2.5f, at, size.width / 2f, 0f)
+                        })
                     }
                     .pointerInput(Unit) {
                         awaitEachGesture {
@@ -542,10 +557,7 @@ private fun PdfPages(file: File, startIndex: Int = 0, onPage: (page: Int, total:
                                 val ev = awaitPointerEvent(PointerEventPass.Initial)
                                 val down = ev.changes.filter { it.pressed }
                                 if (down.size >= 2) {
-                                    val z = ev.calculateZoom()
-                                    val pan = ev.calculatePan()
-                                    zoom = (zoom * z).coerceIn(1f, 4f)
-                                    panX = (panX + pan.x).coerceIn(-maxPan(zoom), maxPan(zoom))
+                                    zoomAround((zoom * ev.calculateZoom()).coerceIn(1f, 4f), ev.calculateCentroid(), size.width / 2f, ev.calculatePan().x)
                                     ev.changes.forEach { it.consume() }
                                 } else if (zoom > 1f && down.size == 1) {
                                     val dx = ev.calculatePan().x

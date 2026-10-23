@@ -124,26 +124,21 @@ class PageHost(context: Context) : ScrollView(context) {
         sheet.addView(edit, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
 
-    private var cellEditor: android.widget.EditText? = null
+    private var cellEditor: RichEditText? = null
 
     /** Called with a phone number when it is double-tapped (the screen opens the dialer). */
     var onDial: ((String) -> Unit)? = null
-    private var cellDone: ((String) -> Unit)? = null
+    private var cellDone: ((Boolean) -> Unit)? = null
 
-    /** Types straight into a table cell: an edit box laid exactly over the cell, scrolling with the page. */
-    fun showCellEditor(r: android.graphics.RectF, pad: Float, initial: String, sizePx: Float, bg: Int, onDone: (String) -> Unit) {
+    /**
+     * Types straight into a table cell: a rich edit box laid exactly over the cell, scrolling with the page. [build]
+     * attaches the cell's own editor to it; [onDone] gets true when typing ended normally, false when it is discarded.
+     */
+    fun showCellEditor(r: android.graphics.RectF, build: (RichEditText) -> Unit, onDone: (Boolean) -> Unit) {
         closeCellEditor()
-        val ed = android.widget.EditText(context).apply {
-            setText(initial)
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, sizePx)
-            setTextColor(0xFF1B1B1F.toInt())
-            setBackgroundColor(bg)
-            includeFontPadding = false
-            gravity = android.view.Gravity.TOP or android.view.Gravity.START
-            setPadding(pad.toInt(), pad.toInt(), pad.toInt(), pad.toInt())
-            minHeight = r.height().toInt()
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        }
+        val ed = RichEditText(context)
+        build(ed)
+        ed.minHeight = r.height().toInt()
         val lp = FrameLayout.LayoutParams(r.width().toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
         lp.leftMargin = edit.left + r.left.toInt()
         lp.topMargin = edit.top + r.top.toInt()
@@ -174,19 +169,20 @@ class PageHost(context: Context) : ScrollView(context) {
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(ed, 0)
     }
 
-    /** Removes the cell box without handing anything back. */
-    fun discardCellEditor() { cellDone = null; closeCellEditor() }
+    /** Removes the cell box without keeping what was typed in it. */
+    fun discardCellEditor() = endCell(false)
 
-    /** Ends cell typing and hands the text back. */
-    fun closeCellEditor() {
+    /** Ends cell typing and keeps what was typed. */
+    fun closeCellEditor() = endCell(true)
+
+    private fun endCell(keep: Boolean) {
         val ed = cellEditor ?: return
         val done = cellDone
         cellEditor = null
         cellDone = null
-        val t = ed.text.toString()
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(ed.windowToken, 0)
         sheet.removeView(ed)
-        done?.invoke(t)
+        done?.invoke(keep)
     }
 
     /** Called with how far the page just scrolled (positive = moving down the document). */
