@@ -16,8 +16,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -37,7 +37,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -148,14 +151,15 @@ fun rememberDeckState(): DeckState {
 
 /**
  * The document's first pages as a living deck: the front page keeps turning over to show the next one, drag it any way
- * to revolve it (down or sideways, upside down included), tap to send the real pages flying far across the screen, hold to preview the whole document until the finger lifts. Pure Compose, no extra libraries.
+ * to revolve it (down or sideways, upside down included), tap to send the real pages flying far across the screen, hold to preview the whole document until the finger lifts (and slide up or down while holding to scrub to its start or end). Pure Compose, no extra libraries.
  */
 @Composable
-fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modifier, state: DeckState = rememberDeckState(), onHold: (Boolean) -> Unit = {}) {
+fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modifier, state: DeckState = rememberDeckState(), onHold: (Boolean) -> Unit = {}, onScrub: (Float) -> Unit = {}) {
     val density = LocalDensity.current.density
     val n = pages.size
     val current by rememberUpdatedState(pages)
     val holdNow by rememberUpdatedState(onHold)
+    val scrubNow by rememberUpdatedState(onScrub)
     val fan = remember { Animatable(if (state.still) 1f else 0f) }
     LaunchedEffect(Unit) { fan.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)) }
     LaunchedEffect(n, state.still) {
@@ -174,25 +178,44 @@ fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modi
             .size(width = 100.dp, height = 124.dp)
             .zIndex(1f)
             .pointerInput(state) {
-                // Holding the deck shows a preview of the document for as long as the finger stays down; a quick tap sends the pages flying.
-                detectTapGestures(
-                    onPress = {
-                        var holding = false
-                        kotlinx.coroutines.coroutineScope {
-                            val timer = launch { delay(viewConfiguration.longPressTimeoutMillis); holding = true; holdNow(true) }
-                            tryAwaitRelease()
-                            timer.cancel()
-                            if (holding) holdNow(false)
+                // One gesture decides what the finger is doing: lifted quickly = a tap (the pages fly); moved at once = revolve the deck;
+                // kept down = hold, which shows the preview, and then moving up or down scrubs through the document.
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    var revolving = false
+                    var released = false
+                    val undecided = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                            if (change.changedToUp()) { released = true; break }
+                            if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) { revolving = true; break }
                         }
-                    },
-                    onLongPress = {},
-                    onTap = { state.fling(current) },
-                )
-            }
-            .pointerInput(state) {
-                detectDragGestures(onDragEnd = { state.release() }, onDragCancel = { state.release() }) { change, drag ->
-                    change.consume()
-                    state.drag(drag.x, drag.y)
+                    }
+                    when {
+                        released -> state.fling(current)
+                        revolving -> {
+                            while (true) {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                if (change.changedToUp()) break
+                                val move = change.positionChange()
+                                change.consume()
+                                state.drag(move.x, move.y)
+                            }
+                            state.release()
+                        }
+                        undecided == null -> {
+                            holdNow(true)
+                            val originY = down.position.y
+                            while (true) {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                if (change.changedToUp()) break
+                                change.consume()
+                                scrubNow((change.position.y - originY) / density)
+                            }
+                            scrubNow(0f)
+                            holdNow(false)
+                        }
+                    }
                 }
             },
         contentAlignment = Alignment.Center,

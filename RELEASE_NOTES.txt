@@ -83,4 +83,4 @@
 *|FREE|Tap to open|In Documents, tapping a file opens it straight away. The three dots hold share, move, rename and the rest.
 *|FREE|Open with Docxels|Word, PDF and text files opened from other apps now offer Docxels more reliably and open straight into editing or viewing.
 *|FIX|Open from other apps|A Word, PDF or text file opened from another app now opens straight into editing or viewing.
-*|FREE|Hold to preview|Hold the pages on Continue where you stopped to see the whole document flip by; let go and it goes away. Tap still sends the pages flying, higher than before.
+*|FREE|Hold to preview|Hold the pages on Continue where you stopped to see the whole document flip by; slide up for the start or down for the end, faster the further you slide; let go and it goes away. Tap still sends the pages flying, higher than before.

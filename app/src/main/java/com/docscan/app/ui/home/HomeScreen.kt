@@ -364,7 +364,8 @@ internal suspend fun loadPages(
 @Composable
 private fun CardThumb(item: LibraryItem) {
     var holding by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    if (holding) HoldPreview(item)
+    var scrub by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    if (holding) HoldPreview(item, scrub = { scrub })
     val container = com.docscan.app.LocalContainer.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val key = "${item.kind}:${item.id}:${item.modified}"
@@ -373,5 +374,5 @@ private fun CardThumb(item: LibraryItem) {
         val all = loadPages(context, container, item) { value = it }
         if (all.isNotEmpty()) CardThumbs.put(key, all)
     }
-    PageDeck(pages, "First page of ${item.title}", onHold = { holding = it })
+    PageDeck(pages, "First page of ${item.title}", onHold = { holding = it }, onScrub = { scrub = it })
 }
