@@ -159,7 +159,8 @@ private fun PreviewImage(bitmap: Bitmap?, modifier: Modifier = Modifier) {
                         val event = awaitPointerEvent()
                         val fingers = event.changes.count { it.pressed }
                         // One finger only moves the page once it is zoomed in; otherwise the touch is left alone.
-                        if (fingers >= 2 || zoom > 1.01f) {
+                        // The event where the last finger lifts has no centroid (it is NaN); using it would push the page off screen.
+                        if (fingers >= 1 && (fingers >= 2 || zoom > 1.01f)) {
                             val newZoom = (zoom * (if (fingers >= 2) event.calculateZoom() else 1f)).coerceIn(1f, 4f)
                             val rel = event.calculateCentroid() - Offset(size.width / 2f, size.height / 2f)
                             val moved = rel - (rel - pan) * (newZoom / zoom) + event.calculatePan()

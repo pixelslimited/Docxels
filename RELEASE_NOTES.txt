@@ -94,3 +94,4 @@
 *|FREE|Updated privacy and terms|Our privacy policy and terms now describe accounts, the writing assistant, Pro and update checks.
 *|FREE|Delete your account|You can now delete your Docxels account from the Account box.
 *|FREE|Service status bar|If Docxels' online services are unreachable, a bar at the top says so, and turns into a Refresh button when they are back.
+*|FREE|Pinch zoom fix|Pinch-zooming a scan no longer makes the page disappear when you lift your fingers.
