@@ -40,6 +40,20 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
     val nav = rememberNavController()
     val incomingUri by incoming.collectAsState()
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    // A file opened from another app waits here until the terms are accepted (the effect below runs only after this).
+    var termsOk by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(
+            if (container.ui.termsAccepted.isEmpty() && !TermsGate.required(appContext, "")) {
+                container.ui.termsAccepted = "legacy"
+                true
+            } else container.ui.termsAccepted.isNotEmpty(),
+        )
+    }
+    if (!termsOk) {
+        TermsGateScreen(onAccept = { container.ui.termsAccepted = TermsGate.VERSION; termsOk = true })
+        return
+    }
+
     // Clearing the incoming file changes the effect's key, which would cancel the import half way (the file got saved but the
     // screen never opened). The import therefore runs in a scope that outlives the key change.
     val importScope = androidx.compose.runtime.rememberCoroutineScope()

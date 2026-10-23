@@ -89,3 +89,4 @@
 *|FREE|Calmer page animation|The flying pages on the Continue card now fly lower.
 *|FREE|Type in the cell|Typing in a table now happens in the cell itself, with the caret inside it, no box over it, and stays smooth because the table is only rebuilt when a line is added or typing pauses.
 *|PRO|Hide the Docxels credit|Pro can switch off the small credit on exported pages. It now sits at the bottom right.
+*|FREE|Terms and privacy|New users must accept the Terms of use and Privacy policy before they can use Docxels.

@@ -94,4 +94,9 @@ class UiPrefs(context: Context) {
     var watermarkOff: Boolean
         get() = prefs.getBoolean("watermark_off", false)
         set(v) = prefs.edit().putBoolean("watermark_off", v).apply()
+
+    /** Version of the terms and privacy policy that was accepted ("legacy" for people who had the app before the screen existed; empty = not yet). */
+    var termsAccepted: String
+        get() = prefs.getString("terms_accepted", "") ?: ""
+        set(v) = prefs.edit().putString("terms_accepted", v).putLong("terms_accepted_at", System.currentTimeMillis()).apply()
 }
