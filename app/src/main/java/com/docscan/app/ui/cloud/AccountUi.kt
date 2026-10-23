@@ -43,6 +43,7 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
     var note by remember { mutableStateOf<String?>(null) }
     var sentTo by remember { mutableStateOf<String?>(null) }
     var plan by remember { mutableStateOf<Plan?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(session?.email) {
         plan = null
@@ -56,6 +57,28 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
             busy = false
         }
     }
+
+    if (confirmDelete) AlertDialog(
+        onDismissRequest = { if (!busy) confirmDelete = false },
+        title = { Text("Delete your account?") },
+        text = {
+            Text(
+                "This permanently erases your account, your plan and your payment and usage records from our server. " +
+                    "If you have Pro, it ends and is not refunded. Documents on this phone are not touched. This cannot be undone.",
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = !busy, onClick = {
+                run {
+                    cloud.deleteAccount()
+                    confirmDelete = false
+                    android.widget.Toast.makeText(context, "Your account was deleted.", android.widget.Toast.LENGTH_LONG).show()
+                    onDismiss()
+                }
+            }) { Text("Delete for good", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = { confirmDelete = false }) { Text("Keep my account") } },
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -101,6 +124,9 @@ fun AccountDialog(cloud: Cloud, onDismiss: () -> Unit) {
                         android.widget.Toast.makeText(context, "Logged out. See you back soon!", android.widget.Toast.LENGTH_LONG).show()
                         onDismiss()
                     }, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+                    TextButton(enabled = !busy, onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Delete account", color = MaterialTheme.colorScheme.error)
+                    }
                 }
                 note?.let { Text(it, color = if (it.startsWith("If that email") || it.startsWith("Sent again")) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }

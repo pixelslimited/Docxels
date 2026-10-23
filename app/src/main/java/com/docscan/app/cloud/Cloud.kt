@@ -177,6 +177,15 @@ class Cloud(context: Context) {
         return Plan(active, until)
     }
 
+    /** Permanently deletes the signed-in account (and its plan, payment and usage records on the server), then signs out here. */
+    suspend fun deleteAccount() {
+        val (code, text) = call("POST", "/functions/v1/delete-account", JSONObject(), token())
+        if (code !in 200..299) throw CloudException(friendly(text))
+        store(null)
+        _plan.value = null
+        ui.knownPro = false
+    }
+
     /** Address of the Paystack payment page for Pro. Opened in the browser; the webhook then turns Pro on. */
     suspend fun checkoutUrl(): String {
         val (code, text) = call("POST", "/functions/v1/paystack-init", JSONObject(), token())

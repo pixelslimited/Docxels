@@ -92,3 +92,4 @@
 *|FREE|Terms and privacy|Everyone must accept the Terms of use and Privacy policy once before using Docxels.
 *|FREE|Clearer pop-ups|Messages and update notices now appear as a big headline with one wide button, like a campaign pop-up.
 *|FREE|Updated privacy and terms|Our privacy policy and terms now describe accounts, the writing assistant, Pro and update checks.
+*|FREE|Delete your account|You can now delete your Docxels account from the Account box.
