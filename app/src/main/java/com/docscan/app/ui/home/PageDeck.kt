@@ -116,15 +116,15 @@ class DeckState(private val scope: CoroutineScope, val still: Boolean) {
         if (still || pages.isEmpty()) return
         touchedAt = SystemClock.uptimeMillis()
         val r = kotlin.random.Random
-        repeat(7) { i ->
+        repeat(4) { i ->
             // Mostly upward, and far: the pages leave the card and travel over the rest of the screen before they fade.
             val angle = Math.toRadians(if (i % 3 == 2) r.nextDouble(0.0, 360.0) else r.nextDouble(15.0, 165.0))
-            val dist = r.nextFloat() * 220f + 190f
+            val dist = r.nextFloat() * 90f + 90f
             val t = ThrownPage(
                 bmp = pages[i % pages.size],
                 dx = (cos(angle) * dist).toFloat(), dy = (-kotlin.math.sin(angle) * dist).toFloat(),
                 turn = (r.nextFloat() * 420f + 140f) * (if (r.nextBoolean()) 1 else -1),
-                ms = r.nextInt(1300, 1900), size = r.nextFloat() * 0.25f + 0.55f,
+                ms = r.nextInt(1000, 1400), size = r.nextFloat() * 0.25f + 0.55f,
             )
             thrown.add(t)
             scope.launch {
