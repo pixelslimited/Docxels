@@ -125,8 +125,11 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 key = "scan-$docId",
                 factory = viewModelFactory { initializer { ScanViewModel(container, docId) } },
             )
+            val allScans by container.repository.observeHome().collectAsState(initial = emptyList())
             ScanScreen(
                 vm = vm,
+                scans = allScans,
+                onOpenScan = { id -> nav.navigate("doc/$id") },
                 onDone = {
                     if (nav.previousBackStackEntry?.destination?.route == DOC) {
                         nav.popBackStack()
