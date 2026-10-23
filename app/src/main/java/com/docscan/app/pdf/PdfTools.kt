@@ -158,6 +158,8 @@ class PdfTools(context: Context) {
         LIGHT("Light (best quality)", 80, 2400),
         MEDIUM("Medium (balanced)", 60, 1700),
         STRONG("Strong (smallest file)", 40, 1200),
+        /** Used by Docxels' own PDF export: pages are already sized by the chosen picture size. */
+        EXPORT("Export", 70, 2400),
     }
 
     /**

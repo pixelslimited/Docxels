@@ -51,7 +51,7 @@ enum class ImageSize(val label: String, val side: Int) {
 data class ExportOptions(
     val format: DocFormat = DocFormat.PDF,
     /** PDF and image export: picture size. */
-    val size: ImageSize = ImageSize.BEST,
+    val size: ImageSize = ImageSize.MEDIUM,
     /** PDF only: fit pages onto A4 sheets instead of using the scan's own proportions. */
     val a4: Boolean = true,
     /** PDF only: also put the recognised text under the picture so the PDF can be searched and copied from (runs OCR; slower). */
@@ -83,6 +83,19 @@ class ExportManager(
         }
     }
 
+    /**
+     * Android's PdfDocument stores drawn pictures without JPEG compression, which makes big files. This re-saves the
+     * pictures as JPEG (about 70% quality) and replaces [file]; if that fails the original, larger file is kept.
+     */
+    private fun lighten(file: File) {
+        val small = File(file.parentFile, file.name + ".tmp")
+        try {
+            com.docscan.app.pdf.PdfTools(context).compress(file, com.docscan.app.pdf.PdfTools.Compression.EXPORT, small)
+            if (small.length() in 1 until file.length()) { file.delete(); small.renameTo(file) }
+        } catch (_: Throwable) {
+        } finally { small.delete() }
+    }
+
     private suspend fun pdf(pages: List<PageEntity>, base: String, a4: Boolean, searchable: Boolean = false, side: Int = EXPORT_SIDE): File =
         withContext(Dispatchers.IO) {
             val file = File(dir, "$base.pdf")
@@ -98,6 +111,7 @@ class ExportManager(
             } finally {
                 document.close()
             }
+            lighten(file)
             file
         }
 
@@ -124,6 +138,7 @@ class ExportManager(
             document.finishPage(page)
             FileOutputStream(file).use { document.writeTo(it) }
         } finally { document.close() }
+        lighten(file)
         file
     }
 
@@ -137,6 +152,7 @@ class ExportManager(
         val page = document.startPage(PdfDocument.PageInfo.Builder(pageW, pageH, number).create())
         val canvas = page.canvas
         canvas.drawColor(Color.WHITE)
+        bitmap.setHasAlpha(false) // an opaque picture avoids a second, heavy transparency layer in the PDF
         val scale = min(pageW.toFloat() / bitmap.width, pageH.toFloat() / bitmap.height)
         val w = bitmap.width * scale
         val h = bitmap.height * scale
@@ -234,6 +250,7 @@ class ExportManager(
         } finally {
             document.close()
         }
+        lighten(file)
         file
     }
 

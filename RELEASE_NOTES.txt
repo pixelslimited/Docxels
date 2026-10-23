@@ -56,4 +56,4 @@
 *|FREE|Better scan clean-up|New options in Edit page: reduce noise, sharpen, reduce glare spots and mirror.
 *|FREE|Duplicate a page|A new button on each page in a document makes a copy right after it.
 *|FREE|Smaller exports|Choose Small, Medium or Best picture size when you export a PDF or images.
-
+*|FIX|Lighter PDFs|Exported PDFs are now much smaller. Page pictures are saved as JPEG and the default size is Medium.

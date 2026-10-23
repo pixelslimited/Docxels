@@ -401,7 +401,9 @@ Visual Basic, macros, XML mapping pane, COM add-ins, Get Add-ins, 3D models, Sma
 | Reduce glare spots | IMPLEMENTED — NOT VERIFIED | Enhancer.reduceGlare: small, fully blown-out spots with a darker ring are filled from their surroundings (inpaint). Strong glare destroys what was underneath and cannot be recovered. Never run on a real glossy page. |
 | Mirror (flip left to right) | IMPLEMENTED — NOT VERIFIED | Applied last, after rotation; hand-removal strokes are mapped back through it. |
 | Duplicate page | IMPLEMENTED — NOT VERIFIED | DocumentRepository.duplicatePage copies the picture files and all settings; the copy follows the original. |
-| Export picture size (Small 1200, Medium 1800, Best 2400) for PDF and images | IMPLEMENTED — NOT VERIFIED | ExportOptions.size. |
+| Export picture size (Small 1200, Medium 1800, Best 2400) for PDF and images | IMPLEMENTED — NOT VERIFIED | ExportOptions.size; default is now Medium. |
+| Lighter PDF export | IMPLEMENTED — NOT VERIFIED | ExportManager.lighten re-saves page pictures as JPEG (~70%) with PDFBox after PdfDocument writes; falls back to the original file on failure. Check real file size on a phone. |
+| AI deblur | NOT BUILT | No deblur model could be fetched and tested here (Hugging Face and Git LFS blocked). Sharpen slider remains. |
 | Database version 2 (four new page columns) | IMPLEMENTED — NOT VERIFIED | MIGRATION_1_2 adds denoise, sharpen, glare, mirror with defaults. Existing scans must be opened after updating to confirm the upgrade keeps them. No fallback-to-destructive is set, so a failed migration would crash on start: test with a phone that already has scans. |
 | TXT export of scanned text | ALREADY BUILT | Export sheet > TXT (OCR). |
 | Not built yet from the list | OPEN | QR and barcode detection, handwriting removal, colour tags and batch rotation, ZIP export, favourites and collections, Send to PC, shareable links, cloud drives other than the existing sync. |
