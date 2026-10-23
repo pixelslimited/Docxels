@@ -319,6 +319,14 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         val saver = Runnable {
             if (save()) host.edit.postDelayed({ host.edit.cellRectOf(idx, row, col)?.let { host.moveCellEditor(it.first) } }, 120)
         }
+        // Typing within a line only marks the cell as changed; the table is rebuilt (the expensive part) when a line is added
+        // or removed so the row grows, and otherwise a moment after typing stops.
+        var shownHeight = -1
+        val check = Runnable {
+            val h = host.cellContentHeight()
+            if (shownHeight < 0) shownHeight = h
+            if (h != shownHeight) { shownHeight = h; saver.run() } else host.postDelayed(saver, 1000)
+        }
         host.showCellEditor(idx, row, col, rect, { ed ->
             ctl.attach(ed)
             ed.paint.density = dens
@@ -327,9 +335,10 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
             ed.setBackgroundColor(bg)
             ed.includeFontPadding = false
             ed.onUserTouch = { quick = true }
-            ctl.onChanged = { host.removeCallbacks(saver); host.postDelayed(saver, 300) }
+            ctl.onChanged = { host.removeCallbacks(saver); host.removeCallbacks(check); host.post(check) }
         }) { keep ->
             host.removeCallbacks(saver)
+            host.removeCallbacks(check)
             if (keep) save()
             ctl.detach()
             if (cellCtl === ctl) cellCtl = null

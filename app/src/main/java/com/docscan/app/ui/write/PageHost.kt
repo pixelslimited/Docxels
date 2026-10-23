@@ -152,10 +152,15 @@ class PageHost(context: Context) : ScrollView(context) {
             override fun run() {
                 if (cellEditor !== ed) return
                 edit.invalidate()
-                edit.postDelayed(this, 150)
+                edit.postDelayed(this, 250)
             }
         }
         edit.post(redraw)
+        ed.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) { edit.invalidate() }
+        })
         cellEditor = ed
         cellDone = onDone
         // The first tap of a double tap opened this box, so the second one lands here: count the box opening as the first tap.
@@ -181,6 +186,9 @@ class PageHost(context: Context) : ScrollView(context) {
         ed.setSelection(ed.length())
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(ed, 0)
     }
+
+    /** Height of the text typed in the cell now (changes when a line is added or removed). */
+    fun cellContentHeight(): Int = cellEditor?.layout?.height ?: 0
 
     /** Follows the cell when its row grows or the table moves while typing. */
     fun moveCellEditor(r: android.graphics.RectF) {
