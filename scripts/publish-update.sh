@@ -107,20 +107,6 @@ if [ -d site-extra/dashboard ]; then # (also copies site-extra/reset, the passwo
   cp site-extra/assets/*.png "$T/site/"
   # The Privacy and Terms pages are kept in this repo (site-extra/pages) so they change together with the app.
   [ -d site-extra/pages ] && cp site-extra/pages/*.html "$T/site/"
-  # Home page sentences that said "no accounts / no analytics / only for updates" no longer match the app: replace them (does nothing once changed).
-  python3 - "$T/site/index.html" <<'PY'
-import sys, pathlib
-p = pathlib.Path(sys.argv[1])
-if p.exists():
-    t = p.read_text()
-    for old, new in (
-        ("the app only uses the internet when you ask it to check for updates.", "your documents are never uploaded. The app uses the internet only for update checks and news, anonymous usage counts, and, if you choose them, your account, the writing assistant and Pro."),
-        ("No accounts, ads or analytics, encrypted storage,", "No ads, encrypted storage, an optional account, anonymous usage counts you can switch off,"),
-        ("The app uses the internet only when you tap Check for updates. No accounts, no ads, no analytics.", "Your documents are never uploaded. The app uses the internet only for update checks, anonymous usage counts you can switch off, and, if you choose them, your account, the writing assistant and Pro. No ads."),
-    ):
-        t = t.replace(old, new)
-    p.write_text(t)
-PY
   python3 - "$T/site" <<'PY'
 import re, sys, pathlib
 d = pathlib.Path(sys.argv[1])
