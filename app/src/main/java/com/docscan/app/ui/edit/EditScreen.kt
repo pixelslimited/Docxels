@@ -4,6 +4,17 @@ import com.docscan.app.ui.SwitchRow
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -127,9 +138,39 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
     }
 }
 
+/** The scanned page. Pinch to zoom, drag to move around when zoomed in, double-tap to zoom in or back out. */
 @Composable
 private fun PreviewImage(bitmap: Bitmap?, modifier: Modifier = Modifier) {
-    Box(modifier, contentAlignment = Alignment.Center) {
+    var zoom by remember { mutableFloatStateOf(1f) }
+    var pan by remember { mutableStateOf(Offset.Zero) }
+    Box(
+        modifier
+            .clipToBounds()
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = { if (zoom > 1.01f) { zoom = 1f; pan = Offset.Zero } else zoom = 2.5f })
+            }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        val fingers = event.changes.count { it.pressed }
+                        // One finger only moves the page once it is zoomed in; otherwise the touch is left alone.
+                        if (fingers >= 2 || zoom > 1.01f) {
+                            val newZoom = (zoom * (if (fingers >= 2) event.calculateZoom() else 1f)).coerceIn(1f, 4f)
+                            val rel = event.calculateCentroid() - Offset(size.width / 2f, size.height / 2f)
+                            val moved = rel - (rel - pan) * (newZoom / zoom) + event.calculatePan()
+                            val maxX = size.width * (newZoom - 1f) / 2f
+                            val maxY = size.height * (newZoom - 1f) / 2f
+                            zoom = newZoom
+                            pan = Offset(moved.x.coerceIn(-maxX, maxX), moved.y.coerceIn(-maxY, maxY))
+                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
         if (bitmap == null) {
             CircularProgressIndicator()
         } else {
@@ -137,7 +178,9 @@ private fun PreviewImage(bitmap: Bitmap?, modifier: Modifier = Modifier) {
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = "Page preview",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = zoom; scaleY = zoom; translationX = pan.x; translationY = pan.y
+                },
             )
         }
     }
