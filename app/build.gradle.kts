@@ -115,6 +115,8 @@ dependencies {
     // Lossless PDF editing (merge / split / rotate / reorder / password). Pure Java, runs on the phone.
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    // QR codes and barcodes, read on the phone (model bundled, no download).
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     // Runs the U^2-Net-P subject model (downloaded once on demand, see update/CutOutModel.kt; source file models/u2netp.onnx) on the phone for background removal.
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

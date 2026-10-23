@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.RotateRight
@@ -35,6 +36,10 @@ import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -53,13 +58,15 @@ private class ToolDef(val icon: ImageVector, val label: String, val tint: Tint, 
 @Composable
 fun ToolsScreen(actions: Actions) {
     val t = DocxelsTheme.tints
-    fun planned(name: String) = { actions.soon(name) }
+    var qrOpen by remember { mutableStateOf(false) }
+    if (qrOpen) QrScannerDialog(onClose = { qrOpen = false })
 
     val scan = listOf(
         ToolDef(Icons.Default.DocumentScanner, "Document scan", t.violet, false, actions.scan),
         ToolDef(Icons.Default.Badge, "ID card", t.violet, false, actions.idCard),
         ToolDef(Icons.Default.PhotoLibrary, "Import images", t.violet, false, actions.importPhotos),
         ToolDef(Icons.Default.ViewModule, "Batch scan", t.violet, false, actions.scan),
+        ToolDef(Icons.Default.QrCodeScanner, "QR and barcode", t.violet, false, { qrOpen = true }),
     )
     val pdf = listOf(
         ToolDef(Icons.Default.FolderOpen, "Open PDF", t.blue, false, { actions.pdfTool("view") }),
