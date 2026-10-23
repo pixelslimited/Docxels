@@ -23,6 +23,7 @@ import com.docscan.app.ui.shell.MainShell
 import com.docscan.app.ui.write.WordEditorScreen
 import com.docscan.app.ui.write.WordViewModel
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 
 private const val HOME = "home"
@@ -39,13 +40,18 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
     val nav = rememberNavController()
     val incomingUri by incoming.collectAsState()
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    // Clearing the incoming file changes the effect's key, which would cancel the import half way (the file got saved but the
+    // screen never opened). The import therefore runs in a scope that outlives the key change.
+    val importScope = androidx.compose.runtime.rememberCoroutineScope()
     LaunchedEffect(incomingUri) {
         val uri = incomingUri ?: return@LaunchedEffect
         onIncomingHandled()
-        val route = Incoming.import(appContext, container, uri) { msg ->
-            android.os.Handler(android.os.Looper.getMainLooper()).post { android.widget.Toast.makeText(appContext, msg, android.widget.Toast.LENGTH_LONG).show() }
+        importScope.launch {
+            val route = Incoming.import(appContext, container, uri) { msg ->
+                android.os.Handler(android.os.Looper.getMainLooper()).post { android.widget.Toast.makeText(appContext, msg, android.widget.Toast.LENGTH_LONG).show() }
+            }
+            if (route != null) nav.navigate(route)
         }
-        if (route != null) nav.navigate(route)
     }
 
     var showIntro by androidx.compose.runtime.remember {
