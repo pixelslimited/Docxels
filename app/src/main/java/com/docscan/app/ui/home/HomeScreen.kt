@@ -252,12 +252,14 @@ private fun greeting(): String {
 /** The most recent document as a large card: a little page, its title and details, and a button to carry on. */
 @Composable
 private fun ContinueCard(item: LibraryItem, export: com.docscan.app.export.ExportStatus.State?, onClick: () -> Unit) {
+    var glance by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    if (glance) QuickGlance(item, onOpen = { glance = false; onClick() }, onClose = { glance = false })
     Column(
         Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(DocxelsTheme.brand.gradient).padding(20.dp),
     ) {
         Text("CONTINUE WHERE YOU STOPPED", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelLarge, letterSpacing = 1.sp)
         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            CardThumb(item)
+            CardThumb(item, onGlance = { glance = true })
             Column(Modifier.padding(start = 16.dp).weight(1f)) {
                 Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 2)
                 Text(
@@ -317,7 +319,7 @@ private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier, on
 }
 
 /** First pages already drawn, so Home does not redraw them every time it is shown. */
-private object CardThumbs {
+internal object CardThumbs {
     private val cache = object : android.util.LruCache<String, List<android.graphics.Bitmap>>(4) {}
     fun get(key: String): List<android.graphics.Bitmap>? = cache.get(key)
     fun put(key: String, pages: List<android.graphics.Bitmap>) { cache.put(key, pages) }
@@ -326,19 +328,20 @@ private object CardThumbs {
 }
 
 /** Real pictures of the document's first pages: scans, PDFs and Word documents alike. [publish] hears about each page as it is ready. */
-private suspend fun loadPages(
-    context: android.content.Context, container: com.docscan.app.AppContainer, item: LibraryItem, publish: (List<android.graphics.Bitmap>) -> Unit,
+internal suspend fun loadPages(
+    context: android.content.Context, container: com.docscan.app.AppContainer, item: LibraryItem,
+    max: Int = CardThumbs.MAX, side: Int = 360, publish: (List<android.graphics.Bitmap>) -> Unit,
 ): List<android.graphics.Bitmap> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
     val out = ArrayList<android.graphics.Bitmap>()
     fun add(b: android.graphics.Bitmap?) { if (b != null) { out += b; publish(out.toList()) } }
     runCatching {
         when (item.kind) {
             com.docscan.app.data.DocKind.SCAN ->
-                container.repository.pages(item.id).take(CardThumbs.MAX).forEach { add(runCatching { container.renderer.thumbnail(it) }.getOrNull()) }
+                container.repository.pages(item.id).take(max).forEach { add(runCatching { if (side <= 420) container.renderer.thumbnail(it) else container.renderer.render(it, side) }.getOrNull()) }
             com.docscan.app.data.DocKind.PDF -> {
                 val f = container.pdfs.open(item.id)
                 if (f != null) try {
-                    com.docscan.app.pdf.PdfPreview(f).use { pv -> for (i in 0 until minOf(pv.pageCount, CardThumbs.MAX)) add(pv.render(i, 360)) }
+                    com.docscan.app.pdf.PdfPreview(f).use { pv -> for (i in 0 until minOf(pv.pageCount, max)) add(pv.render(i, side)) }
                 } finally { f.delete() }
             }
             com.docscan.app.data.DocKind.DOCX -> {
@@ -348,7 +351,7 @@ private suspend fun loadPages(
                     val tmp = java.io.File.createTempFile("thumb", ".pdf", container.thumbDir())
                     try {
                         tmp.outputStream().use { com.docscan.app.export.PdfExport.write(context, doc.copy(blocks = doc.blocks.take(80)), it) }
-                        com.docscan.app.pdf.PdfPreview(tmp).use { pv -> for (i in 0 until minOf(pv.pageCount, CardThumbs.MAX)) add(pv.render(i, 360)) }
+                        com.docscan.app.pdf.PdfPreview(tmp).use { pv -> for (i in 0 until minOf(pv.pageCount, max)) add(pv.render(i, side)) }
                     } finally { tmp.delete() }
                 }
             }
@@ -359,7 +362,7 @@ private suspend fun loadPages(
 
 /** The Continue card's pages, alive: see [PageDeck]. */
 @Composable
-private fun CardThumb(item: LibraryItem) {
+private fun CardThumb(item: LibraryItem, onGlance: () -> Unit) {
     val container = com.docscan.app.LocalContainer.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val key = "${item.kind}:${item.id}:${item.modified}"
@@ -368,5 +371,5 @@ private fun CardThumb(item: LibraryItem) {
         val all = loadPages(context, container, item) { value = it }
         if (all.isNotEmpty()) CardThumbs.put(key, all)
     }
-    PageDeck(pages, "First page of ${item.title}")
+    PageDeck(pages, "First page of ${item.title}", onTap = onGlance)
 }

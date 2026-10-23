@@ -147,10 +147,10 @@ fun rememberDeckState(): DeckState {
 
 /**
  * The document's first pages as a living deck: the front page keeps turning over to show the next one, drag it any way
- * to revolve it (down or sideways, upside down included), tap to send the real pages flying. Pure Compose, no extra libraries.
+ * to revolve it (down or sideways, upside down included), tap to send the real pages flying and open a quick glance through the whole document. Pure Compose, no extra libraries.
  */
 @Composable
-fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modifier, state: DeckState = rememberDeckState()) {
+fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modifier, state: DeckState = rememberDeckState(), onTap: () -> Unit = {}) {
     val density = LocalDensity.current.density
     val n = pages.size
     val current by rememberUpdatedState(pages)
@@ -171,7 +171,7 @@ fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modi
         modifier
             .size(width = 100.dp, height = 124.dp)
             .zIndex(1f)
-            .pointerInput(state) { detectTapGestures(onTap = { state.fling(current) }) }
+            .pointerInput(state) { detectTapGestures(onTap = { state.fling(current); onTap() }) }
             .pointerInput(state) {
                 detectDragGestures(onDragEnd = { state.release() }, onDragCancel = { state.release() }) { change, drag ->
                     change.consume()
