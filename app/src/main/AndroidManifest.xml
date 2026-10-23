@@ -15,6 +15,8 @@
     <!-- Network is used for exactly one thing: the user-initiated "Check for updates" in Settings (see update/Updater.kt).
          Scanning, OCR, editing and exports never touch the network. CI fails if networking code appears outside update/. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lets Docxels tell you a new version is ready. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
     <uses-feature

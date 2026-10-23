@@ -93,6 +93,7 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // Camera (live preview, capture, live edge overlay)
     val camerax = "1.4.0"

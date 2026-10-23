@@ -59,3 +59,4 @@
 *|FIX|Lighter PDFs|Exported PDFs are now much smaller. Page pictures are saved as JPEG and the default size is Medium.
 *|FIX|Better automatic scans|Cleaner colour and black-and-white copies with no settings needed, and the page is found more reliably next to hands and other papers.
 *|FIX|Crop handles keep working|Dragging page corners and sides no longer freezes after the first adjustment.
+*|FREE|New version notice|Docxels now tells you about a new version within minutes, with a notification even when the app is closed.

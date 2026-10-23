@@ -1,6 +1,14 @@
 package com.docscan.app.ui.announce
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.Image
@@ -70,11 +78,31 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit, onOpenP
         if (!enabled || !manager.due()) return@LaunchedEffect
         manager.checked()
         manager.refresh()
-        update = runCatching { Updater(context.applicationContext).check() }.getOrNull()
         refreshed++
     }
 
-    LaunchedEffect(enabled, introDone, plan, refreshed, pending == null, session?.fullName) {
+    // A new build is noticed as soon as the app is opened or comes back to the front, and every 10 minutes while it is open.
+    var resumes by remember { mutableStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumes++ }
+    LaunchedEffect(enabled, resumes) {
+        if (!enabled) return@LaunchedEffect
+        while (true) {
+            runCatching { Updater(context.applicationContext).check() }.onSuccess { update = it }
+            delay(10 * 60 * 1000L)
+        }
+    }
+
+    // Android 13+ needs permission to show the "new version" notification; asked once, after the first-run intro.
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(enabled, introDone) {
+        if (!enabled || !introDone || manager.askedNotifications || Build.VERSION.SDK_INT < 33) return@LaunchedEffect
+        manager.askedNotifications = true
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            runCatching { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) }
+        }
+    }
+
+    LaunchedEffect(enabled, introDone, plan, refreshed, update?.versionCode, pending == null, session?.fullName) {
         if (!enabled || pending != null) return@LaunchedEffect
         val a = manager.next(plan?.pro == true, introDone)
         val today = System.currentTimeMillis() / 86_400_000L

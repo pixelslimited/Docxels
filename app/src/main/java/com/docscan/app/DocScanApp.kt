@@ -39,6 +39,7 @@ class DocScanApp : Application() {
         }
         enableEncryption()
         container = AppContainer(this)
+        runCatching { com.docscan.app.update.UpdateWatch.schedule(this) }
         thread(name = "docxels-housekeeping") {
             // Encrypt pages saved by older versions, and remove temp files an interrupted session left behind.
             SecureFiles.migrate(File(filesDir, "docs"))

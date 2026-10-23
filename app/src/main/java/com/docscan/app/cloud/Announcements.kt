@@ -44,6 +44,11 @@ class Announcements(private val context: Context) {
     }
 
     /** The build whose "update available" notice was already shown (or dismissed). */
+    /** Whether the one-time "allow notifications" question was already shown. */
+    var askedNotifications: Boolean
+        get() = prefs.getBoolean("asked_notifications", false)
+        set(v) = prefs.edit().putBoolean("asked_notifications", v).apply()
+
     var noticedUpdate: Long
         get() = prefs.getLong("noticed_update", 0L)
         set(v) = prefs.edit().putLong("noticed_update", v).apply()

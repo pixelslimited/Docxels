@@ -276,7 +276,7 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null, goal: 
             var announce by remember { mutableStateOf(container.ui.announcements) }
             ToggleRow(
                 "Announcements and update notices",
-                "Once a day Docxels checks for news and new versions and shows them as a pop-up. It also sends anonymous statistics: a random install code, build number, Android version, phone model, which tools were used and error codes. No name, email, documents or file names. Turn off to stay fully offline and send nothing.",
+                "Docxels checks for news once a day, and for new versions when you open it and about every 15 minutes in the background, then shows a pop-up or a notification. It also sends anonymous statistics: a random install code, build number, Android version, phone model, which tools were used and error codes. No name, email, documents or file names. Turn off to stay fully offline and send nothing.",
                 announce,
             ) { announce = it; container.ui.announcements = it }
 
