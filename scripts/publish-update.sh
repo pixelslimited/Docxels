@@ -105,6 +105,8 @@ if [ -d site-extra/dashboard ]; then # (also copies site-extra/reset, the passwo
   done
   # Docxels logo (the pixel "D"): icons, the site header mark and the cPanel copy list.
   cp site-extra/assets/*.png "$T/site/"
+  # The Privacy and Terms pages are kept in this repo (site-extra/pages) so they change together with the app.
+  [ -d site-extra/pages ] && cp site-extra/pages/*.html "$T/site/"
   python3 - "$T/site" <<'PY'
 import re, sys, pathlib
 d = pathlib.Path(sys.argv[1])
