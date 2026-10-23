@@ -82,3 +82,4 @@
 *|FREE|New scans folder|In Settings you can name a folder that every new scan goes into.
 *|FREE|Tap to open|Tap the pages on Continue where you stopped to open the document straight away.
 *|FREE|Tap to open|In Documents, tapping a file opens it straight away. The three dots hold share, move, rename and the rest.
+*|FREE|Open with Docxels|Word, PDF and text files opened from other apps now offer Docxels more reliably and open straight into editing or viewing.

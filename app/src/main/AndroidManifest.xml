@@ -51,8 +51,23 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/pdf" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/*" />
                 <data android:mimeType="image/*" />
+            </intent-filter>
+            <!-- Some file managers describe a file as "any type" and only the name tells what it is: match by extension, so Docxels is still offered. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.pdf" />
+                <data android:pathPattern=".*\\.PDF" />
+                <data android:pathPattern=".*\\.docx" />
+                <data android:pathPattern=".*\\.DOCX" />
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\.TXT" />
             </intent-filter>
             <!-- "Share to Docxels". -->
             <intent-filter>
@@ -60,7 +75,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/pdf" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/*" />
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
