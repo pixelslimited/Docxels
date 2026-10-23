@@ -53,6 +53,11 @@ class Announcements(private val context: Context) {
         get() = prefs.getLong("noticed_update", 0L)
         set(v) = prefs.edit().putLong("noticed_update", v).apply()
 
+    /** When "Remind me later" was chosen on a new-version notice: it is not shown again before this time (milliseconds). */
+    var updateRemindAt: Long
+        get() = prefs.getLong("update_remind_at", 0L)
+        set(v) = prefs.edit().putLong("update_remind_at", v).apply()
+
     /** The day (days since 1970) the "complete your profile" reminder was last shown, so it appears at most once a day. */
     var profileNudgeDay: Long
         get() = prefs.getLong("profile_nudge_day", 0L)

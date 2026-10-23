@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +51,9 @@ import com.docscan.app.cloud.Announcement
 import com.docscan.app.update.UpdateInfo
 import com.docscan.app.update.Updater
 import kotlinx.coroutines.delay
+
+/** How long "Remind me later" waits before the new-version notice returns. */
+private const val REMIND_LATER_MS = 4 * 60 * 60 * 1000L
 
 private sealed interface Pending {
     data class Message(val a: Announcement, val image: Bitmap?) : Pending
@@ -92,6 +96,7 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit, onOpenP
         if (!enabled) return@LaunchedEffect
         while (true) {
             runCatching { Updater(context.applicationContext).check() }.onSuccess { update = it }
+            refreshed++ // lets a "Remind me later" notice come back once its time has passed
             delay(10 * 60 * 1000L)
         }
     }
@@ -111,7 +116,7 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit, onOpenP
         val a = manager.next(plan?.pro == true, introDone)
         val today = System.currentTimeMillis() / 86_400_000L
         val needProfile = session != null && session?.fullName.isNullOrBlank() && introDone && manager.profileNudgeDay != today
-        val u = update?.takeIf { it.versionCode != manager.noticedUpdate }
+        val u = update?.takeIf { it.versionCode != manager.noticedUpdate && System.currentTimeMillis() >= manager.updateRemindAt }
         pending = when {
             a != null -> Pending.Message(a, a.imagePath?.let { manager.image(it) })
             needProfile -> { manager.profileNudgeDay = today; Pending.Profile }
@@ -137,6 +142,8 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit, onOpenP
             image = null, button = "Update now",
             onButton = { manager.noticedUpdate = p.info.versionCode; update = null; pending = null; onOpenUpdates() },
             onClose = { manager.noticedUpdate = p.info.versionCode; update = null; pending = null },
+            laterLabel = "Remind me later",
+            onLater = { manager.updateRemindAt = System.currentTimeMillis() + REMIND_LATER_MS; pending = null },
         )
         Pending.Profile -> MessageDialog(
             title = "Complete your profile",
@@ -150,7 +157,10 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit, onOpenP
 }
 
 @Composable
-private fun MessageDialog(title: String, body: String, image: Bitmap?, button: String?, onButton: () -> Unit, onClose: () -> Unit) {
+private fun MessageDialog(
+    title: String, body: String, image: Bitmap?, button: String?, onButton: () -> Unit, onClose: () -> Unit,
+    laterLabel: String? = null, onLater: () -> Unit = {},
+) {
     // Only the X closes it: tapping outside or pressing back leaves the message up, so it is never missed by accident.
     Dialog(onDismissRequest = onClose, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 6.dp) {
@@ -167,6 +177,7 @@ private fun MessageDialog(title: String, body: String, image: Bitmap?, button: S
                 }
                 Text(body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    if (laterLabel != null) TextButton(onClick = onLater) { Text(laterLabel) }
                     if (button != null) Button(onClick = onButton) { Text(button) }
                 }
             }
