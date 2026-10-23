@@ -42,12 +42,7 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     // A file opened from another app waits here until the terms are accepted (the effect below runs only after this).
     var termsOk by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf(
-            if (container.ui.termsAccepted.isEmpty() && !TermsGate.required(appContext, "")) {
-                container.ui.termsAccepted = "legacy"
-                true
-            } else container.ui.termsAccepted.isNotEmpty(),
-        )
+        androidx.compose.runtime.mutableStateOf(container.ui.termsAccepted == TermsGate.VERSION)
     }
     if (!termsOk) {
         TermsGateScreen(onAccept = { container.ui.termsAccepted = TermsGate.VERSION; termsOk = true })

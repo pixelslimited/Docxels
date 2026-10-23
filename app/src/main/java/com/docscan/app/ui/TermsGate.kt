@@ -1,7 +1,6 @@
 package com.docscan.app.ui
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -29,20 +28,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 /**
- * The terms and privacy policy a new person must accept before the app can be used. People who already had the app
- * before this screen existed are not asked: they are marked as having accepted the version that was in force.
+ * The terms and privacy policy everyone must accept before the app can be used: new people and people who already had
+ * the app alike. Raising [VERSION] asks everyone again.
  */
 object TermsGate {
     /** Change this when the terms or privacy policy change in a way people must agree to again. */
     const val VERSION = "2026-10"
     const val SITE = "https://docxels.pixelslimited.ng"
-
-    /** True when the screen has to be shown: nothing accepted yet, on a fresh install. */
-    fun required(context: Context, accepted: String): Boolean {
-        if (accepted.isNotEmpty()) return false
-        val info = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull() ?: return true
-        return info.firstInstallTime == info.lastUpdateTime
-    }
 }
 
 @Composable
