@@ -60,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -182,6 +183,7 @@ fun MainShell(
         bottomBar = { BottomBar(tab, onSelect = { tab = it }) },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize().swipeTabs(tab.ordinal, Tab.entries.size) { tab = Tab.entries[it] }) {
+            com.docscan.app.ui.cloud.ServiceBanner(container.cloud, Modifier.align(Alignment.TopCenter).zIndex(2f))
             com.docscan.app.ui.announce.AnnouncementHost(container, onOpenUpdates = { settingsGoal = com.docscan.app.ui.settings.SettingsGoal.UPDATE; tab = Tab.SETTINGS }, onOpenProfile = { settingsGoal = com.docscan.app.ui.settings.SettingsGoal.PROFILE; tab = Tab.SETTINGS })
             when (tab) {
                 Tab.HOME -> if (!loaded) com.docscan.app.ui.HomeSkeleton() else HomeScreen(

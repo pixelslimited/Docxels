@@ -64,7 +64,28 @@ class Cloud(context: Context) {
         else SecureFiles.write(file, JSONObject().put("email", s.email).put("access", s.access).put("refresh", s.refresh).put("exp", s.expiresAtSec).put("first", s.first).put("last", s.last).toString().toByteArray())
     }
 
-    private suspend fun call(method: String, path: String, body: JSONObject?, token: String?): Pair<Int, String> = withContext(Dispatchers.IO) {
+    private val connectivity = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+
+    private fun online(): Boolean = runCatching {
+        connectivity.getNetworkCapabilities(connectivity.activeNetwork)?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }.getOrDefault(true)
+
+    /** A tiny request that only asks our servers whether they are up; used while the services are down to notice when they are back. */
+    suspend fun probe() { runCatching { call("GET", "/auth/v1/health", null, null) } }
+
+    /** Every request goes through here so the top banner knows whether the services can be reached. */
+    private suspend fun call(method: String, path: String, body: JSONObject?, token: String?): Pair<Int, String> {
+        val result = try {
+            rawCall(method, path, body, token)
+        } catch (e: java.io.IOException) {
+            if (online()) ServiceStatus.failed() // a phone with no connection is not the same as our servers being down
+            throw e
+        }
+        if (result.first >= 500) ServiceStatus.failed() else ServiceStatus.succeeded()
+        return result
+    }
+
+    private suspend fun rawCall(method: String, path: String, body: JSONObject?, token: String?): Pair<Int, String> = withContext(Dispatchers.IO) {
         val c = URL(CloudConfig.URL + path).openConnection() as HttpURLConnection
         try {
             c.requestMethod = method

@@ -93,3 +93,4 @@
 *|FREE|Clearer pop-ups|Messages and update notices now appear as a big headline with one wide button, like a campaign pop-up.
 *|FREE|Updated privacy and terms|Our privacy policy and terms now describe accounts, the writing assistant, Pro and update checks.
 *|FREE|Delete your account|You can now delete your Docxels account from the Account box.
+*|FREE|Service status bar|If Docxels' online services are unreachable, a bar at the top says so, and turns into a Refresh button when they are back.
