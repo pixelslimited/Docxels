@@ -51,4 +51,4 @@
 *|FREE|Remove background on demand|The app is about 4 MB smaller: the helper that makes Remove background cut cleanly now downloads once, when you first use it. Choose Use basic to skip it.
 *|FREE|Update now works|The new-version pop-up now opens App updates and starts downloading by itself. Open Profile also takes you straight to Profile.
 *|FREE|Centred pop-ups|Menus that slid up from the bottom now open as pop-ups in the middle of the screen.
-*|FREE|Version count|Once a day, with the announcements check, Docxels sends a random code and its build number so we know which versions are in use. No name, email or documents. Switch it off in Settings.
+*|FREE|Anonymous statistics|Once a day, with the announcements check, Docxels sends a random code, build, Android version, phone model, which tools were used and error codes. No name, email, documents or file names. Switch it off in Settings.

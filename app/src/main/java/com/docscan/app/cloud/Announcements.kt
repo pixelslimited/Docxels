@@ -63,21 +63,28 @@ class Announcements(private val context: Context) {
         prefs.getString("install_id", null) ?: java.util.UUID.randomUUID().toString().also { prefs.edit().putString("install_id", it).apply() }
 
     /**
-     * Tells the Docxels server which build is installed, with the random install code, so the owner can see which
-     * versions are in use. Runs with the daily check and obeys the same Settings switch. Failures are ignored.
+     * Sends the anonymous usage ping (see [Analytics]): a random install code, the build number, Android version, phone
+     * brand and model, language, and counts of features used and errors seen since the last ping. No name, email,
+     * document or anything typed. Runs with the daily check and obeys the same Settings switch. Failures are ignored.
      */
     private fun ping() {
         runCatching {
             val code = context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode.toInt()
-            val c = URL(CloudConfig.URL + "/rest/v1/rpc/ping_install").openConnection() as HttpURLConnection
+            val (features, errors) = Analytics.snapshot()
+            val body = org.json.JSONObject()
+                .put("i", installId()).put("v", code).put("sdk", android.os.Build.VERSION.SDK_INT)
+                .put("brand", android.os.Build.MANUFACTURER).put("model", android.os.Build.MODEL)
+                .put("lang", java.util.Locale.getDefault().language)
+                .put("f", org.json.JSONObject(features)).put("e", org.json.JSONObject(errors))
+            val c = URL(CloudConfig.URL + "/functions/v1/ping").openConnection() as HttpURLConnection
             try {
                 c.requestMethod = "POST"; c.doOutput = true
                 c.connectTimeout = 15000; c.readTimeout = 20000
                 c.setRequestProperty("apikey", CloudConfig.PUBLISHABLE_KEY)
                 c.setRequestProperty("Authorization", "Bearer " + CloudConfig.PUBLISHABLE_KEY)
                 c.setRequestProperty("Content-Type", "application/json")
-                c.outputStream.use { it.write(org.json.JSONObject().put("p_install", installId()).put("p_version", code).toString().toByteArray()) }
-                c.responseCode
+                c.outputStream.use { it.write(body.toString().toByteArray()) }
+                if (c.responseCode in 200..299) Analytics.sent(features, errors)
             } finally { c.disconnect() }
         }
     }

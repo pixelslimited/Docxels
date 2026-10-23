@@ -55,6 +55,7 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
     fun work(label: String, replaces: Boolean, task: String, instruction: String = "", q: String = "") {
         val sc = controller.assistantScope()
         if (sc.text.isBlank()) { say("Write or select some text first."); return }
+        com.docscan.app.cloud.Analytics.track("assistant:$task")
         scope.launch {
             busy = true
             try {

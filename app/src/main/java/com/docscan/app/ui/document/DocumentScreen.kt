@@ -202,6 +202,7 @@ fun DocumentScreen(
             onDismiss = { showExport = false },
             onExport = { options, save, saveAs ->
                 showExport = false
+                com.docscan.app.cloud.Analytics.track("export:" + options.format.name.lowercase())
                 vm.export(options, save, saveAs)
             },
         )

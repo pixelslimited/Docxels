@@ -4,6 +4,7 @@ import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import com.docscan.app.cloud.Analytics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -151,24 +152,25 @@ fun MainShell(
         if (uri != null) vm.pdfToWord(context, uri, onOpenWord)
     }
 
+    fun t(name: String, f: () -> Unit): () -> Unit = { Analytics.track(name); f() }
     val actions = remember(vm) {
         Actions(
-            newDoc = { vm.newWord(onOpenWord) },
-            templates = { templateSheet = true },
-            newFromTemplate = { id -> if (id == "invoice") invoiceMaker = true else vm.newFromTemplate(id, onOpenWord) },
-            newInvoice = { invoiceMaker = true },
-            scan = { vm.startScan(onScanDoc) },
-            importMenu = { importSheet = true },
-            importPhotos = { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-            importWord = { word.launch(arrayOf(Mime.DOCX, "application/octet-stream")) },
-            scanToWord = { pick = Pick.SCAN_TO_WORD },
-            scanToExcel = { pick = Pick.SCAN_TO_EXCEL },
-            idCard = { vm.say("Scan the front, then the back. When you export, switch on “ID card layout” to get both sides on one page."); vm.startScan(onScanDoc) },
-            wordToPdf = { pick = Pick.WORD_TO_PDF },
+            newDoc = t("new_doc") { vm.newWord(onOpenWord) },
+            templates = t("templates") { templateSheet = true },
+            newFromTemplate = { id -> Analytics.track("template:$id"); if (id == "invoice") invoiceMaker = true else vm.newFromTemplate(id, onOpenWord) },
+            newInvoice = t("invoice") { invoiceMaker = true },
+            scan = t("scan") { vm.startScan(onScanDoc) },
+            importMenu = t("import_menu") { importSheet = true },
+            importPhotos = t("import_photos") { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            importWord = t("import_word") { word.launch(arrayOf(Mime.DOCX, "application/octet-stream")) },
+            scanToWord = t("scan_to_word") { pick = Pick.SCAN_TO_WORD },
+            scanToExcel = t("scan_to_excel") { pick = Pick.SCAN_TO_EXCEL },
+            idCard = t("id_card") { vm.say("Scan the front, then the back. When you export, switch on “ID card layout” to get both sides on one page."); vm.startScan(onScanDoc) },
+            wordToPdf = t("word_to_pdf") { pick = Pick.WORD_TO_PDF },
             soon = { name -> vm.say("$name is coming in a later update.") },
             openWord = onOpenWord,
-            pdfTool = onPdfTool,
-            pdfToWord = { pdfPicker.launch(arrayOf("application/pdf")) },
+            pdfTool = { id -> Analytics.track("pdf_tool:$id"); onPdfTool(id) },
+            pdfToWord = t("pdf_to_word") { pdfPicker.launch(arrayOf("application/pdf")) },
         )
     }
 

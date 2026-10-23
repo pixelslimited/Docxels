@@ -34,6 +34,7 @@ class CutOutGate internal constructor(private val context: Context, private val 
     private var error by mutableStateOf<String?>(null)
 
     fun run(action: () -> Unit) {
+        com.docscan.app.cloud.Analytics.track("remove_background")
         if (CutOutModel.ready(context) || declined) action() else { error = null; progress = -1f; pending = action }
     }
 
@@ -62,7 +63,8 @@ class CutOutGate internal constructor(private val context: Context, private val 
                     scope.launch {
                         val problem = CutOutModel.download(context) { progress = it }
                         progress = -1f
-                        if (problem == null) { pending = null; action() } else error = problem
+                        if (problem == null) { com.docscan.app.cloud.Analytics.track("cutout_model_downloaded"); pending = null; action() }
+                        else { com.docscan.app.cloud.Analytics.error("cutout_model_download_failed"); error = problem }
                     }
                 }) { Text(if (error != null) "Try again" else "Download") }
             },

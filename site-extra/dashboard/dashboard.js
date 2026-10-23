@@ -289,10 +289,10 @@ function csv(name, head, rows) {
 }
 
 /* ---------- shell ---------- */
-const NAV = [["Monitor", [["overview", "Overview", "home"], ["users", "Users", "users"], ["payments", "Payments", "card"], ["ai", "AI usage", "spark"], ["sync", "Cloud sync", "cloud"], ["releases", "Releases", "down"], ["versions", "App versions", "phone"]]],
+const NAV = [["Monitor", [["overview", "Overview", "home"], ["users", "Users", "users"], ["payments", "Payments", "card"], ["ai", "AI usage", "spark"], ["sync", "Cloud sync", "cloud"], ["releases", "Releases", "down"], ["versions", "Analytics", "phone"]]],
   ["Engage", [["messages", "Messages", "bell"]]],
   ["Protect", [["security", "Security", "shield"], ["audit", "Audit log", "list"]]]];
-const TITLES = { overview: "Overview", users: "Users", payments: "Payments", ai: "AI usage", sync: "Cloud sync", releases: "Releases", versions: "App versions", messages: "Messages", security: "Security", audit: "Audit log" };
+const TITLES = { overview: "Overview", users: "Users", payments: "Payments", ai: "AI usage", sync: "Cloud sync", releases: "Releases", versions: "Analytics", messages: "Messages", security: "Security", audit: "Audit log" };
 function shell() {
   const root = el("div", { class: "app" });
   const side = el("aside", { class: "side" }, brand());
@@ -462,22 +462,33 @@ const VIEWS = {
       el("div", { class: "grid g-kpi" }, kpi("Total downloads", fmtN(sum(rows, (r) => r.value)), "across listed releases", null, "c5", "down"), kpi("Releases", fmtN(d.releases.length), "most recent", null, "c1", "doc")),
       card("Downloads per release", hbars(rows, fmtN, "c5")),
       table([["Release", (r) => r.tag], ["Published", (r) => fmtD(r.published_at)], ["Downloads", (r) => fmtN(sum(r.assets, (a) => a.downloads))], ["Files", (r) => r.assets.map((a) => a.name + " (" + fmtB(a.size) + ")").join(", ")]], d.releases),
-      el("p", { class: "mute" }, "These are download counts only. Installs and versions in use are on the App versions page."),
+      el("p", { class: "mute" }, "These are download counts only. Installs and versions in use are on the Analytics page."),
     ];
   },
   async versions() {
     const d = await api("versions");
-    const rows = d.by_version.map((r) => ({ label: "Build " + r.version_code, value: Number(r.installs) }));
+    const top = (rows, empty) => (rows && rows.length ? hbars(rows.map((r) => ({ label: r.label, value: Number(r.n) })), fmtN, "c1") : el("p", { class: "mute" }, empty));
+    const none = "Nothing reported yet.";
+    const builds = d.by_version.map((r) => ({ label: "Build " + r.version_code, value: Number(r.installs) }));
     return [
       el("div", { class: "grid g-kpi" },
         kpi("Phones seen", fmtN(d.installs_total), "since counting began", null, "c1", "phone"),
         kpi("Active, last 7 days", fmtN(d.active_7d), "opened the app", null, "c5", "phone"),
         kpi("Active, last 30 days", fmtN(d.active_30d), "opened the app", null, "c2", "phone"),
         kpi("New, last 7 days", fmtN(d.new_7d), "first seen", null, "c3", "phone")),
-      card("Builds in use (last 30 days)", rows.length ? hbars(rows, fmtN, "c1") : el("p", { class: "mute" }, "No phones have reported yet. Counts start when people install a build that includes the daily check.")),
-      el("p", { class: "mute" }, "Each phone sends a random install code and its build number about once a day, only when Announcements and update notices is on in Settings. There is no name, email, device id or document data. Phones that turned the switch off are not counted, so treat the numbers as a floor."),
+      card("Active phones per day (last 14 days)", top(d.daily_active, none)),
+      card("Builds in use (last 30 days)", builds.length ? hbars(builds, fmtN, "c1") : el("p", { class: "mute" }, none)),
+      card("Features used (last 30 days)", top(d.features, none)),
+      card("Errors and crashes (last 30 days)", d.errors && d.errors.length ? table([["Code", (r) => r.label], ["Build", (r) => String(r.version_code)], ["Times", (r) => fmtN(Number(r.n))]], d.errors) : el("p", { class: "mute" }, "No errors reported.")),
+      card("Android versions", top(d.by_android, none)),
+      card("Phone brands", top(d.by_brand, none)),
+      card("Phone models", top(d.by_model, none)),
+      card("Countries", top(d.by_country, none)),
+      card("Languages", top(d.by_lang, none)),
+      el("p", { class: "mute" }, "Each phone sends, about once a day and only while Announcements and update notices is on in Settings: a random install code, its build number, Android version, phone brand and model, language, how many times each feature was used and short error codes. Never a name, email, document or file name; the country comes from the network address and the address itself is not kept. Phones that turned the switch off are not counted, so treat the numbers as a floor. Limits per network address and per day make large fake counts hard but not impossible."),
     ];
   },
+
   async messages() {
     let data = await api("", { action: "announce_list" });
     const holder = el("div", { class: "grid g-2" });

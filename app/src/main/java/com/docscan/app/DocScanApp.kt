@@ -30,6 +30,13 @@ class DocScanApp : Application() {
         }
         com.docscan.app.ui.write.WordFonts.init(this)
         com.docscan.app.imaging.BackgroundRemover.init(this)
+        com.docscan.app.cloud.Analytics.init(this)
+        // A crash is counted by type and place in Docxels' code only (no message, no data), then Android handles it as usual.
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
+            runCatching { com.docscan.app.cloud.Analytics.error(com.docscan.app.cloud.Analytics.crashCode(e)) }
+            previousHandler?.uncaughtException(thread, e)
+        }
         enableEncryption()
         container = AppContainer(this)
         thread(name = "docxels-housekeeping") {
