@@ -52,6 +52,11 @@ class DocumentViewModel(private val container: AppContainer, private val docId: 
         viewModelScope.launch { repo.rotate(page, 90) }
     }
 
+    /** Turns every page a quarter turn clockwise (for a batch that was photographed sideways). */
+    fun rotateAll() {
+        viewModelScope.launch { repo.pages(docId).forEach { repo.rotate(it, 90) } }
+    }
+
     fun duplicate(page: PageEntity) {
         viewModelScope.launch { runCatching { repo.duplicatePage(page) }.onFailure { com.docscan.app.cloud.Analytics.error("duplicate_page_failed") } }
     }

@@ -112,6 +112,9 @@ fun DocumentScreen(
                     IconButton(onClick = vm::autoArrange, enabled = pages.isNotEmpty()) {
                         Icon(Icons.Default.AutoFixHigh, contentDescription = "Auto-arrange pages")
                     }
+                    IconButton(onClick = vm::rotateAll, enabled = pages.isNotEmpty()) {
+                        Icon(Icons.Default.RotateRight, contentDescription = "Rotate all pages")
+                    }
                     IconButton(onClick = { vm.convertToWord(onOpenWord) }, enabled = pages.isNotEmpty() && busyLabel == null) {
                         Icon(Icons.Default.Description, contentDescription = "Convert to an editable Word document")
                     }
@@ -259,7 +262,7 @@ private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean
                     )
                 }
             }
-            if (options.format == DocFormat.PDF || options.format == DocFormat.JPEG || options.format == DocFormat.PNG) {
+            if (options.format == DocFormat.PDF || options.format == DocFormat.JPEG || options.format == DocFormat.PNG || options.format == DocFormat.ZIP) {
                 Text("Picture size", style = MaterialTheme.typography.labelLarge)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     com.docscan.app.export.ImageSize.entries.forEach { size ->
@@ -281,6 +284,7 @@ private fun ExportSheet(onDismiss: () -> Unit, onExport: (ExportOptions, Boolean
                     "All text from the pages (OCR) in one plain .txt file.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                DocFormat.ZIP -> Text("All pages as pictures in one .zip file.", style = MaterialTheme.typography.bodySmall)
                 else -> Text("One image file per page.", style = MaterialTheme.typography.bodySmall)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {

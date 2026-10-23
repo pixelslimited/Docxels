@@ -31,6 +31,7 @@ object Mime {
     const val PNG = "image/png"
     const val TXT = "text/plain"
     const val RTF = "application/rtf"
+    const val ZIP = "application/zip"
 }
 
 enum class DocFormat(val label: String) {
@@ -39,6 +40,7 @@ enum class DocFormat(val label: String) {
     TXT("Text"),
     JPEG("Image (JPEG)"),
     PNG("Image (PNG)"),
+    ZIP("Images (ZIP)"),
 }
 
 /** How large exported page pictures are (longer side in pixels). Smaller sizes make smaller files for email and WhatsApp. */
@@ -80,6 +82,7 @@ class ExportManager(
             DocFormat.TXT -> ExportResult(listOf(textFile(pages, base)), Mime.TXT)
             DocFormat.JPEG -> ExportResult(images(pages, base, png = false, side = options.size.side), Mime.JPEG)
             DocFormat.PNG -> ExportResult(images(pages, base, png = true, side = options.size.side), Mime.PNG)
+            DocFormat.ZIP -> ExportResult(listOf(zipImages(pages, base, options.size.side)), Mime.ZIP)
         }
     }
 
@@ -224,6 +227,24 @@ class ExportManager(
                 file
             }
         }
+
+    /** All pages as JPEG pictures in one .zip file: one file to send instead of many. */
+    private suspend fun zipImages(pages: List<PageEntity>, base: String, side: Int): File = withContext(Dispatchers.IO) {
+        val file = File(dir, "$base.zip")
+        java.util.zip.ZipOutputStream(FileOutputStream(file)).use { zip ->
+            pages.forEachIndexed { index, page ->
+                val bitmap = renderer.render(page, side)
+                try {
+                    zip.putNextEntry(java.util.zip.ZipEntry("${base}_${index + 1}.jpg"))
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, zip)
+                    zip.closeEntry()
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+        }
+        file
+    }
 
     // ---- Tables -------------------------------------------------------------------------------
 

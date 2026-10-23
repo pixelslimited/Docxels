@@ -151,7 +151,7 @@ class Cloud(context: Context) {
         val body = JSONObject().put("task", task).put("text", text).put("instruction", instruction).put("question", question)
         val (code, resp) = call("POST", "/functions/v1/ai", body, token())
         if (code in 200..299) return JSONObject(resp).getString("result")
-        throw CloudException(friendly(resp), limitReached = code == 429)
+        throw CloudException(friendly(resp), limitReached = code == 429 || code == 403)
     }
 
     suspend fun checkWriting(text: String): List<WritingIssue> {

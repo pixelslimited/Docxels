@@ -22,6 +22,7 @@ object SaveAs {
         "rtf" -> "application/rtf"
         "jpg", "jpeg" -> Mime.JPEG
         "png" -> "image/png"
+        "zip" -> Mime.ZIP
         else -> "application/octet-stream"
     }
 

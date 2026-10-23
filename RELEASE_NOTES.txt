@@ -61,3 +61,5 @@
 *|FIX|Crop handles keep working|Dragging page corners and sides no longer freezes after the first adjustment.
 *|FREE|New version notice|Docxels now tells you about a new version within minutes, with a notification even when the app is closed.
 *|FREE|Automatic clean-up|Fingers, objects and folded corners are removed for you. Manual tools moved to Enhance, Fine-tune.
+*|PRO|Write with AI|Describe a letter, email, application or report and get a finished draft to insert into your document.
+*|FREE|ZIP export and rotate all|Send all pages as one ZIP, and turn every page at once.

@@ -4,6 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,7 +37,7 @@ import com.docscan.app.cloud.CloudException
 import com.docscan.app.ui.cloud.AccountDialog
 import kotlinx.coroutines.launch
 
-private class Proposal(val title: String, val text: String, val start: Int, val end: Int, val original: String, val replaces: Boolean)
+private class Proposal(val title: String, val text: String, val start: Int, val end: Int, val original: String, val replaces: Boolean, val insert: Boolean = false)
 
 /** The writing assistant: rewrite, fix, shorten, translate, clean scanned text, check writing, summarise and ask. Runs only on tap. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +54,12 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
     var askOpen by remember { mutableStateOf(false) }
     var question by remember { mutableStateOf("") }
     var account by remember { mutableStateOf(false) }
+    var writeOpen by remember { mutableStateOf(false) }
+    var kind by remember { mutableStateOf("Formal letter") }
+    var tone by remember { mutableStateOf("Formal") }
+    var brief by remember { mutableStateOf("") }
+    var from by remember { mutableStateOf("") }
+    var to by remember { mutableStateOf("") }
 
     fun work(label: String, replaces: Boolean, task: String, instruction: String = "", q: String = "") {
         val sc = controller.assistantScope()
@@ -63,6 +72,29 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
                 proposal = Proposal(label, out, sc.start, sc.end, sc.text, replaces)
             } catch (e: CloudException) {
                 say(e.message ?: "The assistant could not answer.")
+                if (e.limitReached) account = true
+            } catch (e: Exception) {
+                say("Could not reach the assistant. Check your connection.")
+            }
+            busy = false
+        }
+    }
+
+    fun writeWithAi() {
+        if (brief.isBlank()) return
+        com.docscan.app.cloud.Analytics.track("assistant:write")
+        val instruction = buildString {
+            append("Kind of document: ").append(kind).append(". Tone: ").append(tone).append('.')
+            if (from.isNotBlank()) append(" From: ").append(from.trim().take(300)).append('.')
+            if (to.isNotBlank()) append(" To: ").append(to.trim().take(300)).append('.')
+        }
+        scope.launch {
+            busy = true
+            try {
+                val out = cloud.ai("write", brief.trim(), instruction).trim()
+                proposal = Proposal("Your $kind", out, 0, 0, "", replaces = false, insert = true)
+            } catch (e: CloudException) {
+                say(e.message ?: "The assistant could not write it.")
                 if (e.limitReached) account = true
             } catch (e: Exception) {
                 say("Could not reach the assistant. Check your connection.")
@@ -93,6 +125,7 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
 
     class Act(val label: String, val hint: String, val run: () -> Unit)
     val acts = listOf(
+        Act("Write with AI (Pro)", "Describe it and get a finished letter, email, application or report") { writeOpen = true },
         Act("Check writing", "Underline spelling, grammar and clarity problems; tap one to fix it") { checkWriting() },
         Act("Fix spelling and grammar", "Correct mistakes only, keep your wording") { work("Corrected text", true, "fix") },
         Act("Improve writing", "Clearer and smoother, same meaning") { work("Improved text", true, "rewrite", "Improve clarity, flow and tone. Keep the meaning.") },
@@ -145,6 +178,33 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
         dismissButton = { TextButton(onClick = { askOpen = false }) { Text("Cancel") } },
     )
 
+    if (writeOpen) AlertDialog(
+        onDismissRequest = { writeOpen = false },
+        title = { Text("Write with AI") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("Kind of document", style = MaterialTheme.typography.labelMedium)
+                androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                    listOf("Formal letter", "Email", "Application", "Complaint", "Request", "Resignation", "Recommendation", "Report", "Proposal", "Speech").forEach { k ->
+                        FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(k) })
+                    }
+                }
+                Text("Tone", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                    listOf("Formal", "Friendly", "Polite and firm", "Persuasive", "Apologetic", "Grateful").forEach { t ->
+                        FilterChip(selected = tone == t, onClick = { tone = t }, label = { Text(t) })
+                    }
+                }
+                OutlinedTextField(brief, { brief = it }, label = { Text("What should it say?") }, minLines = 3, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                OutlinedTextField(from, { from = it }, label = { Text("From: your name and address (optional)") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                OutlinedTextField(to, { to = it }, label = { Text("To: recipient and address (optional)") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                Text("Check names, dates and amounts before you send. Missing details appear in [square brackets].", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+            }
+        },
+        confirmButton = { TextButton(enabled = brief.isNotBlank() && !busy, onClick = { writeOpen = false; writeWithAi() }) { Text("Write it") } },
+        dismissButton = { TextButton(onClick = { writeOpen = false }) { Text("Cancel") } },
+    )
+
     if (account) AccountDialog(cloud) { account = false }
 
     proposal?.let { p ->
@@ -153,7 +213,8 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
             title = { Text(p.title) },
             text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(p.text) } },
             confirmButton = {
-                if (p.replaces) TextButton(onClick = {
+                if (p.insert) TextButton(onClick = { controller.insertText(p.text); proposal = null; onDismiss() }) { Text("Insert into document") }
+                else if (p.replaces) TextButton(onClick = {
                     // Only replace if the text underneath has not changed since it was sent.
                     if (controller.textBetween(p.start, p.end).replace(CHIP_CHAR, ' ') == p.original) { controller.replaceRange(p.start, p.end, p.text); proposal = null; onDismiss() }
                     else { say("The text changed while the assistant was working. Run it again."); proposal = null }
@@ -163,7 +224,15 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
                     say("Copied."); proposal = null
                 }) { Text("Copy") }
             },
-            dismissButton = { TextButton(onClick = { proposal = null }) { Text(if (p.replaces) "Keep mine" else "Close") } },
+            dismissButton = {
+                if (p.insert) Row {
+                    TextButton(onClick = {
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Docxels", p.text))
+                        say("Copied."); proposal = null
+                    }) { Text("Copy") }
+                    TextButton(onClick = { proposal = null }) { Text("Discard") }
+                } else TextButton(onClick = { proposal = null }) { Text(if (p.replaces) "Keep mine" else "Close") }
+            },
         )
     }
 }
