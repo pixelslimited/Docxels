@@ -73,3 +73,4 @@
 *|FREE|Alignment on the quick bar|Align left, centre, right or justify from the quick bar, before the highlighter and text colour.
 *|FREE|Cleaner paper edges|Grey strips, cream patches and torn fringes around the page now turn paper white.
 *|FREE|QR and barcode reader|Tools, Scan: point the camera at a code, then open, copy or share it. Can read a picture too.
+*|FREE|Scan credit|Exported scan pages carry a small "Scanned with Docxels by Pixels" line with the logos, bottom-left.

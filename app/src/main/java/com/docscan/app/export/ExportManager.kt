@@ -107,8 +107,9 @@ class ExportManager(
                 pages.forEachIndexed { index, page ->
                     val bitmap = renderer.render(page, side)
                     val text = if (searchable) runCatching { ocr.recognize(bitmap) }.getOrNull() else null
-                    drawPdfPage(document, bitmap, index + 1, a4, text)
-                    bitmap.recycle()
+                    val stamped = Watermark.stamp(context, bitmap)
+                    drawPdfPage(document, stamped, index + 1, a4, text)
+                    stamped.recycle()
                 }
                 FileOutputStream(file).use { document.writeTo(it) }
             } finally {
@@ -218,7 +219,7 @@ class ExportManager(
     private suspend fun images(pages: List<PageEntity>, base: String, png: Boolean, side: Int = EXPORT_SIDE): List<File> =
         withContext(Dispatchers.IO) {
             pages.mapIndexed { index, page ->
-                val bitmap = renderer.render(page, side)
+                val bitmap = Watermark.stamp(context, renderer.render(page, side))
                 val file = File(dir, "${base}_${index + 1}.${if (png) "png" else "jpg"}")
                 FileOutputStream(file).use {
                     bitmap.compress(if (png) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 92, it)
@@ -233,7 +234,7 @@ class ExportManager(
         val file = File(dir, "$base.zip")
         java.util.zip.ZipOutputStream(FileOutputStream(file)).use { zip ->
             pages.forEachIndexed { index, page ->
-                val bitmap = renderer.render(page, side)
+                val bitmap = Watermark.stamp(context, renderer.render(page, side))
                 try {
                     zip.putNextEntry(java.util.zip.ZipEntry("${base}_${index + 1}.jpg"))
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 90, zip)
