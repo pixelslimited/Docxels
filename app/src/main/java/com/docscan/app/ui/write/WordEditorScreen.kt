@@ -216,6 +216,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var tick by remember { mutableIntStateOf(0) }
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    /** A letterhead (false) or signature (true) waiting for its details before it is kept for reuse. */
+    var pendingKeep by remember { mutableStateOf<Pair<Boolean, ByteArray>?>(null) }
     var findOpen by remember { mutableStateOf(false) }
     var pageOpen by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
@@ -361,9 +363,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                         out.toByteArray()
                     }
                     bmp.recycle()
-                    val store = com.docscan.app.store.SavedAssets(context, "letterheads")
-                    store.add("Letterhead ${store.list().size + 1}", bytes)
-                    snackbar.showSnackbar("Also kept in My letterheads.")
+                    pendingKeep = false to bytes
                 }
             }
         }
@@ -371,17 +371,14 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var savedPicker by remember { mutableStateOf<Boolean?>(null) }
     /** A new signature (drawn or from a picture) is also kept in Settings > Signatures so it can be used again anywhere. */
     fun keepSignature(bytes: ByteArray) {
-        runCatching {
-            val store = com.docscan.app.store.SavedAssets(context, "signatures")
-            store.add("Signature ${store.list().size + 1}", bytes)
-        }
+        pendingKeep = true to bytes
     }
     fun placeSignature(block: ImageBlock, keep: Boolean = false) {
         val found = controller.insertSignature(block, page.contentWidthTwips)
         if (keep) keepSignature(block.bytes)
         scope.launch {
             val base = if (found) "Signature placed on the signing line." else "No signing line found. Drag the signature where you want it."
-            snackbar.showSnackbar(if (keep) "$base Also kept in My signatures." else base)
+            snackbar.showSnackbar(base)
         }
     }
     var signSource by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -824,11 +821,17 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                 placeSignature(ImageBlock(bytes, "png", tw, (tw.toLong() * h / w.coerceAtLeast(1)).toInt().coerceAtLeast(200), Align.LEFT, com.docscan.app.core.word.ImageWrap.IN_FRONT), keep = true)
             },
             onDismiss = { signPad = false },
-            onSave = { bytes ->
-                val store = com.docscan.app.store.SavedAssets(context, "signatures")
-                store.add("Signature ${store.list().size + 1}", bytes)
-            },
+            onSave = { bytes -> pendingKeep = true to bytes },
         )
+    }
+    pendingKeep?.let { (isSignature, bytes) ->
+        com.docscan.app.ui.settings.AssetDetailsDialog(isSignature, if (isSignature) "Keep this signature" else "Keep this letterhead", null, "Keep",
+            onDone = { n, c, p ->
+                runCatching { com.docscan.app.store.SavedAssets(context, if (isSignature) "signatures" else "letterheads").add(n, bytes, c, p) }
+                pendingKeep = null
+                scope.launch { snackbar.showSnackbar(if (isSignature) "Kept in My signatures." else "Kept in My letterheads.") }
+            },
+            onDismiss = { pendingKeep = null })
     }
 
     if (renaming) {

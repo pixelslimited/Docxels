@@ -56,11 +56,18 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
     var account by remember { mutableStateOf(false) }
     var writeOpen by remember { mutableStateOf(false) }
     var kind by remember { mutableStateOf("Let AI decide") }
-    // Saved letterheads give the company; saved signatures give who signs. The newest of each is chosen at first.
-    val letterheads = remember { com.docscan.app.store.SavedAssets(context, "letterheads").list().map { it.name }.filter { it != "Untitled" } }
-    val signers = remember { com.docscan.app.store.SavedAssets(context, "signatures").list().map { it.name }.filter { it != "Untitled" } }
-    var company by remember { mutableStateOf(letterheads.firstOrNull()) }
-    var signer by remember { mutableStateOf(signers.firstOrNull()) }
+    // Saved letterheads give the company name; saved signatures give the signer, company and position. Only items with
+    // their details filled in are used. "Auto" lets the AI choose from what the user writes.
+    val letterheads = remember {
+        com.docscan.app.store.SavedAssets(context, "letterheads").list()
+            .filter { it.name != "Untitled" && !it.name.matches(Regex("Letterhead \\d+")) }.map { it.name }.take(10)
+    }
+    val signers = remember {
+        com.docscan.app.store.SavedAssets(context, "signatures").list()
+            .filter { it.name != "Untitled" && it.company.isNotBlank() && it.position.isNotBlank() }.take(10)
+    }
+    var company by remember { mutableStateOf(AUTO) }
+    var signer by remember { mutableStateOf(AUTO) }
     var brief by remember { mutableStateOf("") }
     var from by remember { mutableStateOf("") }
     var to by remember { mutableStateOf("") }
@@ -89,9 +96,20 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
         com.docscan.app.cloud.Analytics.track("assistant:write")
         val instruction = buildString {
             append("Kind of document: ").append(kind).append('.')
-            company?.let { append(" Company (from the saved letterhead): ").append(it).append('.') }
-            signer?.let { append(" Signed by (from the saved signature): ").append(it).append('.') }
-            if (company == null && from.isNotBlank()) append(" From: ").append(from.trim().take(300)).append('.')
+            when {
+                company == AUTO && letterheads.isNotEmpty() ->
+                    append(" Saved companies (pick the one the description is about; if unclear use the first): ").append(letterheads.joinToString(" | ")).append('.')
+                company != AUTO && company != NONE -> append(" Company (from the saved letterhead): ").append(company).append('.')
+            }
+            when {
+                signer == AUTO && signers.isNotEmpty() ->
+                    append(" Saved signers (name; position; company; pick the one the description is about, or a signer of the chosen company): ")
+                        .append(signers.joinToString(" | ") { "${it.name}; ${it.position}; ${it.company}" }).append('.')
+                signer != AUTO && signer != NONE -> signers.firstOrNull { it.name == signer }?.let {
+                    append(" Signed by (from the saved signature): ").append(it.name).append("; ").append(it.position).append("; ").append(it.company).append('.')
+                }
+            }
+            if ((company == NONE || letterheads.isEmpty()) && from.isNotBlank()) append(" From: ").append(from.trim().take(300)).append('.')
             if (to.isNotBlank()) append(" To: ").append(to.trim().take(300)).append('.')
         }
         scope.launch {
@@ -196,21 +214,23 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
                     }
                 }
                 if (letterheads.isNotEmpty()) {
-                    Text("Company (from your letterheads)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                    Text("Company (Auto picks it from what you write)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
                     androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = company == null, onClick = { company = null }, label = { Text("None") })
+                        FilterChip(selected = company == AUTO, onClick = { company = AUTO }, label = { Text("Auto") })
                         letterheads.forEach { n -> FilterChip(selected = company == n, onClick = { company = n }, label = { Text(n) }) }
+                        FilterChip(selected = company == NONE, onClick = { company = NONE }, label = { Text("None") })
                     }
                 }
                 if (signers.isNotEmpty()) {
-                    Text("Signed by (from your signatures)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                    Text("Signed by (Auto picks it from what you write)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
                     androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = signer == null, onClick = { signer = null }, label = { Text("None") })
-                        signers.forEach { n -> FilterChip(selected = signer == n, onClick = { signer = n }, label = { Text(n) }) }
+                        FilterChip(selected = signer == AUTO, onClick = { signer = AUTO }, label = { Text("Auto") })
+                        signers.forEach { g -> FilterChip(selected = signer == g.name, onClick = { signer = g.name }, label = { Text(g.name) }) }
+                        FilterChip(selected = signer == NONE, onClick = { signer = NONE }, label = { Text("None") })
                     }
                 }
                 OutlinedTextField(brief, { brief = it }, label = { Text("What should it say?") }, minLines = 3, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                if (company == null) OutlinedTextField(from, { from = it }, label = { Text("From: your name and address (optional)") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                if (company == NONE || letterheads.isEmpty()) OutlinedTextField(from, { from = it }, label = { Text("From: your name and address (optional)") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                 OutlinedTextField(to, { to = it }, label = { Text("To: recipient and address (optional)") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                 Text("The tone is chosen for you. Check names, dates and amounts before you send. Missing details appear in [square brackets]. Add your signature picture on the blank lines above your name.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
             }
@@ -250,3 +270,6 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
         )
     }
 }
+
+private const val AUTO = "\u0000auto"
+private const val NONE = "\u0000none"

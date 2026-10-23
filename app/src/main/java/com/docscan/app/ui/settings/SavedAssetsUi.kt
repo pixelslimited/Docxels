@@ -115,7 +115,12 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Thumb(store, item, signature, Modifier.width(110.dp))
-                Text(item.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                Column(Modifier.weight(1f)) {
+                    Text(item.name, style = MaterialTheme.typography.bodyMedium)
+                    val sub = if (signature) listOf(item.position, item.company).filter { it.isNotBlank() }.joinToString(", ") else ""
+                    if (signature && sub.isBlank()) Text("Tap to add position and company", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    else if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         OutlinedButton(onClick = { picker.launch(PageSources.MIMES) }) {
@@ -124,9 +129,9 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
         }
     }
     pendingBytes?.let { bytes ->
-        NameDialog("Name this $word", "${word.replaceFirstChar { it.uppercase() }} ${items.size + 1}", "Save",
-            onDone = { n ->
-                store.add(n, bytes); items = store.list(); pendingBytes = null
+        AssetDetailsDialog(signature, "Add this $word", null, "Save",
+            onDone = { n, c, p ->
+                store.add(n, bytes, c, p); items = store.list(); pendingBytes = null
                 say("Saved as ${SavedAssets.cleanName(n)}. Insert it from the editor's ${if (signature) "Signature" else "Letterhead"} menu.")
             },
             onDismiss = { pendingBytes = null })
@@ -145,7 +150,7 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
                         modifier = Modifier.clickable { acting = null; run() },
                     )
                 }
-                Act("Rename", Icons.Default.Edit) { renaming = item }
+                Act("Edit details", Icons.Default.Edit) { renaming = item }
                 Act("Save to the phone", Icons.Default.SaveAlt) {
                     val bytes = store.bytes(item)
                     if (bytes == null) say("Could not read it.") else {
@@ -160,8 +165,8 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
         }
     }
     renaming?.let { item ->
-        NameDialog("Rename $word", item.name, "Rename",
-            onDone = { n -> store.rename(item, n); items = store.list(); renaming = null },
+        AssetDetailsDialog(signature, "Edit details", item, "Save",
+            onDone = { n, c, p -> store.update(item, n, c, p); items = store.list(); renaming = null },
             onDismiss = { renaming = null })
     }
     source?.let { src ->
@@ -169,14 +174,37 @@ fun SavedAssetsPanel(signature: Boolean, say: (String) -> Unit) {
     }
 }
 
+/**
+ * Asks for what the writing assistant needs to know about a kept letterhead or signature. A letterhead needs its company
+ * name; a signature needs the person's name, their company and their position. Nothing is saved until these are filled in.
+ */
 @Composable
-private fun NameDialog(title: String, initial: String, action: String, onDone: (String) -> Unit, onDismiss: () -> Unit) {
-    var text by remember { mutableStateOf(initial) }
+fun AssetDetailsDialog(
+    signature: Boolean, title: String, initial: SavedAssets.Item?, action: String,
+    onDone: (name: String, company: String, position: String) -> Unit, onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(initial?.name?.takeIf { it != "Untitled" && !it.matches(Regex("(Letterhead|Signature) \\d+")) } ?: "") }
+    var company by remember { mutableStateOf(initial?.company ?: "") }
+    var position by remember { mutableStateOf(initial?.position ?: "") }
+    val ok = name.isNotBlank() && (!signature || (company.isNotBlank() && position.isNotBlank()))
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { androidx.compose.material3.OutlinedTextField(text, { text = it.take(40) }, singleLine = true, label = { Text("Name") }) },
-        confirmButton = { TextButton(onClick = { onDone(text) }) { Text(action) } },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.OutlinedTextField(name, { name = it.take(40) }, singleLine = true,
+                    label = { Text(if (signature) "Name of the person (required)" else "Company name (required)") })
+                if (signature) {
+                    androidx.compose.material3.OutlinedTextField(company, { company = it.take(60) }, singleLine = true, label = { Text("Company (required)") })
+                    androidx.compose.material3.OutlinedTextField(position, { position = it.take(60) }, singleLine = true, label = { Text("Position, e.g. Managing Director (required)") })
+                }
+                Text(
+                    "The writing assistant uses ${if (signature) "these" else "the company name"} to know which company a letter is from${if (signature) " and who signs it" else ""}.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = { TextButton(enabled = ok, onClick = { onDone(name, company, position) }) { Text(action) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -214,13 +242,13 @@ fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: Strin
     source?.let { src -> com.docscan.app.ui.write.SignatureImportDialog(src, onInsert = { bytes, _, _ -> source = null; pendingBytes = bytes }, onDismiss = { source = null }) }
     if (drawing) com.docscan.app.ui.write.SignaturePadDialog(onDone = { bytes, _, _ -> drawing = false; pendingBytes = bytes }, onDismiss = { drawing = false })
     pendingBytes?.let { bytes ->
-        NameDialog("Name this $word", "${word.replaceFirstChar { it.uppercase() }} ${items.size + 1}", "Save",
-            onDone = { n -> store.add(n, bytes); items = store.list(); pendingBytes = null; message = "Saved. Choose it below to use it." },
+        AssetDetailsDialog(signature, "Add this $word", null, "Save",
+            onDone = { n, c, p -> store.add(n, bytes, c, p); items = store.list(); pendingBytes = null; message = "Saved. Choose it below to use it." },
             onDismiss = { pendingBytes = null })
     }
     renaming?.let { item ->
-        NameDialog("Rename", item.name, "Rename",
-            onDone = { n -> store.rename(item, n); items = store.list(); renaming = null },
+        AssetDetailsDialog(signature, "Edit details", item, "Save",
+            onDone = { n, c, p -> store.update(item, n, c, p); items = store.list(); renaming = null },
             onDismiss = { renaming = null })
     }
     AlertDialog(
@@ -236,8 +264,12 @@ fun SavedAssetsDialog(signature: Boolean, onPick: (bytes: ByteArray, mode: Strin
                     val bytes = remember(item.id) { store.bytes(item) }
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(item.name, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { renaming = item }) { Icon(Icons.Default.Edit, contentDescription = "Rename ${item.name}") }
+                            Column(Modifier.weight(1f)) {
+                                Text(item.name, style = MaterialTheme.typography.labelLarge)
+                                val sub = if (signature) listOf(item.position, item.company).filter { it.isNotBlank() }.joinToString(", ") else ""
+                                if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall)
+                            }
+                            IconButton(onClick = { renaming = item }) { Icon(Icons.Default.Edit, contentDescription = "Edit details of ${item.name}") }
                         }
                         Thumb(store, item, signature, Modifier.fillMaxWidth())
                         if (bytes != null) {

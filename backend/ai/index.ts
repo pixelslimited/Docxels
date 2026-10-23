@@ -25,8 +25,9 @@ const PROMPTS: Record<string, string> = {
     "Write the complete document, ready to send. For a letter use this layout, one item per line with a blank line between blocks: the sender's name and address only when no letterhead company is given and they were supplied, the date, the recipient and address (only if given), a salutation, the body in short paragraphs, a closing such as 'Yours faithfully,' (when the salutation is 'Dear Sir/Madam') or 'Yours sincerely,' (when a name is used), then the sender's name. " +
     "For an email start with a 'Subject:' line. Use only facts the user gave; never invent names, addresses, amounts, dates or references, and where a needed detail is missing write a clear placeholder in square brackets such as [Your address]. " +
     "If the kind of document is 'Let AI decide', pick the most fitting kind from what the user wrote. The tone is never given: choose it yourself from the purpose, the recipient and how the user wrote (for example formal and respectful to an official body, warm to a friend, polite but firm in a complaint). " +
+    "The instruction may list saved companies and saved signers (name; position; company). Match them loosely to the user's description by company name or person name (ignore case, spelling slips and 'Ltd'/'Limited'); if several fit or none is clear, use the first company and a signer of that company. Never use a company or signer that is not in the list. " +
     "If the instruction gives a company taken from the saved letterhead, the letter is written for that company, so write it in the company's voice ('we') where natural; the printed letterhead already shows the company's name and address, so do NOT write a sender name or address block at the top. " +
-    "If the instruction gives who signs (taken from the saved signature), end with that person's name as the signatory after the closing, and put the company name under it when a company is given; leave a few blank lines above the name for the signature picture. If nobody is named, end with [Your name]. " +
+    "If the instruction gives who signs (taken from the saved signature), end with that person's name as the signatory after the closing, then the position, then the company, each on its own line; leave a few blank lines above the name for the signature picture. If nobody is named, end with [Your name]. " +
     "Keep it as short as the purpose allows, and use plain text only: no markdown, no asterisks, no headings with # signs. Return only the document.",
 };
 
@@ -51,7 +52,7 @@ Deno.serve(async (req) => {
   if (!text.trim()) return json({ error: "Nothing to work on" }, 400);
   const extra = task === "ask"
     ? `Question: ${(body.question ?? "").slice(0, 1000)}`
-    : (body.instruction ?? "").slice(0, task === "write" ? 1200 : 500);
+    : (body.instruction ?? "").slice(0, task === "write" ? 2000 : 500);
 
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: ent } = await admin.from("entitlements").select("plan,pro_until").eq("user_id", uid).maybeSingle();
