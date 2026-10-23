@@ -134,7 +134,7 @@ class PageHost(context: Context) : ScrollView(context) {
      * Types straight into a table cell: a rich edit box laid exactly over the cell, scrolling with the page. [build]
      * attaches the cell's own editor to it; [onDone] gets true when typing ended normally, false when it is discarded.
      */
-    fun showCellEditor(r: android.graphics.RectF, build: (RichEditText) -> Unit, onDone: (Boolean) -> Unit) {
+    fun showCellEditor(index: Int, row: Int, col: Int, r: android.graphics.RectF, build: (RichEditText) -> Unit, onDone: (Boolean) -> Unit) {
         closeCellEditor()
         val ed = RichEditText(context)
         build(ed)
@@ -143,6 +143,19 @@ class PageHost(context: Context) : ScrollView(context) {
         lp.leftMargin = edit.left + r.left.toInt()
         lp.topMargin = edit.top + r.top.toInt()
         sheet.addView(ed, lp)
+        // Invisible: the table draws the cell's text, caret and selection itself. The view only takes the keyboard and touches.
+        ed.alpha = 0f
+        ed.setTextColor(0xFF1B1B1F.toInt())
+        ed.paint.color = 0xFF1B1B1F.toInt()
+        LiveCell.current = LiveCell(index, row, col, ed)
+        val redraw = object : Runnable {
+            override fun run() {
+                if (cellEditor !== ed) return
+                edit.invalidate()
+                edit.postDelayed(this, 150)
+            }
+        }
+        edit.post(redraw)
         cellEditor = ed
         cellDone = onDone
         // The first tap of a double tap opened this box, so the second one lands here: count the box opening as the first tap.
@@ -198,6 +211,7 @@ class PageHost(context: Context) : ScrollView(context) {
     private fun endCell(keep: Boolean) {
         val ed = cellEditor ?: return
         val done = cellDone
+        LiveCell.current = null
         cellEditor = null
         cellDone = null
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(ed.windowToken, 0)

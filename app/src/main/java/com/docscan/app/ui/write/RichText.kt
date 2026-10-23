@@ -1046,7 +1046,7 @@ class BlockChipSpan(
         val pad = 57f * k
         val plan = paging(paint)
         fun drawRow(ri: Int, y: Float, h: Float) {
-            for (cell in lay.rows[ri]) {
+            for ((ci, cell) in lay.rows[ri].withIndex()) {
                 val r = android.graphics.RectF(x + cell.xPx, y, x + cell.xPx + cell.wPx, y + h)
                 cell.cell.shading?.let {
                     paint.style = Paint.Style.FILL
@@ -1057,7 +1057,8 @@ class BlockChipSpan(
                 c.save()
                 c.clipRect(r)
                 c.translate(r.left + pad, r.top + pad)
-                cell.layout.draw(c)
+                val live = LiveCell.current?.takeIf { it.index == index && it.row == ri && it.col == ci }
+                if (live != null) live.draw(c) else cell.layout.draw(c)
                 c.restore()
             }
         }
@@ -1075,6 +1076,36 @@ class BlockChipSpan(
         paint.style = savedStyle
         paint.strokeWidth = savedStroke
     }
+}
+
+/**
+ * The cell being typed in. The keyboard feeds an invisible input behind the table; the cell's text, caret and selection
+ * are drawn by the table itself, so typing happens in the cell and nothing sits on top of it.
+ */
+class LiveCell(val index: Int, val row: Int, val col: Int, private val input: android.widget.EditText) {
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x553B82F6 }
+    private val line = Paint().apply { color = 0xFF1B1B1F.toInt(); strokeWidth = 2f }
+    private val path = android.graphics.Path()
+
+    fun draw(c: Canvas) {
+        val lay = input.layout ?: return
+        val a = input.selectionStart
+        val b = input.selectionEnd
+        if (a in 0..input.length() && b in 0..input.length() && a != b) {
+            path.reset()
+            lay.getSelectionPath(minOf(a, b), maxOf(a, b), path)
+            c.drawPath(path, fill)
+        }
+        lay.draw(c)
+        if (a >= 0 && a == b && input.isFocused && (android.os.SystemClock.uptimeMillis() / 500) % 2 == 0L) {
+            val ln = lay.getLineForOffset(a)
+            val x = lay.getPrimaryHorizontal(a)
+            line.strokeWidth = input.resources.displayMetrics.density * 1.5f
+            c.drawLine(x, lay.getLineTop(ln).toFloat(), x, lay.getLineBottom(ln).toFloat(), line)
+        }
+    }
+
+    companion object { var current: LiveCell? = null }
 }
 
 object EditorModel {

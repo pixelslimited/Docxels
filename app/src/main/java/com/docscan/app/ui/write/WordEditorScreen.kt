@@ -319,7 +319,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         val saver = Runnable {
             if (save()) host.edit.postDelayed({ host.edit.cellRectOf(idx, row, col)?.let { host.moveCellEditor(it.first) } }, 120)
         }
-        host.showCellEditor(rect, { ed ->
+        host.showCellEditor(idx, row, col, rect, { ed ->
             ctl.attach(ed)
             ed.paint.density = dens
             ed.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, com.docscan.app.core.word.StyleDefaults.BODY_SIZE_PT * ZOOM * dens)
