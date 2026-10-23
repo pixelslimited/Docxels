@@ -152,7 +152,7 @@ fun ScanScreen(vm: ScanViewModel, onDone: () -> Unit, onBack: () -> Unit) {
 
     var mode by remember { mutableStateOf(ScanMode.DOCUMENT) }
     var autoCapture by remember { mutableStateOf(false) }
-    var removeFingers by remember { mutableStateOf(false) }
+    var removeFingers by remember { mutableStateOf(true) }
     // 0 off, 1 auto, 2 on
     var flashMode by remember { mutableIntStateOf(0) }
     var showGrid by remember { mutableStateOf(false) }
@@ -169,7 +169,7 @@ fun ScanScreen(vm: ScanViewModel, onDone: () -> Unit, onBack: () -> Unit) {
     SideEffect { autoFlag.set(autoCapture) }
 
     // Books and spreads are usually held by hand, so finger removal starts on there.
-    LaunchedEffect(mode) { removeFingers = mode != ScanMode.DOCUMENT }
+    LaunchedEffect(mode) { removeFingers = true }
 
     var hasPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)

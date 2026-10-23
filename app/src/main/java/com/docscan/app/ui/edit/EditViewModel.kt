@@ -100,8 +100,26 @@ class EditViewModel(
     fun setCorners(corners: List<Pt>) {
         val p = page.value ?: return
         _table.value = null
-        viewModelScope.launch { repo.updateCorners(p, corners) }
+        viewModelScope.launch {
+            repo.updateCorners(p, corners)
+            // Changing the crop discards the cleaned copy; make a fresh one in the background, without messages.
+            // A newer crop cancels an older clean-up that is still running.
+            cleanJob?.cancel()
+            cleanJob = viewModelScope.launch {
+                val fresh = repo.page(pageId) ?: return@launch
+                val outcome = clean(fresh, repair = HandRemover::fillPaper) { base ->
+                    val detection = HandRemover.detectJunkMask(base)
+                    if (detection.coverage < MIN_HAND_COVERAGE) { detection.mask.release(); null } else detection.mask
+                }
+                if (outcome is CleanOutcome.Done) {
+                    repo.setCleaned(fresh, outcome.bitmap)
+                    _table.value = null
+                }
+            }
+        }
     }
+
+    private var cleanJob: kotlinx.coroutines.Job? = null
 
     fun useFullImage() = setCorners(Geometry.FullImage)
 

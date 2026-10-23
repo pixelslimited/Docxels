@@ -60,3 +60,4 @@
 *|FIX|Better automatic scans|Cleaner colour and black-and-white copies with no settings needed, and the page is found more reliably next to hands and other papers.
 *|FIX|Crop handles keep working|Dragging page corners and sides no longer freezes after the first adjustment.
 *|FREE|New version notice|Docxels now tells you about a new version within minutes, with a notification even when the app is closed.
+*|FREE|Automatic clean-up|Fingers, objects and folded corners are removed for you. Manual tools moved to Enhance, Fine-tune.

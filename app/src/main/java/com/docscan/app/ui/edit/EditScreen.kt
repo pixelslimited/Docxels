@@ -66,7 +66,7 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-private val TABS = listOf("Crop", "Enhance", "Clean", "Table")
+private val TABS = listOf("Crop", "Enhance", "Table")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -118,7 +118,6 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
                     when (tab) {
                         0 -> CropTab(vm, current, source)
                         1 -> EnhanceTab(vm, current, preview)
-                        2 -> CleanTab(vm, current, preview)
                         else -> TableTab(vm, preview, table)
                     }
                 }
@@ -176,9 +175,18 @@ private fun EnhanceTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
     var contrast by remember(settings.contrast) { mutableFloatStateOf(settings.contrast) }
     var sharpen by remember(settings.sharpen) { mutableFloatStateOf(settings.sharpen.toFloat()) }
     var fine by remember { mutableStateOf(false) }
+    var painting by remember { mutableStateOf(false) }
+    var strokes by remember { mutableStateOf<List<List<Pt>>>(emptyList()) }
+    var brush by remember { mutableFloatStateOf(0.03f) }
 
     Column(Modifier.fillMaxSize()) {
-        PreviewImage(preview, Modifier.weight(1f).fillMaxWidth().padding(8.dp))
+        if (painting && preview != null) {
+            Box(Modifier.weight(1f).fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                BrushCanvas(bitmap = preview, strokes = strokes, brushFraction = brush, onStroke = { strokes = strokes + listOf(it) })
+            }
+        } else {
+            PreviewImage(preview, Modifier.weight(1f).fillMaxWidth().padding(8.dp))
+        }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DocMode.entries.forEach { mode ->
@@ -196,6 +204,28 @@ private fun EnhanceTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
             )
             TextButton(onClick = { fine = !fine }) { Text(if (fine) "Hide fine-tune" else "Fine-tune (optional)") }
             if (fine) {
+                Text("Fingers, objects and folded corners are removed automatically. If something is left or was removed by mistake:", style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Button(onClick = vm::autoRemoveHand, modifier = Modifier.weight(1f)) { Text("Clean again") }
+                    OutlinedButton(onClick = vm::restoreOriginalPage, enabled = page.cleanedPath != null, modifier = Modifier.weight(1f)) { Text("Undo removal") }
+                }
+                OutlinedButton(
+                    onClick = { painting = !painting; strokes = emptyList() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (painting) "Stop painting" else "Paint over something to remove") }
+                if (painting) {
+                    Text("Paint over it with your finger, then tap Remove painted area.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                    Text("Brush size", style = MaterialTheme.typography.labelMedium)
+                    Slider(value = brush, onValueChange = { brush = it }, valueRange = 0.01f..0.08f)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = { vm.removePainted(strokes, brush); strokes = emptyList() },
+                            enabled = strokes.isNotEmpty(),
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Remove painted area") }
+                        OutlinedButton(onClick = { strokes = emptyList() }, enabled = strokes.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Clear painting") }
+                    }
+                }
                 SwitchRow("Reduce noise (grain from dim light)", settings.denoise) { vm.setSettings(settings.copy(denoise = it)) }
                 SwitchRow("Mirror (flip left to right)", settings.mirror) { vm.setSettings(settings.copy(mirror = it)) }
                 Text("Sharpen (reduces mild blur)  ${sharpen.roundToInt()}", style = MaterialTheme.typography.labelMedium)
@@ -226,54 +256,6 @@ private fun EnhanceTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
                     modifier = Modifier.weight(1f),
                 ) { Text("Reset sliders") }
                 Button(onClick = { vm.applyLookToAll(settings) }, modifier = Modifier.weight(1f)) { Text("Apply to all pages") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CleanTab(vm: EditViewModel, page: PageEntity, preview: Bitmap?) {
-    var strokes by remember { mutableStateOf<List<List<Pt>>>(emptyList()) }
-    var brush by remember { mutableFloatStateOf(0.03f) }
-
-    Column(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f).fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
-            if (preview == null) {
-                CircularProgressIndicator()
-            } else {
-                BrushCanvas(
-                    bitmap = preview,
-                    strokes = strokes,
-                    brushFraction = brush,
-                    onStroke = { strokes = strokes + listOf(it) },
-                )
-            }
-        }
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(
-                "Auto-clean removes hands and fingers, pens and other objects, staple pins and folded corners at the page edge. If it misses something, paint over it with your finger, then tap Remove painted area.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text("Brush size", style = MaterialTheme.typography.labelMedium)
-            Slider(value = brush, onValueChange = { brush = it }, valueRange = 0.01f..0.08f)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = vm::autoRemoveHand, modifier = Modifier.weight(1f)) { Text("Auto-clean") }
-                Button(
-                    onClick = {
-                        vm.removePainted(strokes, brush)
-                        strokes = emptyList()
-                    },
-                    enabled = strokes.isNotEmpty(),
-                    modifier = Modifier.weight(1f),
-                ) { Text("Remove painted area") }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                OutlinedButton(onClick = { strokes = emptyList() }, enabled = strokes.isNotEmpty(), modifier = Modifier.weight(1f)) {
-                    Text("Clear painting")
-                }
-                OutlinedButton(onClick = vm::restoreOriginalPage, enabled = page.cleanedPath != null, modifier = Modifier.weight(1f)) {
-                    Text("Undo removal")
-                }
             }
         }
     }
