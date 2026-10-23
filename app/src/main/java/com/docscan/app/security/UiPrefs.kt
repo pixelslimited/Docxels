@@ -70,4 +70,18 @@ class UiPrefs(context: Context) {
     var introSeen: Boolean
         get() = prefs.getBoolean("intro_seen", false)
         set(v) = prefs.edit().putBoolean("intro_seen", v).apply()
+
+    /** How the Documents list is sorted and shown; remembered between visits (names of the Sort and ViewMode choices). */
+    var librarySort: String
+        get() = prefs.getString("library_sort", "NEWEST") ?: "NEWEST"
+        set(v) = prefs.edit().putString("library_sort", v).apply()
+
+    var libraryView: String
+        get() = prefs.getString("library_view", "LIST") ?: "LIST"
+        set(v) = prefs.edit().putString("library_view", v).apply()
+
+    /** Folder that every new scan is put into (empty = none; the scan stays loose in the library). */
+    var newScanFolder: String
+        get() = prefs.getString("new_scan_folder", "") ?: ""
+        set(v) = prefs.edit().putString("new_scan_folder", v).apply()
 }

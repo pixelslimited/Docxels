@@ -2,6 +2,11 @@ package com.docscan.app.ui.library
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,7 +84,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 private enum class Filter { ALL, WORD, SCANS, PDFS, FAVOURITES, TRASH }
-private enum class Sort(val label: String) { DATE("Date modified"), NAME("Name") }
+private enum class Sort(val label: String) {
+    NEWEST("Newest first"), OLDEST("Oldest first"), NAME_AZ("Name A to Z"), NAME_ZA("Name Z to A"), TYPE("Type"),
+}
+
+private enum class ViewMode(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val tile: Int) {
+    LIST("List", Icons.AutoMirrored.Filled.ViewList, 0),
+    GRID("Grid", Icons.Default.GridView, 150),
+    SMALL("Small grid", Icons.Default.GridView, 100),
+}
 
 @Composable
 fun DocumentsScreen(
@@ -113,8 +126,14 @@ fun DocumentsScreen(
     }
     val deviceHits = remember(deviceIndex, query) { deviceIndex?.let { com.docscan.app.core.DeviceFiles.filter(it, query) } ?: emptyList() }
     var filter by remember { mutableStateOf(Filter.ALL) }
-    var sort by remember { mutableStateOf(Sort.DATE) }
+    var sort by remember { mutableStateOf(runCatching { Sort.valueOf(vm.prefs.librarySort) }.getOrDefault(Sort.NEWEST)) }
     var sortMenu by remember { mutableStateOf(false) }
+    var viewMenu by remember { mutableStateOf(false) }
+    // Tick items by long-pressing one; then Share, Favourite, Move and Trash work on all ticked items.
+    var selected by remember { mutableStateOf(setOf<String>()) }
+    var movingMany by remember { mutableStateOf(false) }
+    var deletingMany by remember { mutableStateOf(false) }
+    var foreverMany by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<LibraryItem?>(null) }
     var deleting by remember { mutableStateOf<LibraryItem?>(null) }
     var foreverOf by remember { mutableStateOf<LibraryItem?>(null) }
@@ -123,7 +142,7 @@ fun DocumentsScreen(
     var moving by remember { mutableStateOf<LibraryItem?>(null) }
     var tagging by remember { mutableStateOf<LibraryItem?>(null) }
     var folder by remember { mutableStateOf<String?>(null) }
-    var grid by remember { mutableStateOf(false) }
+    var view by remember { mutableStateOf(runCatching { ViewMode.valueOf(vm.prefs.libraryView) }.getOrDefault(ViewMode.LIST)) }
     val folders = remember(items) { items.map { it.meta.folder }.filter { it.isNotEmpty() }.distinct().sorted() }
     if (folder != null && folder !in folders) folder = null
 
@@ -143,8 +162,22 @@ fun DocumentsScreen(
             .filter { folder == null || filter == Filter.TRASH || it.meta.folder == folder }
             .filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) || it.meta.tags.any { t -> t.contains(query.trim(), ignoreCase = true) } ||
                 (inside[com.docscan.app.data.LibraryMeta.key(it.kind, it.id)]?.text?.contains(query.trim(), ignoreCase = true) == true) }
-            .let { list -> if (sort == Sort.NAME) list.sortedBy { it.title.lowercase() } else list }
+            .let { list ->
+                when (sort) {
+                    Sort.NEWEST -> list.sortedByDescending { it.modified }
+                    Sort.OLDEST -> list.sortedBy { it.modified }
+                    Sort.NAME_AZ -> list.sortedBy { it.title.lowercase() }
+                    Sort.NAME_ZA -> list.sortedByDescending { it.title.lowercase() }
+                    Sort.TYPE -> list.sortedWith(compareBy<LibraryItem> { it.kind.ordinal }.thenByDescending { it.modified })
+                }
+            }
     }
+    fun keyOf(item: LibraryItem) = item.kind.name + item.id
+    // Only items still on screen stay ticked (a filter change or a deletion must not leave hidden ticks behind).
+    val picked = shown.filter { keyOf(it) in selected }
+    val selecting = picked.isNotEmpty()
+    androidx.activity.compose.BackHandler(enabled = selecting) { selected = emptySet() }
+    fun toggle(item: LibraryItem) { selected = if (keyOf(item) in selected) selected - keyOf(item) else selected + keyOf(item) }
 
     val menuFor: (LibraryItem) -> RowMenu = { item ->
         if (filter == Filter.TRASH) RowMenu(
@@ -193,7 +226,22 @@ fun DocumentsScreen(
         }
     } else {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Text("Documents", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 12.dp))
+            if (selecting) {
+                SelectionBar(
+                    count = picked.size,
+                    trash = filter == Filter.TRASH,
+                    allFavourite = picked.all { it.meta.favourite },
+                    onClose = { selected = emptySet() },
+                    onSelectAll = { selected = shown.map { keyOf(it) }.toSet() },
+                    onShare = { vm.sharePdfs(context, picked); selected = emptySet() },
+                    onFavourite = { vm.favouriteMany(picked, !picked.all { it.meta.favourite }); selected = emptySet() },
+                    onMove = { movingMany = true },
+                    onDelete = { if (filter == Filter.TRASH) foreverMany = true else deletingMany = true },
+                    onRestore = { vm.restoreMany(picked); selected = emptySet() },
+                )
+            } else {
+                Text("Documents", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 12.dp))
+            }
             TextField(
                 value = query,
                 onValueChange = { query = it },
@@ -224,20 +272,29 @@ fun DocumentsScreen(
             Row(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
               Box(Modifier.weight(1f)) {
                 Text(
-                    "Sorted by ${sort.label.lowercase()}  ▾",
+                    "${sort.label}  ▾",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.clip(CircleShape).clickable { sortMenu = true }.padding(vertical = 6.dp, horizontal = 4.dp),
                 )
                 DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
-                    Sort.entries.forEach { s -> DropdownMenuItem(text = { Text(s.label) }, onClick = { sort = s; sortMenu = false }) }
+                    Sort.entries.forEach { s -> DropdownMenuItem(text = { Text(s.label) }, onClick = { sort = s; vm.prefs.librarySort = s.name; sortMenu = false }) }
                 }
               }
               if (filter == Filter.TRASH && trash.isNotEmpty()) {
                   androidx.compose.material3.TextButton(onClick = { emptying = true }) { Text("Empty Trash") }
               }
-              IconButton(onClick = { grid = !grid }) {
-                  Icon(if (grid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView, contentDescription = if (grid) "Show as list" else "Show as grid")
+              Box {
+                  IconButton(onClick = { viewMenu = true }) { Icon(view.icon, contentDescription = "View: ${view.label}") }
+                  DropdownMenu(expanded = viewMenu, onDismissRequest = { viewMenu = false }) {
+                      ViewMode.entries.forEach { m ->
+                          DropdownMenuItem(
+                              text = { Text(if (m == view) "${m.label}  ✓" else m.label) },
+                              leadingIcon = { Icon(m.icon, contentDescription = null) },
+                              onClick = { view = m; vm.prefs.libraryView = m.name; viewMenu = false },
+                          )
+                      }
+                  }
               }
             }
             if (filter == Filter.TRASH) {
@@ -253,16 +310,16 @@ fun DocumentsScreen(
                 )
             }
             val showDevice = deviceActive && filter != Filter.TRASH
-            if (grid && !showDevice) {
+            if (view != ViewMode.LIST && !showDevice) {
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(150.dp),
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(view.tile.dp),
                     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(shown.size, key = { shown[it].kind.name + shown[it].id }) { idx ->
                         val item = shown[idx]
-                        LibraryTile(item, onClick = { actionsFor = item })
+                        LibraryTile(item, selected = keyOf(item) in selected, small = view == ViewMode.SMALL, onClick = { if (selecting) toggle(item) else actionsFor = item }, onLongClick = { toggle(item) })
                     }
                 }
             } else {
@@ -271,7 +328,7 @@ fun DocumentsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(shown, key = { it.kind.name + it.id }) { item ->
-                        LibraryRow(item, onClick = { actionsFor = item })
+                        LibraryRow(item, selected = keyOf(item) in selected, onClick = { if (selecting) toggle(item) else actionsFor = item }, onLongClick = { toggle(item) })
                     }
                     if (showDevice) {
                         item(key = "device-head") {
@@ -338,7 +395,28 @@ fun DocumentsScreen(
         )
     }
     moving?.let { item ->
-        FolderDialog(item, folders, onPick = { vm.moveToFolder(item, it); moving = null }, onDismiss = { moving = null })
+        FolderDialog(item.meta.folder, folders, onPick = { vm.moveToFolder(item, it); moving = null }, onDismiss = { moving = null })
+    }
+    if (movingMany) {
+        FolderDialog("", folders, onPick = { vm.moveMany(picked, it); movingMany = false; selected = emptySet() }, onDismiss = { movingMany = false })
+    }
+    if (deletingMany) {
+        ConfirmDialog(
+            title = "Move ${picked.size} to Trash?",
+            message = "They go to Trash. You can restore them for 30 days.",
+            confirmLabel = "Move to Trash",
+            onConfirm = { vm.deleteMany(picked); deletingMany = false; selected = emptySet() },
+            onDismiss = { deletingMany = false },
+        )
+    }
+    if (foreverMany) {
+        ConfirmDialog(
+            title = "Delete ${picked.size} for good?",
+            message = "They will be permanently deleted from this phone. This cannot be undone.",
+            confirmLabel = "Delete",
+            onConfirm = { val doomed = picked; foreverMany = false; selected = emptySet(); confirmWithLock(context, "Delete ${doomed.size} items for good") { vm.deleteForeverMany(doomed) } },
+            onDismiss = { foreverMany = false },
+        )
     }
     tagging?.let { item ->
         TextInputDialog("Tags (separate with commas)", item.meta.tags.joinToString(", "), "Save", onConfirm = { vm.setTags(item, it); tagging = null }, onDismiss = { tagging = null }, allowBlank = true, maxLength = 200)
@@ -365,11 +443,13 @@ class RowMenu(
 )
 
 @Composable
-fun LibraryRow(item: LibraryItem, onClick: () -> Unit) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun LibraryRow(item: LibraryItem, onClick: () -> Unit, selected: Boolean = false, onLongClick: (() -> Unit)? = null) {
     Row(
-        Modifier.fillMaxWidth().docCard().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().docCard().selectedOutline(selected).combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (selected) Icon(Icons.Default.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 10.dp))
         DocBadge(item.kind)
         Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -438,11 +518,13 @@ private fun confirmWithLock(context: android.content.Context, why: String, run: 
 }
 
 @Composable
-fun LibraryTile(item: LibraryItem, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().docCard().clickable(onClick = onClick).padding(12.dp)) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun LibraryTile(item: LibraryItem, onClick: () -> Unit, selected: Boolean = false, small: Boolean = false, onLongClick: (() -> Unit)? = null) {
+    Column(Modifier.fillMaxWidth().docCard().selectedOutline(selected).combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(if (small) 8.dp else 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DocBadge(item.kind)
             Box(Modifier.weight(1f))
+            if (selected) Icon(Icons.Default.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             if (item.meta.favourite) Icon(Icons.Default.Star, contentDescription = "Favourite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         }
         Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, modifier = Modifier.padding(top = 8.dp))
@@ -452,15 +534,15 @@ fun LibraryTile(item: LibraryItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun FolderDialog(item: LibraryItem, folders: List<String>, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+private fun FolderDialog(current: String, folders: List<String>, onPick: (String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Move to folder") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (item.meta.folder.isNotEmpty()) androidx.compose.material3.TextButton(onClick = { onPick("") }) { Text("Take out of \"${item.meta.folder}\"") }
-                folders.filter { it != item.meta.folder }.forEach { f -> androidx.compose.material3.TextButton(onClick = { onPick(f) }) { Text("\uD83D\uDCC1 $f") } }
+                if (current.isNotEmpty()) androidx.compose.material3.TextButton(onClick = { onPick("") }) { Text("Take out of \"$current\"") }
+                folders.filter { it != current }.forEach { f -> androidx.compose.material3.TextButton(onClick = { onPick(f) }) { Text("\uD83D\uDCC1 $f") } }
                 androidx.compose.material3.OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("New folder name") })
             }
         },
@@ -507,6 +589,34 @@ private fun DeviceRow(f: com.docscan.app.core.DeviceFile, onClick: () -> Unit) {
                 "${f.folder} · ${android.text.format.Formatter.formatShortFileSize(androidx.compose.ui.platform.LocalContext.current, f.size)}",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
             )
+        }
+    }
+}
+
+/** A coloured outline around a ticked card. */
+@Composable
+private fun Modifier.selectedOutline(selected: Boolean): Modifier =
+    if (selected) this.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)) else this
+
+/** Replaces the page title while items are ticked: how many, select all, and what can be done with them. */
+@Composable
+private fun SelectionBar(
+    count: Int, trash: Boolean, allFavourite: Boolean,
+    onClose: () -> Unit, onSelectAll: () -> Unit, onShare: () -> Unit, onFavourite: () -> Unit,
+    onMove: () -> Unit, onDelete: () -> Unit, onRestore: () -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Clear selection") }
+        Text("$count selected", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, contentDescription = "Select all") }
+        if (trash) {
+            IconButton(onClick = onRestore) { Icon(Icons.Default.Restore, contentDescription = "Restore") }
+            IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteForever, contentDescription = "Delete for good", tint = MaterialTheme.colorScheme.error) }
+        } else {
+            IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = "Share as PDF") }
+            IconButton(onClick = onFavourite) { Icon(Icons.Default.Star, contentDescription = if (allFavourite) "Remove from favourites" else "Add to favourites") }
+            IconButton(onClick = onMove) { Icon(Icons.Default.Folder, contentDescription = "Move to folder") }
+            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Move to Trash", tint = MaterialTheme.colorScheme.error) }
         }
     }
 }

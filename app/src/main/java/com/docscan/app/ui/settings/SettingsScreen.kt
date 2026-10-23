@@ -144,6 +144,17 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)? = null, goal: 
                 }
             }
 
+            Section("New scans")
+            Text("Every new scan is put into this folder. Leave it empty to keep new scans loose in Documents.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            var scanFolder by remember { mutableStateOf(container.ui.newScanFolder) }
+            androidx.compose.material3.OutlinedTextField(
+                value = scanFolder,
+                onValueChange = { scanFolder = it.take(40); container.ui.newScanFolder = it.take(40) },
+                singleLine = true,
+                label = { Text("Folder name (for example Scans)") },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            )
+
             Section("Exporting scans")
             Text("The export sheet starts with this format.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             var fmt by remember { mutableStateOf(container.ui.exportFormat) }

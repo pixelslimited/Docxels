@@ -65,6 +65,14 @@ class DocumentViewModel(private val container: AppContainer, private val docId: 
         viewModelScope.launch { repo.deletePage(page) }
     }
 
+    fun deletePages(ids: Set<String>) {
+        viewModelScope.launch { repo.pages(docId).filter { it.id in ids }.forEach { repo.deletePage(it) } }
+    }
+
+    fun rotatePages(ids: Set<String>) {
+        viewModelScope.launch { repo.pages(docId).filter { it.id in ids }.forEach { repo.rotate(it, 90) } }
+    }
+
     fun applyModeToAll(mode: DocMode) {
         viewModelScope.launch {
             repo.pages(docId).forEach { page -> repo.updateSettings(page, page.settings().copy(mode = mode)) }
@@ -118,9 +126,10 @@ class DocumentViewModel(private val container: AppContainer, private val docId: 
         }
     }
 
-    fun export(options: ExportOptions, save: Boolean, saveAs: Boolean = false) {
+    /** [only] limits the export to those pages (ticked in the document); null exports every page. */
+    fun export(options: ExportOptions, save: Boolean, saveAs: Boolean = false, only: Set<String>? = null) {
         viewModelScope.launch {
-            val current = repo.pages(docId)
+            val current = repo.pages(docId).filter { only == null || it.id in only }
             val name = document.value?.name ?: "Scan"
             _busyLabel.value = "Preparing ${options.format.label}…"
             runCatching { container.exporter.exportDocument(current, name, options) }

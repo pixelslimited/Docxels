@@ -101,6 +101,26 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
     fun setTags(item: LibraryItem, text: String) = container.libraryMeta.update(item.kind, item.id) { m ->
         m.copy(tags = text.split(',', ' ').map { LibraryMeta.cleanName(it) }.filter { it.isNotEmpty() }.toSet())
     }
+    val prefs get() = container.ui
+
+    fun moveMany(items: List<LibraryItem>, folder: String) = items.forEach { moveToFolder(it, folder) }
+    fun favouriteMany(items: List<LibraryItem>, on: Boolean) = items.forEach { setFavourite(it, on) }
+    fun deleteMany(items: List<LibraryItem>) = items.forEach { delete(it) }
+    fun restoreMany(items: List<LibraryItem>) = items.forEach { restore(it) }
+    fun deleteForeverMany(items: List<LibraryItem>) = items.forEach { deleteForever(it) }
+
+    /** One PDF per item (Word documents and scans alike), made one after another, then handed over together. */
+    fun withPdfs(context: Context, items: List<LibraryItem>, then: (List<File>) -> Unit) {
+        val made = ArrayList<File>()
+        fun next(i: Int) {
+            if (i >= items.size) { then(made); return }
+            withFile(context, items[i], asPdf = true) { made += it; next(i + 1) }
+        }
+        next(0)
+    }
+
+    fun sharePdfs(context: Context, items: List<LibraryItem>) = withPdfs(context, items) { ShareHelper.share(context, it, Mime.PDF) }
+
     fun restore(item: LibraryItem) = container.libraryMeta.update(item.kind, item.id) { it.copy(trashedAt = 0L) }
 
     /** Items sit in Trash for 30 days, then they are deleted for good. */
@@ -130,7 +150,15 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun startScan(onReady: (String) -> Unit) {
-        viewModelScope.launch { onReady(container.repository.createDocument()) }
+        viewModelScope.launch { onReady(newScanDocument()) }
+    }
+
+    /** A new scan document, put into the folder chosen in Settings for new scans (if any). */
+    private suspend fun newScanDocument(): String {
+        val id = container.repository.createDocument()
+        val folder = LibraryMeta.cleanName(container.ui.newScanFolder)
+        if (folder.isNotEmpty()) container.libraryMeta.update(DocKind.SCAN, id) { it.copy(folder = folder) }
+        return id
     }
 
     fun newWord(onReady: (String) -> Unit) {
@@ -177,7 +205,7 @@ class LibraryViewModel(private val container: AppContainer) : ViewModel() {
         if (uris.isEmpty()) return
         viewModelScope.launch {
             _busy.value = "Importing photos…"
-            val docId = container.repository.createDocument()
+            val docId = newScanDocument()
             var added = 0
             for (uri in uris) {
                 val ok = runCatching {

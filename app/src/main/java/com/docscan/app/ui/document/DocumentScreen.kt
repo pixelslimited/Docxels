@@ -23,6 +23,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -82,6 +87,9 @@ fun DocumentScreen(
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<PageEntity?>(null) }
     var showExport by remember { mutableStateOf(false) }
+    // Pages ticked by long-pressing one: Share/Export, Rotate and Delete then work on just those pages.
+    var selected by remember { mutableStateOf(setOf<String>()) }
+    var deletingSelected by remember { mutableStateOf(false) }
     val saveScope = androidx.compose.runtime.rememberCoroutineScope()
     val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { msg -> saveScope.launch { snackbar.showSnackbar(msg) } }
 
@@ -99,16 +107,24 @@ fun DocumentScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
+                    if (selected.isNotEmpty()) Text("${selected.size} selected", maxLines = 1)
+                    else Text(
                         document?.name ?: "Document",
                         maxLines = 1,
                         modifier = Modifier.clickable { renaming = true },
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    if (selected.isNotEmpty()) IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Default.Close, contentDescription = "Clear selection") }
+                    else IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
                 actions = {
+                  if (selected.isNotEmpty()) {
+                    IconButton(onClick = { selected = pages.map { it.id }.toSet() }) { Icon(Icons.Default.SelectAll, contentDescription = "Select all pages") }
+                    IconButton(onClick = { vm.rotatePages(selected) }) { Icon(Icons.Default.RotateRight, contentDescription = "Rotate selected pages") }
+                    IconButton(onClick = { showExport = true }) { Icon(Icons.Default.Share, contentDescription = "Export or share selected pages") }
+                    IconButton(onClick = { deletingSelected = true }) { Icon(Icons.Default.Delete, contentDescription = "Delete selected pages", tint = MaterialTheme.colorScheme.error) }
+                  } else {
                     IconButton(onClick = vm::autoArrange, enabled = pages.isNotEmpty()) {
                         Icon(Icons.Default.AutoFixHigh, contentDescription = "Auto-arrange pages")
                     }
@@ -121,6 +137,7 @@ fun DocumentScreen(
                     IconButton(onClick = { showExport = true }, enabled = pages.isNotEmpty()) {
                         Icon(Icons.Default.Share, contentDescription = "Export or share")
                     }
+                  }
                 },
             )
         },
@@ -163,7 +180,9 @@ fun DocumentScreen(
                                 index = index,
                                 count = pages.size,
                                 page = page,
-                                onOpen = { onEditPage(page.id) },
+                                selected = page.id in selected,
+                                onOpen = { if (selected.isNotEmpty()) selected = if (page.id in selected) selected - page.id else selected + page.id else onEditPage(page.id) },
+                                onSelect = { selected = if (page.id in selected) selected - page.id else selected + page.id },
                                 onEarlier = { vm.move(page.id, -1) },
                                 onLater = { vm.move(page.id, 1) },
                                 onRotate = { vm.rotate(page) },
@@ -202,33 +221,50 @@ fun DocumentScreen(
             onDismiss = { deleting = null },
         )
     }
+    if (deletingSelected) {
+        ConfirmDialog(
+            title = "Delete ${selected.size} page(s)?",
+            message = "These pages and their edits will be permanently deleted.",
+            confirmLabel = "Delete",
+            onConfirm = { vm.deletePages(selected); selected = emptySet(); deletingSelected = false },
+            onDismiss = { deletingSelected = false },
+        )
+    }
+    androidx.activity.compose.BackHandler(enabled = selected.isNotEmpty()) { selected = emptySet() }
     if (showExport) {
         ExportSheet(
             onDismiss = { showExport = false },
             onExport = { options, save, saveAs ->
                 showExport = false
                 com.docscan.app.cloud.Analytics.track("export:" + options.format.name.lowercase())
-                vm.export(options, save, saveAs)
+                vm.export(options, save, saveAs, only = selected.takeIf { it.isNotEmpty() })
+                selected = emptySet()
             },
         )
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun PageCard(
     index: Int,
     count: Int,
     page: PageEntity,
+    selected: Boolean,
     onOpen: () -> Unit,
+    onSelect: () -> Unit,
     onEarlier: () -> Unit,
     onLater: () -> Unit,
     onRotate: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        PageThumb(page, Modifier.fillMaxWidth().aspectRatio(0.72f).clickable(onClickLabel = "Edit page", onClick = onOpen))
-        Text("Page ${index + 1}", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 12.dp, top = 8.dp))
+    Card(if (selected) Modifier.fillMaxWidth().border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium) else Modifier.fillMaxWidth()) {
+        PageThumb(page, Modifier.fillMaxWidth().aspectRatio(0.72f).combinedClickable(onClickLabel = "Edit page", onClick = onOpen, onLongClick = onSelect))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 8.dp)) {
+            if (selected) Icon(Icons.Default.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 6.dp))
+            Text("Page ${index + 1}", style = MaterialTheme.typography.labelLarge)
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             IconButton(onClick = onEarlier, enabled = index > 0) {
                 Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Move page earlier")
