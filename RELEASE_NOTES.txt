@@ -64,3 +64,4 @@
 *|PRO|Write with AI|Describe a letter, email, application or report and get a finished draft to insert into your document.
 *|FREE|ZIP export and rotate all|Send all pages as one ZIP, and turn every page at once.
 *|PRO|Write with AI picks your company|Saved letterheads need a company name; signatures need name, company and position. The AI picks the right ones from what you write.
+*|FREE|Flatter pages|Curled or wavy pages are flattened much more, so text lines run level like a flatbed scan.

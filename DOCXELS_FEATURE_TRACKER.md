@@ -28,7 +28,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `IMPLEMENTED — NOT VERIFIED` · `T
 | Camera, auto / manual capture, multi-page | 2 | IMPLEMENTED — NOT VERIFIED | ui/scan | |
 | Automatic edge detection | 2 | IMPLEMENTED — NOT VERIFIED | imaging/EdgeDetector | Synthetic photos only |
 | Manual crop, rotate, retake, rearrange, delete | 2 | IMPLEMENTED — NOT VERIFIED | ui/edit, ui/document | Duplicate page not present |
-| Perspective, skew, curl correction | 2 | IMPLEMENTED — NOT VERIFIED | imaging/Dewarp, Deskew, Warper | |
+| Perspective, skew, curl correction | 2 | IMPLEMENTED — NOT VERIFIED | imaging/Dewarp, Deskew, Warper | Dewarp rewritten: measures text direction across the whole page and levels every part (not only whole-line bows). Tried in Python on one real photo (header and left labels came out level); not yet tried on a phone. Does not fix sideways (horizontal) distortion. Order: deskew, then dewarp. Old polynomial dewarp and LeastSquares removed. |
 | Colour / grey / B&W copy / sharpen | 2 | IMPLEMENTED — NOT VERIFIED | imaging/Enhancer | |
 | Remove fingers, objects, staples, folds | 3 | IMPLEMENTED — NOT VERIFIED | imaging/HandRemover | Staples and folds weakest |
 | Import images from gallery | 2 | IMPLEMENTED — NOT VERIFIED | HomeViewModel | |

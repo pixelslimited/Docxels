@@ -1,6 +1,5 @@
 package com.docscan.app.imaging
 
-import com.docscan.app.core.LeastSquares
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -8,24 +7,30 @@ import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 /**
- * Flattens curled or wavy paper. Text lines are found, each one is measured against a straight
- * line at its own average height, and a smooth surface fitted through all the measurements is
- * used to shift pixels vertically so every line becomes straight.
+ * Flattens curled, wavy or tilted-in-places paper so text lines run level like a flatbed scan.
  *
- * Needs several long text lines. Pages without them (photos, mostly blank pages) are returned unchanged.
+ * It measures which way the text is running at every part of the page (a structure-tensor "orientation field" of the
+ * ink, smoothed and filled in where there is no text), adds that slope up across each row to get how far each point
+ * sits above or below its line, and shifts pixels vertically to cancel it. Because the first pass leaves a little
+ * error (the lines were followed along a straight row, not along themselves), it is repeated a few times on the
+ * small working copy; the real picture is resampled only once.
+ *
+ * Pages without enough text (photos, mostly blank pages) are returned unchanged.
  */
 object Dewarp {
     private const val WORK = 700.0
-    private const val X_TERMS = 5      // x^0..x^4 across the page
-    private const val Y_TERMS = 2      // y^0..y^1 down the page
-    private const val MIN_LINES = 5
-    private const val SAMPLES_PER_LINE = 14
-    private const val MIN_SHIFT = 1.5  // working pixels; smaller than this is not worth touching
-    private const val MAX_SHIFT_FRACTION = 0.06
+    private const val ITERATIONS = 3
+    private const val MIN_SHIFT = 1.0            // working pixels; below this a pass is not worth applying
+    private const val MAX_SHIFT_FRACTION = 0.08  // of the page height
+    private const val MIN_TEXT_FRACTION = 0.03   // share of the page that must show clear text lines
+    private const val MAX_SLOPE = 0.6
 
     private class Field(val values: FloatArray, val width: Int, val height: Int, val scale: Double)
 
@@ -68,144 +73,154 @@ object Dewarp {
         val scale = WORK / max(rgb.cols(), rgb.rows())
         val gray = Mat()
         Imgproc.cvtColor(rgb, gray, Imgproc.COLOR_RGB2GRAY)
-        val small = Mat()
-        Imgproc.resize(gray, small, Size(), scale, scale, Imgproc.INTER_AREA)
+        val g0 = Mat()
+        Imgproc.resize(gray, g0, Size(), scale, scale, Imgproc.INTER_AREA)
         gray.release()
-        val w = small.cols()
-        val h = small.rows()
+        val w = g0.cols()
+        val h = g0.rows()
+        val n = w * h
 
+        val rowIndex = FloatArray(n) { (it / w).toFloat() }
+        val mapX = Mat(h, w, CvType.CV_32F)
+        mapX.put(0, 0, FloatArray(n) { (it % w).toFloat() })
+        var rows = Mat(h, w, CvType.CV_32F)
+        rows.put(0, 0, rowIndex)
+        var current = g0.clone()
+        var changed = false
+
+        for (pass in 0 until ITERATIONS) {
+            val shift = slopeIntegral(current, w, h) ?: break
+            if (shift.maxOf { abs(it) } < MIN_SHIFT) break
+            changed = true
+            val mapY = Mat(h, w, CvType.CV_32F)
+            mapY.put(0, 0, FloatArray(n) { rowIndex[it] + shift[it] })
+            val composed = Mat()
+            Imgproc.remap(rows, composed, mapX, mapY, Imgproc.INTER_LINEAR, Core.BORDER_REPLICATE)
+            rows.release()
+            rows = composed
+            val next = Mat()
+            Imgproc.remap(g0, next, mapX, rows, Imgproc.INTER_LINEAR, Core.BORDER_REPLICATE)
+            current.release()
+            current = next
+            mapY.release()
+        }
+        val total = FloatArray(n)
+        rows.get(0, 0, total)
+        listOf(g0, mapX, rows, current).forEach { it.release() }
+        if (!changed) return null
+
+        val cap = (h * MAX_SHIFT_FRACTION).toFloat()
+        for (i in 0 until n) total[i] = (total[i] - rowIndex[i]).coerceIn(-cap, cap)
+        return Field(total, w, h, scale)
+    }
+
+    /**
+     * One pass: how far each pixel of [gray] sits off its text line, as a vertical shift in working pixels
+     * (add it to the row number to find where to read from). Null when the page has too little text to judge.
+     */
+    private fun slopeIntegral(gray: Mat, w: Int, h: Int): FloatArray? {
+        val n = w * h
         val ink = Mat()
-        Imgproc.adaptiveThreshold(small, ink, 255.0, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY_INV, 31, 15.0)
-        small.release()
+        Imgproc.adaptiveThreshold(gray, ink, 255.0, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY_INV, 31, 15.0)
         val margin = (min(w, h) * 0.03).toInt().coerceAtLeast(1)
         ink.submat(0, margin, 0, w).setTo(Scalar(0.0))
         ink.submat(h - margin, h, 0, w).setTo(Scalar(0.0))
         ink.submat(0, h, 0, margin).setTo(Scalar(0.0))
         ink.submat(0, h, w - margin, w).setTo(Scalar(0.0))
+        val inkF = Mat()
+        ink.convertTo(inkF, CvType.CV_32F, 1.0 / 255.0)
+        ink.release()
 
-        // Merge the letters of a line into one blob (wide, flat kernel).
-        var kw = max(15, (w * 0.05).toInt())
-        if (kw % 2 == 0) kw += 1
-        val blobs = Mat()
-        Imgproc.dilate(ink, blobs, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(kw.toDouble(), 3.0)))
-        val labels = Mat()
-        val stats = Mat()
-        val centroids = Mat()
-        val count = Imgproc.connectedComponentsWithStats(blobs, labels, stats, centroids, 8, CvType.CV_32S)
-        val statData = IntArray(count * 5)
-        stats.get(0, 0, statData)
+        // Words merge into streaks along the line, so edges of the streaks show the line direction rather than the letters.
+        val streak = Mat()
+        Imgproc.GaussianBlur(inkF, streak, Size(0.0, 0.0), 9.0, 2.0)
+        val gx = Mat()
+        val gy = Mat()
+        Imgproc.Sobel(streak, gx, CvType.CV_32F, 1, 0, 3)
+        Imgproc.Sobel(streak, gy, CvType.CV_32F, 0, 1, 3)
+        streak.release()
+        val jxx = window(gx, gx)
+        val jyy = window(gy, gy)
+        val jxy = window(gx, gy)
+        listOf(gx, gy).forEach { it.release() }
+        val density = blurred(inkF, 12.0)
+        val centre = blurred(inkF, 4.0)
+        inkF.release()
 
-        val lineOfLabel = IntArray(count) { -1 }
-        var lines = 0
-        for (i in 1 until count) {
-            val bw = statData[i * 5 + Imgproc.CC_STAT_WIDTH]
-            val bh = statData[i * 5 + Imgproc.CC_STAT_HEIGHT]
-            if (bw >= w * 0.3 && bh <= h * 0.06) lineOfLabel[i] = lines++
+        val slope = FloatArray(n)
+        val weight = FloatArray(n)
+        val energy = FloatArray(n) { jxx[it] + jyy[it] }
+        val sortedEnergy = energy.copyOf().also { it.sort() }
+        val energyFloor = sortedEnergy[n / 2]
+        var clear = 0
+        for (i in 0 until n) {
+            val a = jxx[i] - jyy[i]
+            val b = 2f * jxy[i]
+            val coherence = Math.sqrt((a * a + b * b).toDouble()).toFloat() / (energy[i] + 1e-9f)
+            val theta = 0.5 * atan2(b.toDouble(), a.toDouble())
+            val s = sin(theta)
+            // The ink streaks run perpendicular to the strongest gradient (cos, sin); their slope is -cos/sin.
+            slope[i] = if (abs(s) < 1e-3) 0f else (-cos(theta) / s).coerceIn(-MAX_SLOPE, MAX_SLOPE).toFloat()
+            weight[i] = if (energy[i] >= energyFloor && density[i] > 0.01f) coherence * coherence else 0f
+            if (weight[i] > 0.3f) clear++
         }
-        if (lines < MIN_LINES) {
-            listOf(ink, blobs, labels, stats, centroids).forEach { it.release() }
-            return null
-        }
+        if (clear < n * MIN_TEXT_FRACTION) return null
 
-        val labelData = IntArray(w * h)
-        labels.get(0, 0, labelData)
-        val inkData = ByteArray(w * h)
-        ink.get(0, 0, inkData)
-        listOf(ink, blobs, labels, stats, centroids).forEach { it.release() }
-
-        val sums = DoubleArray(lines * w)
-        val counts = IntArray(lines * w)
+        // Normalised smoothing: average the slope where there is text and spread it into the gaps.
+        val weighted = FloatArray(n) { slope[it] * weight[it] }
+        val num = blurredArray(weighted, w, h, 30.0)
+        val den = blurredArray(weight, w, h, 30.0)
+        val shift = FloatArray(n)
         for (y in 0 until h) {
-            val rowStart = y * w
+            var run = 0f
+            val start = y * w
             for (x in 0 until w) {
-                if (inkData[rowStart + x].toInt() == 0) continue
-                val line = lineOfLabel[labelData[rowStart + x]]
-                if (line < 0) continue
-                sums[line * w + x] += y.toDouble()
-                counts[line * w + x]++
+                val i = start + x
+                run += if (den[i] > 1e-3f) num[i] / den[i] else 0f
+                shift[i] = run
             }
-        }
-
-        // Per line: smooth curve through the ink centre of each column, sampled at a few places.
-        val sampleX = ArrayList<Double>()
-        val sampleY = ArrayList<Double>()
-        val sampleShift = ArrayList<Double>()
-        for (line in 0 until lines) {
-            val xs = ArrayList<Double>()
-            val ys = ArrayList<Double>()
+            // Keep each row's text where it was on average, so only the bend is removed.
+            var sum = 0.0
+            var mass = 0.0
             for (x in 0 until w) {
-                val c = counts[line * w + x]
-                if (c > 0) {
-                    xs += (x + 0.5) / w - 0.5
-                    ys += sums[line * w + x] / c
-                }
+                val m = centre[start + x] + 1e-3
+                sum += shift[start + x] * m
+                mass += m
             }
-            if (xs.size < w * 0.2) continue
-            val curve = LeastSquares.polyFit(xs.toDoubleArray(), ys.toDoubleArray(), 2) ?: continue
-            val x0 = xs.first()
-            val x1 = xs.last()
-            val gx = DoubleArray(SAMPLES_PER_LINE) { x0 + (x1 - x0) * it / (SAMPLES_PER_LINE - 1) }
-            val gy = DoubleArray(SAMPLES_PER_LINE) { LeastSquares.polyEval(curve, gx[it]) }
-            val mean = gy.average()
-            for (i in gx.indices) {
-                sampleX += gx[i]
-                sampleY += mean / h - 0.5
-                sampleShift += gy[i] - mean
-            }
+            val mean = (sum / mass).toFloat()
+            for (x in 0 until w) shift[start + x] -= mean
         }
-        if (sampleX.size < MIN_LINES * SAMPLES_PER_LINE) return null
+        val smooth = Mat(h, w, CvType.CV_32F)
+        smooth.put(0, 0, shift)
+        Imgproc.GaussianBlur(smooth, smooth, Size(0.0, 0.0), 3.0, 6.0)
+        smooth.get(0, 0, shift)
+        smooth.release()
+        return shift
+    }
 
-        fun features(x: Double, y: Double): DoubleArray {
-            val f = DoubleArray(X_TERMS * Y_TERMS)
-            var py = 1.0
-            for (j in 0 until Y_TERMS) {
-                var px = 1.0
-                for (i in 0 until X_TERMS) {
-                    f[j * X_TERMS + i] = px * py
-                    px *= x
-                }
-                py *= y
-            }
-            return f
-        }
+    /** Gaussian-weighted sum of the product of two gradient images (one term of the structure tensor). */
+    private fun window(p: Mat, q: Mat): FloatArray {
+        val prod = Mat()
+        Core.multiply(p, q, prod)
+        val out = blurred(prod, 12.0)
+        prod.release()
+        return out
+    }
 
-        val rows = sampleX.indices.map { features(sampleX[it], sampleY[it]) }
-        val target = sampleShift.toDoubleArray()
-        var coef = LeastSquares.solve(rows, target) ?: return null
-        // Refit without the outliers (headings, stamps, lines that merged) for a robust surface.
-        val residuals = DoubleArray(target.size) { i -> abs(target[i] - rows[i].indices.sumOf { rows[i][it] * coef[it] }) }
-        val median = residuals.sorted()[residuals.size / 2]
-        val limit = max(1.0, 3 * median)
-        val keep = residuals.indices.filter { residuals[it] <= limit }
-        if (keep.size >= residuals.size / 2) {
-            coef = LeastSquares.solve(keep.map { rows[it] }, keep.map { target[it] }.toDoubleArray()) ?: coef
-        }
+    private fun blurred(src: Mat, sigma: Double): FloatArray {
+        val dst = Mat()
+        Imgproc.GaussianBlur(src, dst, Size(0.0, 0.0), sigma)
+        val data = FloatArray(src.rows() * src.cols())
+        dst.get(0, 0, data)
+        dst.release()
+        return data
+    }
 
-        val cap = h * MAX_SHIFT_FRACTION
-        val values = FloatArray(w * h)
-        val rowTerm = Array(Y_TERMS) { DoubleArray(w) }
-        for (x in 0 until w) {
-            val xn = (x + 0.5) / w - 0.5
-            for (j in 0 until Y_TERMS) {
-                var px = 1.0
-                var sum = 0.0
-                for (i in 0 until X_TERMS) {
-                    sum += coef[j * X_TERMS + i] * px
-                    px *= xn
-                }
-                rowTerm[j][x] = sum
-            }
-        }
-        var biggest = 0.0
-        for (y in 0 until h) {
-            val yn = (y + 0.5) / h - 0.5
-            for (x in 0 until w) {
-                val v = (rowTerm[0][x] + yn * rowTerm[1][x]).coerceIn(-cap, cap)
-                values[y * w + x] = v.toFloat()
-                if (abs(v) > biggest) biggest = abs(v)
-            }
-        }
-        if (biggest < MIN_SHIFT) return null
-        return Field(values, w, h, scale)
+    private fun blurredArray(data: FloatArray, w: Int, h: Int, sigma: Double): FloatArray {
+        val m = Mat(h, w, CvType.CV_32F)
+        m.put(0, 0, data)
+        val out = blurred(m, sigma)
+        m.release()
+        return out
     }
 }

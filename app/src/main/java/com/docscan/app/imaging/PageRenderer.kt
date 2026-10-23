@@ -51,12 +51,12 @@ class PageRenderer(private val store: FileStore) {
             if (source == null) original.recycle()
             val warped = Warper.warp(mat, page.cornerList(), maxSide)
             mat.release()
-            // Un-curl wavy paper (needs several text lines), then level any remaining tilt of the text.
-            val flat = Dewarp.apply(warped)
+            // Level the overall tilt first, then flatten curled or wavy paper so every text line runs straight.
+            val level = Deskew.apply(warped)
             warped.release()
-            val level = Deskew.apply(flat)
-            flat.release()
-            level
+            val flat = Dewarp.apply(level)
+            level.release()
+            flat
         }
 
     /** Small cached rendering for lists and grids. */
