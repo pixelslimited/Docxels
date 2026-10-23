@@ -80,7 +80,7 @@
 *|FREE|Select several|Long-press a document or a page to tick it, then share, move, favourite, rotate or delete the ticked ones.
 *|FREE|Sort and view|Sort by date, name or type, and show documents as a list, grid or small grid. It remembers your choice.
 *|FREE|New scans folder|In Settings you can name a folder that every new scan goes into.
-*|FREE|Tap to open|Tap the pages on Continue where you stopped to open the document straight away.
 *|FREE|Tap to open|In Documents, tapping a file opens it straight away. The three dots hold share, move, rename and the rest.
 *|FREE|Open with Docxels|Word, PDF and text files opened from other apps now offer Docxels more reliably and open straight into editing or viewing.
 *|FIX|Open from other apps|A Word, PDF or text file opened from another app now opens straight into editing or viewing.
+*|FREE|Hold to preview|Hold the pages on Continue where you stopped to see the whole document flip by; let go and it goes away. Tap still sends the pages flying, higher than before.

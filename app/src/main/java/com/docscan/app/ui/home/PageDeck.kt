@@ -108,19 +108,20 @@ class DeckState(private val scope: CoroutineScope, val still: Boolean) {
         a.snapTo(0f)
     }
 
-    /** A tap: the document's real pages fly off in every direction, slow down, turn and fade; the deck pops back. */
+    /** A tap: the document's real pages fly off (mostly upward, well beyond the card), slow down, turn and fade; the deck pops back. */
     fun fling(pages: List<Bitmap>) {
         if (still || pages.isEmpty()) return
         touchedAt = SystemClock.uptimeMillis()
         val r = kotlin.random.Random
-        repeat(6) { i ->
-            val angle = Math.toRadians(r.nextDouble(0.0, 360.0))
-            val dist = r.nextFloat() * 90f + 100f
+        repeat(7) { i ->
+            // Mostly upward, and far: the pages leave the card and travel over the rest of the screen before they fade.
+            val angle = Math.toRadians(if (i % 3 == 2) r.nextDouble(0.0, 360.0) else r.nextDouble(15.0, 165.0))
+            val dist = r.nextFloat() * 220f + 190f
             val t = ThrownPage(
                 bmp = pages[i % pages.size],
                 dx = (cos(angle) * dist).toFloat(), dy = (-kotlin.math.sin(angle) * dist).toFloat(),
                 turn = (r.nextFloat() * 420f + 140f) * (if (r.nextBoolean()) 1 else -1),
-                ms = r.nextInt(800, 1200), size = r.nextFloat() * 0.25f + 0.55f,
+                ms = r.nextInt(1300, 1900), size = r.nextFloat() * 0.25f + 0.55f,
             )
             thrown.add(t)
             scope.launch {
@@ -147,13 +148,14 @@ fun rememberDeckState(): DeckState {
 
 /**
  * The document's first pages as a living deck: the front page keeps turning over to show the next one, drag it any way
- * to revolve it (down or sideways, upside down included), tap to send the real pages flying while the document opens. Pure Compose, no extra libraries.
+ * to revolve it (down or sideways, upside down included), tap to send the real pages flying far across the screen, hold to preview the whole document until the finger lifts. Pure Compose, no extra libraries.
  */
 @Composable
-fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modifier, state: DeckState = rememberDeckState(), onTap: () -> Unit = {}) {
+fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modifier, state: DeckState = rememberDeckState(), onHold: (Boolean) -> Unit = {}) {
     val density = LocalDensity.current.density
     val n = pages.size
     val current by rememberUpdatedState(pages)
+    val holdNow by rememberUpdatedState(onHold)
     val fan = remember { Animatable(if (state.still) 1f else 0f) }
     LaunchedEffect(Unit) { fan.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)) }
     LaunchedEffect(n, state.still) {
@@ -171,7 +173,22 @@ fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modi
         modifier
             .size(width = 100.dp, height = 124.dp)
             .zIndex(1f)
-            .pointerInput(state) { detectTapGestures(onTap = { state.fling(current); onTap() }) }
+            .pointerInput(state) {
+                // Holding the deck shows a preview of the document for as long as the finger stays down; a quick tap sends the pages flying.
+                detectTapGestures(
+                    onPress = {
+                        var holding = false
+                        kotlinx.coroutines.coroutineScope {
+                            val timer = launch { delay(viewConfiguration.longPressTimeoutMillis); holding = true; holdNow(true) }
+                            tryAwaitRelease()
+                            timer.cancel()
+                            if (holding) holdNow(false)
+                        }
+                    },
+                    onLongPress = {},
+                    onTap = { state.fling(current) },
+                )
+            }
             .pointerInput(state) {
                 detectDragGestures(onDragEnd = { state.release() }, onDragCancel = { state.release() }) { change, drag ->
                     change.consume()
