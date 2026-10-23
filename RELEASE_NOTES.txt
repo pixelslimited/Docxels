@@ -80,4 +80,4 @@
 *|FREE|Select several|Long-press a document or a page to tick it, then share, move, favourite, rotate or delete the ticked ones.
 *|FREE|Sort and view|Sort by date, name or type, and show documents as a list, grid or small grid. It remembers your choice.
 *|FREE|New scans folder|In Settings you can name a folder that every new scan goes into.
-*|FREE|Quick glance|Tap the pages on Continue where you stopped to flip through the whole document by itself, starting where you left off.
+*|FREE|Tap to open|Tap the pages on Continue where you stopped to open the document straight away.

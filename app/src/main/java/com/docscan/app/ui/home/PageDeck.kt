@@ -147,7 +147,7 @@ fun rememberDeckState(): DeckState {
 
 /**
  * The document's first pages as a living deck: the front page keeps turning over to show the next one, drag it any way
- * to revolve it (down or sideways, upside down included), tap to send the real pages flying and open a quick glance through the whole document. Pure Compose, no extra libraries.
+ * to revolve it (down or sideways, upside down included), tap to send the real pages flying while the document opens. Pure Compose, no extra libraries.
  */
 @Composable
 fun PageDeck(pages: List<Bitmap>, description: String, modifier: Modifier = Modifier, state: DeckState = rememberDeckState(), onTap: () -> Unit = {}) {
