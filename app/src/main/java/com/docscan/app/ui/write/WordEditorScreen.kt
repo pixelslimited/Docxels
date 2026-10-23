@@ -1209,6 +1209,7 @@ private fun Ribbon(
     var tabMenu by remember { mutableStateOf(false) }
     var searching by remember { mutableStateOf(false) }
     var clipMenu by remember { mutableStateOf(false) }
+    var alignMenu by remember { mutableStateOf(false) }
     if (searching) {
         val list = ArrayList<Command>()
         fun cmd(label: String, where: String, words: String = "", run: () -> Unit) { list += Command(label, where, words) { open = false; run() } }
@@ -1400,6 +1401,21 @@ private fun Ribbon(
                         Q(Icons.Default.FormatBold, "Bold", s.bold, fixed = true) { c.toggle(CharKind.BOLD, CharAttr.Bold) }
                         Q(Icons.Default.FormatItalic, "Italic", s.italic, fixed = true) { c.toggle(CharKind.ITALIC, CharAttr.Italic) }
                         Q(Icons.Default.FormatUnderlined, "Underline", s.underline, fixed = true) { c.toggle(CharKind.UNDERLINE, CharAttr.Underline) }
+                        Box(Modifier.width(40.dp)) {
+                            val alignIcon = when (s.align) {
+                                Align.CENTER -> Icons.Default.FormatAlignCenter
+                                Align.RIGHT -> Icons.Default.FormatAlignRight
+                                Align.JUSTIFY -> Icons.Default.FormatAlignJustify
+                                else -> Icons.Default.FormatAlignLeft
+                            }
+                            Row(Modifier.fillMaxWidth()) { Q(alignIcon, "Alignment", fixed = true) { alignMenu = true } }
+                            DropdownMenu(expanded = alignMenu, onDismissRequest = { alignMenu = false }) {
+                                DropdownMenuItem(text = { Text("Align left") }, leadingIcon = { Icon(Icons.Default.FormatAlignLeft, null) }, onClick = { alignMenu = false; c.setAlign(Align.LEFT) })
+                                DropdownMenuItem(text = { Text("Centre") }, leadingIcon = { Icon(Icons.Default.FormatAlignCenter, null) }, onClick = { alignMenu = false; c.setAlign(Align.CENTER) })
+                                DropdownMenuItem(text = { Text("Align right") }, leadingIcon = { Icon(Icons.Default.FormatAlignRight, null) }, onClick = { alignMenu = false; c.setAlign(Align.RIGHT) })
+                                DropdownMenuItem(text = { Text("Justify") }, leadingIcon = { Icon(Icons.Default.FormatAlignJustify, null) }, onClick = { alignMenu = false; c.setAlign(Align.JUSTIFY) })
+                            }
+                        }
                         Box(Modifier.width(40.dp)) {
                             Row(Modifier.fillMaxWidth()) { Q(Icons.Default.FormatColorFill, "Highlight", fixed = true) { fillMenu = true } }
                             DropdownMenu(expanded = fillMenu, onDismissRequest = { fillMenu = false }) {

@@ -70,3 +70,4 @@
 *|FREE|Type in table cells|Tap a table cell and type; the row grows as you type. Bold, colour, size, bullets and the other text tools work in the cell, with a Next cell button.
 *|FREE|Pinch zoom in PDFs|Pinch and double-tap now zoom where your fingers are.
 *|FREE|Remind me later|The new-version notice has a Remind me later button that brings it back in about 4 hours.
+*|FREE|Alignment on the quick bar|Align left, centre, right or justify from the quick bar, before the highlighter and text colour.
