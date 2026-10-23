@@ -90,3 +90,4 @@
 *|FREE|Type in the cell|Typing in a table now happens in the cell itself, with the caret inside it, no box over it, and stays smooth because the table is only rebuilt when a line is added or typing pauses.
 *|PRO|Hide the Docxels credit|Pro can switch off the small credit on exported pages. It now sits at the bottom right.
 *|FREE|Terms and privacy|Everyone must accept the Terms of use and Privacy policy once before using Docxels.
+*|FREE|Clearer pop-ups|Messages and update notices now appear as a big headline with one wide button, like a campaign pop-up.

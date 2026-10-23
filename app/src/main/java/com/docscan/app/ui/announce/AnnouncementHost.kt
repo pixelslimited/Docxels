@@ -12,6 +12,12 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -162,25 +168,47 @@ private fun MessageDialog(
     laterLabel: String? = null, onLater: () -> Unit = {},
 ) {
     // Only the X closes it: tapping outside or pressing back leaves the message up, so it is never missed by accident.
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 6.dp) {
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (image != null) {
-                    Image(
-                        image.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(RoundedCornerShape(16.dp)),
-                    )
-                }
-                Row(verticalAlignment = Alignment.Top) {
-                    Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).padding(top = 4.dp))
-                    IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Close") }
-                }
-                Text(body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    if (laterLabel != null) TextButton(onClick = onLater) { Text(laterLabel) }
-                    if (button != null) Button(onClick = onButton) { Text(button) }
-                }
+    // The pop-up has no card of its own: a big headline, a picture, one big button and a round X sit on the dimmed screen.
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false, usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                title, style = MaterialTheme.typography.headlineLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+                color = androidx.compose.ui.graphics.Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            if (image != null) {
+                Image(image.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp).clip(RoundedCornerShape(20.dp)))
+            } else {
+                Image(
+                    androidx.compose.ui.res.painterResource(com.docscan.app.R.drawable.docxels_logo), contentDescription = null,
+                    modifier = Modifier.size(120.dp).clip(RoundedCornerShape(28.dp)),
+                )
             }
+            Text(
+                body, style = MaterialTheme.typography.bodyLarge, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.88f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            if (button != null) {
+                Box(
+                    Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(30.dp))
+                        .background(com.docscan.app.ui.theme.DocxelsTheme.brand.gradient)
+                        .clickable(onClick = onButton),
+                    contentAlignment = Alignment.Center,
+                ) { Text(button, style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White) }
+            }
+            if (laterLabel != null) TextButton(onClick = onLater) { Text(laterLabel, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f)) }
+            Box(
+                Modifier.size(52.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                    .border(2.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f), androidx.compose.foundation.shape.CircleShape)
+                    .clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Default.Close, contentDescription = "Close", tint = androidx.compose.ui.graphics.Color.White) }
         }
     }
 }

@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
@@ -45,11 +46,16 @@ fun TermsGateScreen(onAccept: () -> Unit) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TermsGate.SITE + path)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Before you start", style = MaterialTheme.typography.headlineSmall)
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Before you start", style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
             Text(
                 "Docxels is made by Pixels Limited. To use the app, please read and accept our Terms of use and Privacy policy.",
                 style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
             )
             OutlinedButton(onClick = { open("/terms.html") }, modifier = Modifier.fillMaxWidth()) { Text("Read the Terms of use") }
             OutlinedButton(onClick = { open("/privacy.html") }, modifier = Modifier.fillMaxWidth()) { Text("Read the Privacy policy") }
@@ -59,7 +65,7 @@ fun TermsGateScreen(onAccept: () -> Unit) {
             }
             Button(onClick = onAccept, enabled = agreed, modifier = Modifier.fillMaxWidth()) { Text("Continue") }
             OutlinedButton(onClick = { (context as? Activity)?.finishAffinity() }, modifier = Modifier.fillMaxWidth()) { Text("Exit") }
-            Text("Docxels cannot be used until these are accepted.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Docxels cannot be used until these are accepted.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }
 }

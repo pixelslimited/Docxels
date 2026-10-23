@@ -113,6 +113,8 @@ for f in ("index.html", "privacy.html", "terms.html"):
     if p.exists():
         t = p.read_text()
         t2 = re.sub(r'<span class="logo"><svg.*?</svg></span>', '<span class="logo"><img src="icon-512.png" alt="" width="36" height="36"></span>', t, flags=re.S)
+        # The "Draft text for review" notice is not shown on the published pages (the earlier tidy step could not clone: its token had a stray newline).
+        t2 = re.sub(r'[ \t]*<div class="notice">Draft text for review.*?</div>\n?', '', t2, flags=re.S)
         if t2 != t: p.write_text(t2)
 c = d / "styles.css"
 if c.exists() and "logo img" not in c.read_text():
