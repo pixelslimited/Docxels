@@ -60,6 +60,7 @@ import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -289,6 +290,73 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         val n = f(t, ctx.second, ctx.third)
         if (n == null) scope.launch { snackbar.showSnackbar("That can't be done on this table (merged cells, or only one row left).") }
         else controller.replaceBlock(ctx.first, Block.Table(n))
+    }
+    /**
+     * Types in a table cell where it is: the cell's text is edited by an editor of its own (so every text tool works
+     * in it), the table is updated a moment after each change so the row grows as you type, and the box follows the cell.
+     */
+    fun openCell(idx: Int, row: Int, col: Int, rect: android.graphics.RectF, pad: Float) {
+        val host = pageHost ?: return
+        val cell = (controller.blockAt(idx) as? Block.Table)?.table?.rows?.getOrNull(row)?.getOrNull(col) ?: return
+        tableCtx = Triple(idx, row, col)
+        val dens = controller.effectiveDensity()
+        val ctl = EditorController(dens, cell.paragraphs.map { Block.Para(it) })
+        cellCtl = ctl
+        val bg = 0xFF000000.toInt() or (cell.shading ?: 0xFFFFFF)
+        fun save(): Boolean {
+            val typed = ctl.cellParagraphs()
+            val now = (controller.blockAt(idx) as? Block.Table)?.table ?: return false
+            val old = now.rows.getOrNull(row)?.getOrNull(col) ?: return false
+            if (old.paragraphs == typed) return false
+            val rows = now.rows.mapIndexed { ri, r -> if (ri == row) r.mapIndexed { ci, c -> if (ci == col) c.copy(paragraphs = typed) else c } else r }
+            controller.replaceBlock(idx, Block.Table(now.copy(rows = rows)))
+            return true
+        }
+        val saver = Runnable {
+            if (save()) host.edit.postDelayed({ host.edit.cellRectOf(idx, row, col)?.let { host.moveCellEditor(it.first) } }, 120)
+        }
+        host.showCellEditor(rect, { ed ->
+            ctl.attach(ed)
+            ed.paint.density = dens
+            ed.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, com.docscan.app.core.word.StyleDefaults.BODY_SIZE_PT * ZOOM * dens)
+            ed.setPadding(pad.toInt(), pad.toInt(), pad.toInt(), pad.toInt())
+            ed.setBackgroundColor(bg)
+            ed.includeFontPadding = false
+            ed.onUserTouch = { quick = true }
+            ctl.onChanged = { host.removeCallbacks(saver); host.postDelayed(saver, 300) }
+        }) { keep ->
+            host.removeCallbacks(saver)
+            if (keep) save()
+            ctl.detach()
+            if (cellCtl === ctl) cellCtl = null
+        }
+    }
+    /** Moves typing to the next cell (adding a row after the last one). */
+    fun nextCell() {
+        val ctx = tableCtx ?: return
+        val host = pageHost ?: return
+        host.closeCellEditor()
+        var table = (controller.blockAt(ctx.first) as? Block.Table)?.table ?: return
+        var r = ctx.second
+        var c = ctx.third
+        do {
+            c++
+            if (c >= table.rows[r].size) { c = 0; r++ }
+        } while (r < table.rows.size && table.rows[r].getOrNull(c)?.vMergeContinue == true)
+        if (r >= table.rows.size) {
+            val grown = TableOps.rowBelow(table, table.rows.lastIndex)
+            if (grown == null) { scope.launch { snackbar.showSnackbar("That's the last cell.") }; return }
+            controller.replaceBlock(ctx.first, Block.Table(grown))
+            table = grown
+            r = grown.rows.lastIndex
+            c = 0
+        }
+        val (nr, nc) = r to c
+        tableCtx = Triple(ctx.first, nr, nc)
+        host.edit.postDelayed({
+            val hit = host.edit.cellRectOf(ctx.first, nr, nc)
+            if (hit != null) { host.revealCell(hit.first); openCell(ctx.first, nr, nc, hit.first, hit.second) }
+        }, 150)
     }
     val deskColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     var tableOpen by remember { mutableStateOf(false) }
@@ -541,35 +609,8 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                             } else editing = i
                         }
                         host.edit.onCellTap = { idx, row, col, rect, pad ->
-                            val tb = (controller.blockAt(idx) as? Block.Table)?.table
-                            val cell = tb?.rows?.getOrNull(row)?.getOrNull(col)
-                            if (tb != null && cell != null && !controller.isReadOnly() && editing == null) {
-                                tableCtx = Triple(idx, row, col)
-                                val dens = controller.effectiveDensity()
-                                val ctl = EditorController(dens, cell.paragraphs.map { Block.Para(it) })
-                                cellCtl = ctl
-                                val bg = 0xFF000000.toInt() or (cell.shading ?: 0xFFFFFF)
-                                host.showCellEditor(rect, { ed ->
-                                    ctl.attach(ed)
-                                    ed.paint.density = dens
-                                    ed.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, com.docscan.app.core.word.StyleDefaults.BODY_SIZE_PT * ZOOM * dens)
-                                    ed.setPadding(pad.toInt(), pad.toInt(), pad.toInt(), pad.toInt())
-                                    ed.setBackgroundColor(bg)
-                                    ed.includeFontPadding = false
-                                    ed.onUserTouch = { quick = true }
-                                }) { keep ->
-                                    if (keep) {
-                                        val typed = ctl.cellParagraphs()
-                                        val now = (controller.blockAt(idx) as? Block.Table)?.table
-                                        val old = now?.rows?.getOrNull(row)?.getOrNull(col)
-                                        if (now != null && old != null && old.paragraphs != typed) {
-                                            val rows = now.rows.mapIndexed { ri, r -> if (ri == row) r.mapIndexed { ci, c -> if (ci == col) c.copy(paragraphs = typed) else c } else r }
-                                            controller.replaceBlock(idx, Block.Table(now.copy(rows = rows)))
-                                        }
-                                    }
-                                    ctl.detach()
-                                    if (cellCtl === ctl) cellCtl = null
-                                }
+                            if (!controller.isReadOnly() && editing == null && (controller.blockAt(idx) as? Block.Table)?.table?.rows?.getOrNull(row)?.getOrNull(col) != null) {
+                                openCell(idx, row, col, rect, pad)
                             } else if (editing == null) editing = idx
                         }
                         controller.setLinkTapListener { a, b, u -> linkActions = Triple(a, b, u) }
@@ -614,6 +655,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                     tableTools = tableCtx?.let { ctx ->
                         val idx = ctx.first
                         listOf(
+                            ToolAction(Icons.AutoMirrored.Filled.ArrowForward, "Next cell") { nextCell() },
                             ToolAction(Icons.Default.TableChart, "Table options") { pageHost?.closeCellEditor(); editing = idx },
                             ToolAction(Icons.Default.Add, "Add a row below") { tableEdit { t, r, _ -> TableOps.rowBelow(t, r) } },
                             ToolAction(Icons.Default.ViewColumn, "Add a column to the right") { tableEdit { t, _, c -> TableOps.columnRight(t, c) } },

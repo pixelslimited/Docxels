@@ -169,6 +169,26 @@ class PageHost(context: Context) : ScrollView(context) {
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(ed, 0)
     }
 
+    /** Follows the cell when its row grows or the table moves while typing. */
+    fun moveCellEditor(r: android.graphics.RectF) {
+        val ed = cellEditor ?: return
+        val lp = ed.layoutParams as FrameLayout.LayoutParams
+        lp.width = r.width().toInt()
+        lp.leftMargin = edit.left + r.left.toInt()
+        lp.topMargin = edit.top + r.top.toInt()
+        ed.minHeight = r.height().toInt()
+        ed.layoutParams = lp
+    }
+
+    /** Scrolls so the cell (given in the editor's coordinates) is in view above the keyboard and tools. */
+    fun revealCell(r: android.graphics.RectF) {
+        val top = edit.top + r.top.toInt()
+        val bottom = edit.top + r.bottom.toInt()
+        val margin = (80 * resources.displayMetrics.density).toInt()
+        if (top - margin < scrollY) smoothScrollTo(0, (top - margin).coerceAtLeast(0))
+        else if (bottom > scrollY + height * 2 / 3) smoothScrollTo(0, bottom - height * 2 / 3)
+    }
+
     /** Removes the cell box without keeping what was typed in it. */
     fun discardCellEditor() = endCell(false)
 

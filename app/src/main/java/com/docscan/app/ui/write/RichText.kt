@@ -996,6 +996,24 @@ class BlockChipSpan(
         return null
     }
 
+    /** Where a given cell is (in text-layout coordinates) as of the last time the table was drawn; null when there is no such cell. */
+    fun cellRect(row: Int, col: Int, paint: Paint): CellHit? {
+        val b = block as? com.docscan.app.core.word.Block.Table ?: return null
+        val lay = tableLayout(b.table, paint)
+        val plan = paging(paint)
+        val x = lastX + b.table.indentTwips * lay.k
+        var acc = 0f
+        for (ri in lay.rows.indices) {
+            val y = lastTop + (plan?.rowTops?.get(ri) ?: acc)
+            val h = plan?.rowHeights?.get(ri) ?: lay.heights[ri]
+            acc += lay.heights[ri]
+            if (ri != row) continue
+            val cell = lay.rows[ri].getOrNull(col) ?: return null
+            return CellHit(ri, col, android.graphics.RectF(x + cell.xPx, y, x + cell.xPx + cell.wPx, y + h), 57f * lay.k)
+        }
+        return null
+    }
+
     private fun drawTable(c: Canvas, t: com.docscan.app.core.word.TableBlock, x0: Float, top: Int, paint: Paint) {
         lastX = x0
         lastTop = top.toFloat()

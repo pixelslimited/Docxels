@@ -428,6 +428,16 @@ class RichEditText(context: Context) : EditText(context) {
     var onLinkTap: ((Int, Int, String) -> Unit)? = null
     /** Called with the fill-in field (check box, text, date or drop-down) that was tapped. */
     var onFormTap: ((com.docscan.app.core.word.FormToken) -> Unit)? = null
+    /** The cell's rectangle in this view (and its padding) as drawn now, or null when that table or cell is not on screen. */
+    fun cellRectOf(index: Int, row: Int, col: Int): Pair<android.graphics.RectF, Float>? {
+        val t = text
+        val chip = t.getSpans(0, t.length, BlockChipSpan::class.java).firstOrNull { it.index == index && it.isTable } ?: return null
+        val hit = chip.cellRect(row, col, paint) ?: return null
+        val r = android.graphics.RectF(hit.rect)
+        r.offset(paddingLeft.toFloat(), totalPaddingTop.toFloat())
+        return r to hit.pad
+    }
+
     /** Called with a phone number when one is double-tapped in the text (or in a table cell while reading). */
     var onDial: ((String) -> Unit)? = null
 
