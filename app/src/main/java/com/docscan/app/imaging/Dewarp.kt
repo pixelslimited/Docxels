@@ -192,7 +192,7 @@ object Dewarp {
         }
         val smooth = Mat(h, w, CvType.CV_32F)
         smooth.put(0, 0, shift)
-        Imgproc.GaussianBlur(smooth, smooth, Size(0.0, 0.0), 3.0, 6.0)
+        Imgproc.GaussianBlur(smooth, smooth, Size(0.0, 0.0), 3.0, 20.0)
         smooth.get(0, 0, shift)
         smooth.release()
         return shift
