@@ -55,8 +55,12 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
     var question by remember { mutableStateOf("") }
     var account by remember { mutableStateOf(false) }
     var writeOpen by remember { mutableStateOf(false) }
-    var kind by remember { mutableStateOf("Formal letter") }
-    var tone by remember { mutableStateOf("Formal") }
+    var kind by remember { mutableStateOf("Let AI decide") }
+    // Saved letterheads give the company; saved signatures give who signs. The newest of each is chosen at first.
+    val letterheads = remember { com.docscan.app.store.SavedAssets(context, "letterheads").list().map { it.name }.filter { it != "Untitled" } }
+    val signers = remember { com.docscan.app.store.SavedAssets(context, "signatures").list().map { it.name }.filter { it != "Untitled" } }
+    var company by remember { mutableStateOf(letterheads.firstOrNull()) }
+    var signer by remember { mutableStateOf(signers.firstOrNull()) }
     var brief by remember { mutableStateOf("") }
     var from by remember { mutableStateOf("") }
     var to by remember { mutableStateOf("") }
@@ -84,15 +88,17 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
         if (brief.isBlank()) return
         com.docscan.app.cloud.Analytics.track("assistant:write")
         val instruction = buildString {
-            append("Kind of document: ").append(kind).append(". Tone: ").append(tone).append('.')
-            if (from.isNotBlank()) append(" From: ").append(from.trim().take(300)).append('.')
+            append("Kind of document: ").append(kind).append('.')
+            company?.let { append(" Company (from the saved letterhead): ").append(it).append('.') }
+            signer?.let { append(" Signed by (from the saved signature): ").append(it).append('.') }
+            if (company == null && from.isNotBlank()) append(" From: ").append(from.trim().take(300)).append('.')
             if (to.isNotBlank()) append(" To: ").append(to.trim().take(300)).append('.')
         }
         scope.launch {
             busy = true
             try {
                 val out = cloud.ai("write", brief.trim(), instruction).trim()
-                proposal = Proposal("Your $kind", out, 0, 0, "", replaces = false, insert = true)
+                proposal = Proposal("Your draft", out, 0, 0, "", replaces = false, insert = true)
             } catch (e: CloudException) {
                 say(e.message ?: "The assistant could not write it.")
                 if (e.limitReached) account = true
@@ -185,20 +191,28 @@ fun AssistantSheet(controller: EditorController, cloud: Cloud, onDismiss: () -> 
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text("Kind of document", style = MaterialTheme.typography.labelMedium)
                 androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-                    listOf("Formal letter", "Email", "Application", "Complaint", "Request", "Resignation", "Recommendation", "Report", "Proposal", "Speech").forEach { k ->
+                    listOf("Let AI decide", "Formal letter", "Email", "Application", "Complaint", "Request", "Resignation", "Recommendation", "Report", "Proposal", "Speech").forEach { k ->
                         FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(k) })
                     }
                 }
-                Text("Tone", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-                    listOf("Formal", "Friendly", "Polite and firm", "Persuasive", "Apologetic", "Grateful").forEach { t ->
-                        FilterChip(selected = tone == t, onClick = { tone = t }, label = { Text(t) })
+                if (letterheads.isNotEmpty()) {
+                    Text("Company (from your letterheads)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                    androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = company == null, onClick = { company = null }, label = { Text("None") })
+                        letterheads.forEach { n -> FilterChip(selected = company == n, onClick = { company = n }, label = { Text(n) }) }
+                    }
+                }
+                if (signers.isNotEmpty()) {
+                    Text("Signed by (from your signatures)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                    androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = signer == null, onClick = { signer = null }, label = { Text("None") })
+                        signers.forEach { n -> FilterChip(selected = signer == n, onClick = { signer = n }, label = { Text(n) }) }
                     }
                 }
                 OutlinedTextField(brief, { brief = it }, label = { Text("What should it say?") }, minLines = 3, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                OutlinedTextField(from, { from = it }, label = { Text("From: your name and address (optional)") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                if (company == null) OutlinedTextField(from, { from = it }, label = { Text("From: your name and address (optional)") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                 OutlinedTextField(to, { to = it }, label = { Text("To: recipient and address (optional)") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                Text("Check names, dates and amounts before you send. Missing details appear in [square brackets].", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                Text("The tone is chosen for you. Check names, dates and amounts before you send. Missing details appear in [square brackets]. Add your signature picture on the blank lines above your name.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
             }
         },
         confirmButton = { TextButton(enabled = brief.isNotBlank() && !busy, onClick = { writeOpen = false; writeWithAi() }) { Text("Write it") } },
