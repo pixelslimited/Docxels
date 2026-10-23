@@ -25,7 +25,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -147,7 +151,8 @@ fun AnnouncementHost(container: AppContainer, onOpenUpdates: () -> Unit, onOpenP
 
 @Composable
 private fun MessageDialog(title: String, body: String, image: Bitmap?, button: String?, onButton: () -> Unit, onClose: () -> Unit) {
-    Dialog(onDismissRequest = onClose) {
+    // Only the X closes it: tapping outside or pressing back leaves the message up, so it is never missed by accident.
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 6.dp) {
             Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (image != null) {
@@ -156,10 +161,12 @@ private fun MessageDialog(title: String, body: String, image: Bitmap?, button: S
                         modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(RoundedCornerShape(16.dp)),
                     )
                 }
-                Text(title, style = MaterialTheme.typography.headlineSmall)
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).padding(top = 4.dp))
+                    IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Close") }
+                }
                 Text(body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onClose) { Text("Close") }
                     if (button != null) Button(onClick = onButton) { Text(button) }
                 }
             }

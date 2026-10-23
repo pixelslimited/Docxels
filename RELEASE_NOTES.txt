@@ -66,3 +66,4 @@
 *|PRO|Write with AI picks your company|Saved letterheads need a company name; signatures need name, company and position. The AI picks the right ones from what you write.
 *|FREE|Flatter pages|Curled or wavy pages are flattened much more, so text lines run level like a flatbed scan.
 *|FREE|Pinch zoom|Pinch the scanned page in the editor to zoom in, drag to move, double-tap to zoom in or out.
+*|FIX|Announcements stay until closed|A message now stays on screen until you tap the X, so you do not miss it by tapping outside.
