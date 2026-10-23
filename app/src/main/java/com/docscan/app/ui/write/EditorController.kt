@@ -596,22 +596,22 @@ class RichEditText(context: Context) : EditText(context) {
             when (event.actionMasked) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     tblSpan = null
-                    selectedSpan()?.takeIf { it.block is com.docscan.app.core.word.Block.Table }?.let { sp ->
-                        val r = selectedRect()
-                        if (r != null && r.contains(event.x, event.y)) {
-                            tblSpan = sp; tblX = event.x; tblY = event.y
-                            tblBase = (sp.block as com.docscan.app.core.word.Block.Table).table.indentTwips
-                            tblDragging = false
-                            parent?.requestDisallowInterceptTouchEvent(true)
-                            return true
-                        }
-                    }
                     val g = gripAt(event.x, event.y)
                     if (g != Grip.NONE) {
                         val sp = text.getSpans(0, text.length, BlockChipSpan::class.java).firstOrNull { it.index == selectedBlock }
                         val sz = sp?.sizeTwips()
                         if (sp != null && sz != null) {
                             grip = g; gripSpan = sp; gripW = sz.first; gripH = sz.second; gripX = event.x; gripY = event.y
+                            parent?.requestDisallowInterceptTouchEvent(true)
+                            return true
+                        }
+                    }
+                    selectedSpan()?.takeIf { it.block is com.docscan.app.core.word.Block.Table }?.let { sp ->
+                        val r = selectedRect()
+                        if (r != null && r.contains(event.x, event.y)) {
+                            tblSpan = sp; tblX = event.x; tblY = event.y
+                            tblBase = (sp.block as com.docscan.app.core.word.Block.Table).table.indentTwips
+                            tblDragging = false
                             parent?.requestDisallowInterceptTouchEvent(true)
                             return true
                         }
@@ -649,13 +649,23 @@ class RichEditText(context: Context) : EditText(context) {
                         var w = gripW
                         var h = gripH
                         when (grip) {
-                            Grip.BOTH -> {
+                            Grip.BOTH -> if (sp.isTable) {
+                                // A table scales freely: width from the sideways drag, height from the vertical one.
+                                w = (gripW + dw).coerceAtLeast(360)
+                                h = (gripH + dh).coerceAtLeast(240)
+                            } else {
                                 w = (gripW + maxOf(dw, if (gripW > 0) (dh * gripW.toFloat() / gripH.coerceAtLeast(1)).toInt() else 0)).coerceAtLeast(240)
                                 h = if (gripH > 0) (w.toLong() * gripH / gripW.coerceAtLeast(1)).toInt() else 0
                             }
                             Grip.WIDTH -> w = (gripW + dw).coerceAtLeast(240)
                             Grip.HEIGHT -> h = (gripH + dh).coerceAtLeast(120)
                             else -> {}
+                        }
+                        // Pulling only the side widens the columns; the rows keep their heights.
+                        if (grip == Grip.WIDTH && sp.isTable) h = 0
+                        // A table stays inside the text column.
+                        (sp.block as? com.docscan.app.core.word.Block.Table)?.let { tb ->
+                            if (contentWidthTwips > 0) w = w.coerceAtMost((contentWidthTwips - tb.table.indentTwips).coerceAtLeast(720))
                         }
                         val nb = sp.withSize(w, h)
                         if (nb != null) onResized?.invoke(sp.index, nb, false)

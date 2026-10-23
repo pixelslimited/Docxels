@@ -763,12 +763,31 @@ class BlockChipSpan(
     fun sizeTwips(): Pair<Int, Int>? = when (val b = block) {
         is com.docscan.app.core.word.Block.Image -> b.image.widthTwips to b.image.heightTwips
         is com.docscan.app.core.word.Block.Shape -> b.shape.widthTwips to (if (com.docscan.app.core.word.ShapePresets.isLine(b.shape.preset)) 0 else b.shape.heightTwips)
+        // A table: its columns' total width and its rows' total height as last drawn (row heights are not stored when they follow the text).
+        is com.docscan.app.core.word.Block.Table -> b.table.columnWidthsTwips.sum() to rowTwips.sum()
         else -> null
     }
+
+    /** Height of each row in twips as last laid out; the table's size handles scale from these. */
+    private var rowTwips: List<Int> = emptyList()
 
     fun withSize(w: Int, h: Int): com.docscan.app.core.word.Block? = when (val b = block) {
         is com.docscan.app.core.word.Block.Image -> com.docscan.app.core.word.Block.Image(b.image.copy(widthTwips = w.coerceAtLeast(240), heightTwips = h.coerceAtLeast(120)))
         is com.docscan.app.core.word.Block.Shape -> com.docscan.app.core.word.Block.Shape(b.shape.copy(widthTwips = w.coerceAtLeast(240), heightTwips = if (com.docscan.app.core.word.ShapePresets.isLine(b.shape.preset)) b.shape.heightTwips else h.coerceAtLeast(120)))
+        // Dragging a table's corner scales it: columns to the new width, every row to its share of the new height.
+        is com.docscan.app.core.word.Block.Table -> {
+            val t = b.table
+            val sumW = t.columnWidthsTwips.sum().coerceAtLeast(1)
+            val widths = t.columnWidthsTwips.map { (it.toLong() * w / sumW).toInt().coerceAtLeast(360) }
+            val sumH = rowTwips.sum()
+            val rows = if (h > 0 && sumH > 0 && rowTwips.size == t.rows.size) {
+                t.rows.mapIndexed { ri, row ->
+                    val target = (rowTwips[ri].toLong() * h / sumH).toInt().coerceAtLeast(240)
+                    row.map { it.copy(rowHeightTwips = target) }
+                }
+            } else t.rows
+            com.docscan.app.core.word.Block.Table(t.copy(columnWidthsTwips = widths, rows = rows))
+        }
         else -> null
     }
 
@@ -864,6 +883,7 @@ class BlockChipSpan(
             out.heights += maxOf(h, com.docscan.app.core.word.CellEdges.rowHeight(row) * k)
         }
         tableCache = out
+        rowTwips = out.heights.map { (it / k).roundToInt() }
         return out
     }
 

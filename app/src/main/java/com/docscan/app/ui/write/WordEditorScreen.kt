@@ -262,6 +262,7 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
     var quick by remember { mutableStateOf(false) }
     // The table (block, row, column) being typed in, so the floating tools offer table actions.
     var tableCtx by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
+    val tableStamp = remember { longArrayOf(0L) }
     // The picture or shape (block index) whose tools the floating bar shows.
     var pictureCtx by remember { mutableStateOf<Int?>(null) }
     var wrapFor by remember { mutableStateOf<Int?>(null) }
@@ -299,6 +300,9 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
         val host = pageHost ?: return
         val cell = (controller.blockAt(idx) as? Block.Table)?.table?.rows?.getOrNull(row)?.getOrNull(col) ?: return
         tableCtx = Triple(idx, row, col)
+        // The table shows its size handles (corner and sides) while its cell is being typed in and until something else is tapped.
+        controller.select(idx)
+        tableStamp[0] = android.os.SystemClock.uptimeMillis()
         val dens = controller.effectiveDensity()
         val ctl = EditorController(dens, cell.paragraphs.map { Block.Para(it) })
         cellCtl = ctl
@@ -597,7 +601,13 @@ private fun Editor(vm: WordViewModel, initial: WordDoc, onBack: () -> Unit, onOp
                         controller.attach(host.edit)
                         pageHost = host
                         host.onScrollDelta = { dy -> if (dy > 8) quick = false else if (dy < -8) quick = true }
-                        host.edit.onUserTouch = { tableCtx = null; if (pictureCtx != null) { pictureCtx = null; controller.select(-1) }; quick = true }
+                        host.edit.onUserTouch = {
+                            tableCtx = null
+                            if (pictureCtx != null) { pictureCtx = null; controller.select(-1) }
+                            // A tap in the text deselects the table, but not the tap that has just opened one of its cells.
+                            else if (android.os.SystemClock.uptimeMillis() - tableStamp[0] > 500) controller.select(-1)
+                            quick = true
+                        }
                         controller.setChipTapListener { i ->
                             if (controller.isReadOnly()) return@setChipTapListener
                             val b = controller.blockAt(i)

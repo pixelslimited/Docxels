@@ -26,6 +26,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -50,7 +51,7 @@ private const val PREVIEW_PAGES = 40
 private const val PREVIEW_SIDE = 1100
 private const val DEAD_ZONE_DP = 14f
 private const val AUTO_DP_PER_SECOND = 130f
-private const val PAGE_GAP_DP = 10
+private const val PAGE_GAP_DP = 14
 
 private object CenterInWindow : PopupPositionProvider {
     override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize) =
@@ -96,28 +97,28 @@ fun HoldPreview(item: LibraryItem, scrub: () -> Float) {
     Popup(popupPositionProvider = CenterInWindow, properties = PopupProperties(focusable = false, clippingEnabled = false)) {
         Column(
             Modifier.size(width = (screen.screenWidthDp * 0.92f).dp, height = (screen.screenHeightDp * 0.5f).dp)
-                .clip(RoundedCornerShape(24.dp)).background(Color(0xF2101418)).padding(14.dp),
+                .clip(RoundedCornerShape(24.dp)).background(Color(0xFFDDE2EC)).padding(horizontal = 10.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(item.title, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            Text(item.title, color = Color(0xFF1B1B1F), style = MaterialTheme.typography.titleMedium, maxLines = 1)
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 10.dp).clip(RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                if (pages.isEmpty()) CircularProgressIndicator(color = Color.White)
+                if (pages.isEmpty()) CircularProgressIndicator()
                 else LazyColumn(Modifier.fillMaxSize(), state = list, userScrollEnabled = false, verticalArrangement = Arrangement.spacedBy(PAGE_GAP_DP.dp)) {
                     itemsIndexed(pages) { i, bmp ->
                         Image(
                             bmp.asImageBitmap(), contentDescription = "Page ${i + 1} of ${item.title}", contentScale = ContentScale.FillWidth,
-                            modifier = Modifier.fillMaxWidth().aspectRatio(bmp.width.toFloat() / bmp.height).background(Color.White),
+                            modifier = Modifier.fillMaxWidth().shadow(2.dp).aspectRatio(bmp.width.toFloat() / bmp.height).background(Color.White),
                         )
                     }
                 }
             }
             Text(
                 if (pages.isEmpty()) "Loading pages…" else "Page ${list.firstVisibleItemIndex + 1} of ${maxOf(item.meta.pageTotal, pages.size)}",
-                color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF3A3F4B), style = MaterialTheme.typography.bodyMedium,
             )
             Text(
                 "Keep holding and slide up for the start, down for the end",
-                color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF5B6270), style = MaterialTheme.typography.bodySmall,
             )
         }
     }
