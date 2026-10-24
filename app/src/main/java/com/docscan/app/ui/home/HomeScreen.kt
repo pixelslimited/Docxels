@@ -36,7 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.CallMerge
@@ -140,7 +140,7 @@ fun HomeScreen(
             ContinueCard(last, exporting?.takeIf { it.key == com.docscan.app.data.LibraryMeta.key(last.kind, last.id) }, onClick = { onOpen(last) })
             Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 QuickAction(Icons.Default.NoteAdd, "New doc", Modifier.weight(1f), actions.newDoc)
-                QuickAction(Icons.Default.ReceiptLong, "Invoice", Modifier.weight(1f), actions.newInvoice)
+                QuickAction(Icons.Default.DocumentScanner, "Scans", Modifier.weight(1f), actions.scans)
                 QuickAction(Icons.Default.Article, "Templates", Modifier.weight(1f), actions.templates)
                 QuickAction(Icons.Default.Download, "Import", Modifier.weight(1f), actions.importMenu)
             }
@@ -160,7 +160,7 @@ fun HomeScreen(
             }
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HeroAction(Icons.Default.NoteAdd, "New doc", primary = true, modifier = Modifier.weight(1f), onClick = actions.newDoc)
-                HeroAction(Icons.Default.ReceiptLong, "Invoice", modifier = Modifier.weight(1f), onClick = actions.newInvoice)
+                HeroAction(Icons.Default.DocumentScanner, "Scans", modifier = Modifier.weight(1f), onClick = actions.scans)
                 HeroAction(Icons.Default.Article, "Templates", modifier = Modifier.weight(1f), onClick = actions.templates)
                 HeroAction(Icons.Default.Download, "Import", modifier = Modifier.weight(1f), onClick = actions.importMenu)
             }

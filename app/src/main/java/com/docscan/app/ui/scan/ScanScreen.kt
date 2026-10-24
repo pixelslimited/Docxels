@@ -42,7 +42,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -144,10 +143,8 @@ fun ScanScreen(
     vm: ScanViewModel,
     onDone: () -> Unit,
     onBack: () -> Unit,
-    scans: List<com.docscan.app.data.HomeItem> = emptyList(),
-    onOpenScan: (String) -> Unit = {},
+    onShowScans: () -> Unit = {},
 ) {
-    var showScans by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptics = LocalHapticFeedback.current
@@ -392,7 +389,7 @@ fun ScanScreen(
             Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 60.dp, end = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            GlassButton(onClick = { showScans = true }, description = "My scans") {
+            GlassButton(onClick = onShowScans, description = "My scans") {
                 Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = Color.White)
             }
             GlassButton(onClick = { showGrid = !showGrid }, description = if (showGrid) "Grid on" else "Grid off") {
@@ -479,38 +476,6 @@ fun ScanScreen(
 
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 200.dp))
     }
-    if (showScans) MyScansDialog(scans, onDismiss = { showScans = false }, onOpen = { showScans = false; onOpenScan(it) })
-}
-
-/** Every scan the person has made, newest first, so an earlier one can be opened without leaving the camera screen's flow. */
-@Composable
-private fun MyScansDialog(scans: List<com.docscan.app.data.HomeItem>, onDismiss: () -> Unit, onOpen: (String) -> Unit) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("My scans") },
-        text = {
-            // A scan still waiting for its first page is not listed.
-            val shown = scans.filter { it.pageCount > 0 }
-            if (shown.isEmpty()) Text("No scans yet.")
-            else androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(shown.size, key = { shown[it].document.id }) { i ->
-                    val item = shown[i]
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onOpen(item.document.id) }.padding(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        PageThumb(item.cover, Modifier.size(width = 44.dp, height = 56.dp).clip(RoundedCornerShape(6.dp)))
-                        Column {
-                            Text(item.document.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text("${item.pageCount} page${if (item.pageCount == 1) "" else "s"}", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-    )
 }
 
 @Composable

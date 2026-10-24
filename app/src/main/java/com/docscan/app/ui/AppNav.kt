@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 
 private const val HOME = "home"
 private const val SCAN = "scan/{docId}"
+private const val SCANS = "scans"
 private const val DOC = "doc/{docId}"
 private const val EDIT = "edit/{docId}/{pageId}"
 private const val WRITE = "write/{id}"
@@ -77,6 +78,16 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 onOpenWord = { id -> nav.navigate(if (id == com.docscan.app.ui.write.REVIEW_ID) REVIEW else "write/$id") },
                 onPdfTool = { mode -> nav.navigate("pdf/$mode") },
                 onOpenPdf = { id -> nav.navigate("pdfdoc/$id") },
+                onShowScans = { nav.navigate(SCANS) },
+            )
+        }
+        composable(SCANS) {
+            val lib: com.docscan.app.ui.shell.LibraryViewModel = viewModel(factory = viewModelFactory { initializer { com.docscan.app.ui.shell.LibraryViewModel(container) } })
+            com.docscan.app.ui.library.ScansScreen(
+                vm = lib,
+                onBack = { nav.popBackStack() },
+                onOpen = { id -> nav.navigate("doc/$id") },
+                onNewScan = { id -> nav.navigate("scan/$id") { popUpTo(SCANS) { inclusive = true } } },
             )
         }
         composable(PDF) { entry ->
@@ -125,11 +136,9 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 key = "scan-$docId",
                 factory = viewModelFactory { initializer { ScanViewModel(container, docId) } },
             )
-            val allScans by container.repository.observeHome().collectAsState(initial = emptyList())
             ScanScreen(
                 vm = vm,
-                scans = allScans,
-                onOpenScan = { id -> nav.navigate("doc/$id") },
+                onShowScans = { nav.navigate(SCANS) },
                 onDone = {
                     if (nav.previousBackStackEntry?.destination?.route == DOC) {
                         nav.popBackStack()

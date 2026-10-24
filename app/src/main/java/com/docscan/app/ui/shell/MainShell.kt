@@ -89,7 +89,7 @@ class Actions(
     val newDoc: () -> Unit,
     val templates: () -> Unit,
     val newFromTemplate: (String) -> Unit,
-    val newInvoice: () -> Unit,
+    val scans: () -> Unit,
     val scan: () -> Unit,
     val importMenu: () -> Unit,
     val importPhotos: () -> Unit,
@@ -115,6 +115,7 @@ fun MainShell(
     onOpenWord: (String) -> Unit,
     onPdfTool: (String) -> Unit,
     onOpenPdf: (String) -> Unit,
+    onShowScans: () -> Unit,
 ) {
     val context = LocalContext.current
     val vm: LibraryViewModel = viewModel(factory = viewModelFactory { initializer { LibraryViewModel(container) } })
@@ -160,7 +161,7 @@ fun MainShell(
             newDoc = t("new_doc") { vm.newWord(onOpenWord) },
             templates = t("templates") { templateSheet = true },
             newFromTemplate = { id -> Analytics.track("template:$id"); if (id == "invoice") invoiceMaker = true else vm.newFromTemplate(id, onOpenWord) },
-            newInvoice = t("invoice") { invoiceMaker = true },
+            scans = t("scans_list") { onShowScans() },
             scan = t("scan") { vm.startScan(onScanDoc) },
             importMenu = t("import_menu") { importSheet = true },
             importPhotos = t("import_photos") { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },

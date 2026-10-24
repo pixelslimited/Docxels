@@ -100,3 +100,4 @@
 *|FREE|Pages open on Enhance|Tapping a page now opens Enhance straight away, with buttons for Crop and Extract table.
 *|FREE|Faster page clean-up|Docxels now checks a small copy of the page for fingers and objects first, and only does the heavy clean-up on pages that need it.
 *|FREE|Photos of things, not paper|Automatic clean-up now leaves a picture alone when most of it would be repainted, so photos of objects are not wiped white.
+*|FREE|Scans button on Home|The Invoice button on Home is now Scans: it lists all your scans with a New scan button. The camera screen button goes to the same list. Invoices are still in Templates.
