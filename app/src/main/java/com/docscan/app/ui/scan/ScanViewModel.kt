@@ -183,6 +183,8 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
                         try {
                             val repaired = HandRemover.fillPaper(base, fullMask)
                             try {
+                                // Only foreign things may be cleared: if the repaint took writing with it, keep the page as photographed.
+                                if (HandRemover.inkLost(base, repaired) > MAX_INK_LOST) return@runCatching
                                 repo.setCleaned(page, repaired.toBitmap())
                             } finally {
                                 repaired.release()
@@ -214,5 +216,6 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
         const val DETECT_SIDE = 900
         const val MIN_CLEAN_COVERAGE = 0.0005
         const val MAX_CLEAN_COVERAGE = 0.33
+        const val MAX_INK_LOST = 0.03
     }
 }

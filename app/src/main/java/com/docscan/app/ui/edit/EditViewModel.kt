@@ -170,7 +170,7 @@ class EditViewModel(
         val p = page.value ?: return
         viewModelScope.launch {
             _busyLabel.value = "Cleaning the page…"
-            val outcome = clean(p, repair = HandRemover::fillPaper) { base ->
+            val outcome = clean(p, repair = HandRemover::fillPaper, keepWriting = true) { base ->
                 val detection = HandRemover.detectJunkMask(base)
                 if (detection.coverage < MIN_HAND_COVERAGE) {
                     detection.mask.release()
@@ -209,6 +209,7 @@ class EditViewModel(
     private suspend fun clean(
         p: PageEntity,
         repair: (Mat, Mat) -> Mat = HandRemover::inpaint,
+        keepWriting: Boolean = false,
         makeMask: (Mat) -> Mat?,
     ): CleanOutcome =
         withContext(Dispatchers.Default) {
@@ -218,7 +219,8 @@ class EditViewModel(
                 try {
                     val repaired = repair(base, mask)
                     try {
-                        CleanOutcome.Done(repaired.toBitmap())
+                        // Automatic clean-up is only for foreign things: a result that loses writing is not used.
+                        if (keepWriting && HandRemover.inkLost(base, repaired) > 0.03) CleanOutcome.NothingFound else CleanOutcome.Done(repaired.toBitmap())
                     } finally {
                         repaired.release()
                     }

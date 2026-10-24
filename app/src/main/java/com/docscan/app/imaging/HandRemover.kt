@@ -190,6 +190,34 @@ object HandRemover {
         return Detection(full, coverage)
     }
 
+    /** Dark thin strokes (text, lines) in the middle of the page, counted on a small copy. */
+    private fun strokeCount(rgb: Mat): Int {
+        val scale = min(1.0, 900.0 / max(rgb.cols(), rgb.rows()))
+        val small = Mat()
+        if (scale < 1.0) Imgproc.resize(rgb, small, Size(), scale, scale, Imgproc.INTER_AREA) else rgb.copyTo(small)
+        val gray = Mat()
+        Imgproc.cvtColor(small, gray, Imgproc.COLOR_RGB2GRAY)
+        val hat = Mat()
+        Imgproc.morphologyEx(gray, hat, Imgproc.MORPH_BLACKHAT, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(9.0, 9.0)))
+        Imgproc.threshold(hat, hat, 20.0, 255.0, Imgproc.THRESH_BINARY)
+        val w = hat.cols()
+        val h = hat.rows()
+        val middle = hat.submat(org.opencv.core.Rect((w * 0.08).toInt(), (h * 0.08).toInt(), (w * 0.84).toInt(), (h * 0.84).toInt()))
+        val count = Core.countNonZero(middle)
+        listOf(small, gray, hat).forEach { it.release() }
+        return count
+    }
+
+    /**
+     * How much of the writing in the middle of the page a repaint took away (0 = none, 1 = all). A clean-up is only for
+     * things that do not belong on the page, so a result that loses text is thrown away by the caller.
+     */
+    fun inkLost(before: Mat, after: Mat): Double {
+        val was = strokeCount(before)
+        if (was < 200) return 0.0
+        return ((was - strokeCount(after)).coerceAtLeast(0)).toDouble() / was
+    }
+
     /** Staple pins: small, dark, bar-shaped, alone, near a corner or the page edge. */
     private fun addStaples(lightness: Mat, bg: Mat, mask: Mat, w: Int, h: Int) {
         val ratio = Mat()
