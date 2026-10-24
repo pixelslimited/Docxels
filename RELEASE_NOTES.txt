@@ -109,3 +109,4 @@
 *|FREE|Rescan a page|On the Crop screen, Rescan this page retakes the photo and puts the new one in the same place among your pages.
 *|FIX|Rescan keeps its place|A rescanned page now stays where the old page was instead of moving to the end.
 *|FREE|Drag pages into place|Press and hold a page, then drag it where you want it. Select several pages first to move them together.
+*|FIX|Text boxes in Word files|Text typed in old-style text boxes is now kept, and the "can't be kept" notice only shows when something really changes.

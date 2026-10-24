@@ -114,8 +114,11 @@ object DocxReader {
         if ("word/vbaProject.bin" in names) notes += "macros (never run, not kept)"
         val eq = count(doc, "<m:oMath")
         if (eq > 0) notes += "equations ($eq)"
-        val boxes = count(doc, "<w:txbxContent") - count(doc, "wordprocessingShape")
-        if (boxes > 0) notes += "text boxes"
+        // Word writes each modern text box twice (a DrawingML copy in mc:Choice and an old VML copy in mc:Fallback), and
+        // modern ones are kept as shapes. Only old VML text boxes outside a fallback are turned into plain paragraphs.
+        val outsideFallback = doc.replace(Regex("<mc:Fallback>.*?</mc:Fallback>", RegexOption.DOT_MATCHES_ALL), "")
+        val vmlBoxes = Regex("<v:textbox[^>]*>\\s*<w:txbxContent").findAll(outsideFallback).count()
+        if (vmlBoxes > 0) notes += "text boxes ($vmlBoxes; their text is kept as ordinary paragraphs, the box itself is not)"
         val sections = count(doc, "<w:sectPr")
         if (sections > 1) notes += "several sections (only the last page setup is kept)"
         if (Regex("<w:cols [^>]*w:num=\"([2-9]|\\d\\d)\"").containsMatchIn(doc)) notes += "multiple columns (shown as one column; the column setting is kept when you save)"
@@ -981,6 +984,15 @@ object DocxReader {
 
             fun readImage(drawing: XNode) {
                 drawing.find("wsp")?.let { readShape(drawing, it); return }
+                // An old-style (VML) text box has no picture: keep what is typed in it as ordinary paragraphs.
+                if (drawing.find("imagedata") == null) {
+                    drawing.find("txbxContent")?.let { box ->
+                        flush(false)
+                        box.childrenNamed("p").forEach { readParagraph(it, out) }
+                        emitted = true
+                        return
+                    }
+                }
                 val blip = drawing.find("blip")
                 val embed = blip?.attr("embed") ?: drawing.find("imagedata")?.attr("id")
                 val path = embed?.let { rels[it] } ?: return
