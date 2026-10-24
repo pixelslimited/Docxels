@@ -97,3 +97,5 @@
 *|FREE|Pinch zoom fix|Pinch-zooming a scan no longer makes the page disappear when you lift your fingers.
 *|FREE|My scans on the camera screen|The camera screen has a new button that lists all your scans, so you can open an earlier one from there.
 *|FREE|Scan progress bar|After each photo a progress bar shows what Docxels is doing with it, and you can take the next photo while the last page is being cleaned.
+*|FREE|Pages open on Enhance|Tapping a page now opens Enhance straight away, with buttons for Crop and Extract table.
+*|FREE|Faster page clean-up|Docxels now checks a small copy of the page for fingers and objects first, and only does the heavy clean-up on pages that need it.

@@ -44,8 +44,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -67,7 +65,6 @@ import androidx.compose.ui.unit.dp
 import com.docscan.app.core.Pt
 import com.docscan.app.core.Geometry
 import com.docscan.app.data.PageEntity
-import com.docscan.app.ui.swipeTabs
 import com.docscan.app.data.cornerList
 import com.docscan.app.data.settings
 import com.docscan.app.export.ShareHelper
@@ -79,7 +76,10 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-private val TABS = listOf("Crop", "Enhance", "Table")
+// A page opens on Enhance. Crop and the table extractor are reached from buttons there and come back to Enhance.
+private const val CROP = 0
+private const val ENHANCE = 1
+private const val TABLE = 2
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +91,8 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
     val table by vm.table.collectAsState()
     val busyLabel by vm.busyLabel.collectAsState()
     val snackbar = remember { SnackbarHostState() }
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf(ENHANCE) }
+    androidx.activity.compose.BackHandler(enabled = tab != ENHANCE) { tab = ENHANCE }
     val saveScope = androidx.compose.runtime.rememberCoroutineScope()
     val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { msg -> saveScope.launch { snackbar.showSnackbar(msg) } }
 
@@ -124,14 +125,23 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
             if (current == null) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             } else {
-                // Crop is dragged sideways everywhere (handles), so swiping between tabs starts on Enhance and Table.
-                Column(Modifier.fillMaxSize().swipeTabs(tab, TABS.size, enabled = tab != 0) { tab = it }) {
-                    TabRow(selectedTabIndex = tab) {
-                        TABS.forEachIndexed { i, title -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) }) }
+                Column(Modifier.fillMaxSize()) {
+                    if (tab == ENHANCE) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+                        ) {
+                            androidx.compose.material3.OutlinedButton(onClick = { tab = CROP }, modifier = Modifier.weight(1f)) { Text("Crop") }
+                            androidx.compose.material3.OutlinedButton(onClick = { tab = TABLE }, modifier = Modifier.weight(1f)) { Text("Extract table") }
+                        }
+                    } else {
+                        androidx.compose.material3.TextButton(onClick = { tab = ENHANCE }, modifier = Modifier.padding(horizontal = 4.dp)) {
+                            Text("‹ Back to Enhance")
+                        }
                     }
                     when (tab) {
-                        0 -> CropTab(vm, current, source)
-                        1 -> EnhanceTab(vm, current, preview)
+                        CROP -> CropTab(vm, current, source)
+                        ENHANCE -> EnhanceTab(vm, current, preview)
                         else -> TableTab(vm, preview, table)
                     }
                 }

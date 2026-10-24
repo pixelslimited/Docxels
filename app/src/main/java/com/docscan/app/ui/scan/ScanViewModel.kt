@@ -162,27 +162,38 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
         }
     }
 
-    /** Removes fingers, objects, staples and folded corners from a freshly added page (if any are found). */
+    /**
+     * Removes fingers, objects, staples and folded corners from a freshly added page (if any are found).
+     * Looking for them is done on a small copy of the page (the detector shrinks to this size anyway), so the
+     * large straighten-and-flatten pass only runs for the pages that really have something to remove.
+     */
     private suspend fun autoClean(page: PageEntity) {
         withContext(Dispatchers.Default) {
             runCatching {
-                val base = container.renderer.warpedBase(page, CLEAN_SIDE) ?: return@runCatching
+                val detection = container.renderer.warpedBase(page, DETECT_SIDE)?.let { small ->
+                    try { HandRemover.detectJunkMask(small) } finally { small.release() }
+                } ?: return@runCatching
                 try {
-                    val detection = HandRemover.detectJunkMask(base)
+                    if (detection.coverage < MIN_CLEAN_COVERAGE) return@runCatching
+                    val base = container.renderer.warpedBase(page, CLEAN_SIDE) ?: return@runCatching
                     try {
-                        if (detection.coverage >= MIN_CLEAN_COVERAGE) {
-                            val repaired = HandRemover.fillPaper(base, detection.mask)
+                        val fullMask = org.opencv.core.Mat()
+                        org.opencv.imgproc.Imgproc.resize(detection.mask, fullMask, base.size(), 0.0, 0.0, org.opencv.imgproc.Imgproc.INTER_NEAREST)
+                        try {
+                            val repaired = HandRemover.fillPaper(base, fullMask)
                             try {
                                 repo.setCleaned(page, repaired.toBitmap())
                             } finally {
                                 repaired.release()
                             }
+                        } finally {
+                            fullMask.release()
                         }
                     } finally {
-                        detection.mask.release()
+                        base.release()
                     }
                 } finally {
-                    base.release()
+                    detection.mask.release()
                 }
             }
         }
@@ -199,6 +210,7 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
     private companion object {
         const val MAX_SIDE = 3000
         const val CLEAN_SIDE = 2400
+        const val DETECT_SIDE = 900
         const val MIN_CLEAN_COVERAGE = 0.0005
     }
 }

@@ -415,7 +415,7 @@ fun ScanScreen(
         progress?.takeIf { pending > 0 }?.let { p ->
             val shownFraction by androidx.compose.animation.core.animateFloatAsState(p.fraction, label = "scanProgress")
             Column(
-                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 112.dp)
+                Modifier.align(Alignment.Center)
                     .clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(alpha = 0.62f)).padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
