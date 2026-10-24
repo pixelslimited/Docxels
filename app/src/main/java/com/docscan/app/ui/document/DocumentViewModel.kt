@@ -48,6 +48,11 @@ class DocumentViewModel(private val container: AppContainer, private val docId: 
         }
     }
 
+    /** Saves a new page order (after pages were dragged into place). */
+    fun setOrder(ids: List<String>) {
+        viewModelScope.launch { repo.reorder(docId, ids) }
+    }
+
     fun rotate(page: PageEntity) {
         viewModelScope.launch { repo.rotate(page, 90) }
     }

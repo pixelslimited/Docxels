@@ -108,3 +108,4 @@
 *|FREE|Clean-up only touches the page edges|Automatic clean-up now only repaints along the edges of the page, where hands and desk show, and never in the middle where the writing is.
 *|FREE|Rescan a page|On the Crop screen, Rescan this page retakes the photo and puts the new one in the same place among your pages.
 *|FIX|Rescan keeps its place|A rescanned page now stays where the old page was instead of moving to the end.
+*|FREE|Drag pages into place|Press and hold a page, then drag it where you want it. Select several pages first to move them together.

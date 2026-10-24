@@ -14,6 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
@@ -27,7 +34,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -91,6 +97,37 @@ fun DocumentScreen(
     var selected by remember { mutableStateOf(setOf<String>()) }
     var deletingSelected by remember { mutableStateOf(false) }
     val saveScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    // Dragging pages into place. While a drag runs (and until the saved order comes back) [order] is the order shown.
+    val gridState = rememberLazyGridState()
+    var order by remember { mutableStateOf<List<String>?>(null) }
+    var dragging by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    val latestPages by rememberUpdatedState(pages)
+    val latestSelected by rememberUpdatedState(selected)
+    val shown = remember(pages, order) {
+        order?.let { o ->
+            val byId = pages.associateBy { it.id }
+            if (o.size == pages.size && o.all { it in byId }) o.map { byId.getValue(it) } else pages
+        } ?: pages
+    }
+    LaunchedEffect(pages) {
+        // The saved order has arrived (or pages were added/deleted meanwhile): stop overriding it.
+        val o = order
+        if (o != null && dragging.isEmpty() && (o.size != pages.size || o == pages.map { it.id })) order = null
+    }
+    // Near the top or bottom edge a drag scrolls the grid, so a page can be carried further than the screen shows.
+    LaunchedEffect(dragging.isNotEmpty()) {
+        while (dragging.isNotEmpty()) {
+            val h = gridState.layoutInfo.viewportSize.height
+            val edge = h * 0.12f
+            when {
+                dragY < edge -> gridState.scrollBy(-18f)
+                dragY > h - edge -> gridState.scrollBy(18f)
+            }
+            kotlinx.coroutines.delay(16)
+        }
+    }
     val saveAs = com.docscan.app.export.SaveAs.rememberSaveAs { msg -> saveScope.launch { snackbar.showSnackbar(msg) } }
 
     LaunchedEffect(Unit) {
@@ -170,19 +207,73 @@ fun DocumentScreen(
                     }
                 } else {
                     LazyVerticalGrid(
+                        state = gridState,
+                        userScrollEnabled = dragging.isEmpty(),
+                        modifier = Modifier.pointerInput(Unit) {
+                            var startId: String? = null
+                            var wasSelected = false
+                            var hadSelection = false
+                            var moved = false
+                            fun idAt(pos: Offset): String? = gridState.layoutInfo.visibleItemsInfo.firstOrNull {
+                                pos.x >= it.offset.x && pos.x < it.offset.x + it.size.width &&
+                                    pos.y >= it.offset.y && pos.y < it.offset.y + it.size.height
+                            }?.key as? String
+                            fun finish(commit: Boolean) {
+                                val id = startId
+                                if (id != null) {
+                                    if (commit && moved) {
+                                        order?.let { vm.setOrder(it) }
+                                        if (!hadSelection) selected = emptySet()
+                                    } else {
+                                        order = null
+                                        if (wasSelected && !moved) selected = selected - id
+                                    }
+                                }
+                                startId = null
+                                dragging = emptySet()
+                            }
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { pos ->
+                                    val id = idAt(pos) ?: return@detectDragGesturesAfterLongPress
+                                    startId = id
+                                    moved = false
+                                    hadSelection = latestSelected.isNotEmpty()
+                                    wasSelected = id in latestSelected
+                                    if (!wasSelected) selected = latestSelected + id
+                                    dragY = pos.y
+                                    order = latestPages.map { it.id }
+                                    dragging = if (wasSelected) latestSelected else setOf(id)
+                                },
+                                onDragEnd = { finish(commit = true) },
+                                onDragCancel = { finish(commit = false) },
+                                onDrag = { change, _ ->
+                                    change.consume()
+                                    dragY = change.position.y
+                                    val target = idAt(change.position) ?: return@detectDragGesturesAfterLongPress
+                                    val current = order ?: return@detectDragGesturesAfterLongPress
+                                    if (target in dragging) return@detectDragGesturesAfterLongPress
+                                    val group = current.filter { it in dragging }
+                                    val rest = current - group.toSet()
+                                    val forward = current.indexOf(target) > current.indexOf(group.first())
+                                    val at = rest.indexOf(target) + if (forward) 1 else 0
+                                    order = rest.take(at) + group + rest.drop(at)
+                                    moved = true
+                                },
+                            )
+                        },
                         columns = GridCells.Adaptive(160.dp),
                         contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 112.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        itemsIndexed(pages, key = { _, page -> page.id }) { index, page ->
+                        itemsIndexed(shown, key = { _, page -> page.id }) { index, page ->
                             PageCard(
+                                modifier = Modifier.animateItem().alpha(if (page.id in dragging) 0.55f else 1f),
                                 index = index,
                                 count = pages.size,
                                 page = page,
                                 selected = page.id in selected,
                                 onOpen = { if (selected.isNotEmpty()) selected = if (page.id in selected) selected - page.id else selected + page.id else onEditPage(page.id) },
-                                onSelect = { selected = if (page.id in selected) selected - page.id else selected + page.id },
                                 onEarlier = { vm.move(page.id, -1) },
                                 onLater = { vm.move(page.id, 1) },
                                 onRotate = { vm.rotate(page) },
@@ -244,23 +335,23 @@ fun DocumentScreen(
     }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun PageCard(
+    modifier: Modifier = Modifier,
     index: Int,
     count: Int,
     page: PageEntity,
     selected: Boolean,
     onOpen: () -> Unit,
-    onSelect: () -> Unit,
     onEarlier: () -> Unit,
     onLater: () -> Unit,
     onRotate: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(if (selected) Modifier.fillMaxWidth().border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium) else Modifier.fillMaxWidth()) {
-        PageThumb(page, Modifier.fillMaxWidth().aspectRatio(0.72f).combinedClickable(onClickLabel = "Edit page", onClick = onOpen, onLongClick = onSelect))
+    Card(modifier.then(if (selected) Modifier.fillMaxWidth().border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium) else Modifier.fillMaxWidth())) {
+        // Long-press (select, or drag to move) is handled by the grid, which needs it to tell a drag from a scroll.
+        PageThumb(page, Modifier.fillMaxWidth().aspectRatio(0.72f).clickable(onClickLabel = "Edit page", onClick = onOpen))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp, top = 8.dp)) {
             if (selected) Icon(Icons.Default.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 6.dp))
             Text("Page ${index + 1}", style = MaterialTheme.typography.labelLarge)
