@@ -17,6 +17,7 @@ import kotlin.math.acos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * Finds the page quadrilateral in a photo. Several independent strategies each propose quads
@@ -55,9 +56,10 @@ object EdgeDetector {
         // page lying behind, which fooled the edge-based strategies below.
         val paper = runCatching { paperCandidates(small, gray, w, h) }.getOrDefault(emptyList())
         if (paper.isNotEmpty()) {
+            val best = paper.maxByOrNull { it.score }?.quad?.let { refine(gray, it, w, h) }
             small.release()
             gray.release()
-            return paper.maxByOrNull { it.score }?.quad
+            return best
         }
 
         val candidates = ArrayList<Candidate>()
@@ -92,11 +94,118 @@ object EdgeDetector {
             candidates += candidatesFrom(mask, w, h)
         }
 
+        val best = candidates.maxByOrNull { it.score }?.quad?.let { refine(gray, it, w, h) }
         bw.release()
         inverted.release()
         small.release()
         gray.release()
-        return candidates.maxByOrNull { it.score }?.quad
+        return best
+    }
+
+    /**
+     * The blob outline that the quad came from is rounded at the corners and bumpy where a thumb, sticker or shadow touches
+     * the edge, which leaves crooked corners. Each side is therefore re-fitted to where the picture really changes from page
+     * to background: sample points along the side, look a little way either side for the strongest change, fit one straight
+     * line through them, and put the corners where neighbouring lines cross. A side with too few clear points, a line that
+     * moves too far or turns too much, or a result that is not a sensible four-sided shape keeps the original.
+     */
+    private fun refine(gray: Mat, quad: List<Pt>, w: Int, h: Int): List<Pt> {
+        return runCatching { refineSides(gray, quad, w, h) }.getOrNull() ?: quad
+    }
+
+    private fun refineSides(gray: Mat, quad: List<Pt>, w: Int, h: Int): List<Pt>? {
+        val data = ByteArray(w * h)
+        gray.get(0, 0, data)
+        fun at(x: Double, y: Double): Int {
+            val xi = x.roundToInt().coerceIn(0, w - 1)
+            val yi = y.roundToInt().coerceIn(0, h - 1)
+            return data[yi * w + xi].toInt() and 0xFF
+        }
+        val px = quad.map { doubleArrayOf(it.x * w.toDouble(), it.y * h.toDouble()) }
+        val cx = px.sumOf { it[0] } / 4
+        val cy = px.sumOf { it[1] } / 4
+        val reach = max(6.0, 0.04 * min(w, h))
+        val diagonal = hypot(w.toDouble(), h.toDouble())
+
+        // One refined line per side: a point on it and its direction.
+        val lines = ArrayList<DoubleArray>(4)
+        for (i in 0 until 4) {
+            val a = px[i]
+            val b = px[(i + 1) % 4]
+            val dx = b[0] - a[0]
+            val dy = b[1] - a[1]
+            val length = hypot(dx, dy)
+            if (length < 20) return null
+            val ux = dx / length
+            val uy = dy / length
+            // Normal pointing away from the middle of the quad.
+            var nx = -uy
+            var ny = ux
+            if ((a[0] - cx) * nx + (a[1] - cy) * ny < 0) { nx = -nx; ny = -ny }
+
+            val found = ArrayList<Point>()
+            val samples = 28
+            for (k in 0 until samples) {
+                val t = 0.1 + 0.8 * k / (samples - 1)
+                val bx = a[0] + dx * t
+                val by = a[1] + dy * t
+                var bestStep = Int.MIN_VALUE
+                var bestGradient = 0.0
+                var step = -reach.toInt()
+                while (step <= reach.toInt()) {
+                    // Change in brightness across this spot, averaged over a few neighbours along the edge.
+                    var g = 0.0
+                    for (j in -2..2) {
+                        val sx = bx + ux * j * 2 + nx * step
+                        val sy = by + uy * j * 2 + ny * step
+                        g += at(sx - nx * 2, sy - ny * 2) - at(sx + nx * 2, sy + ny * 2)
+                    }
+                    val magnitude = kotlin.math.abs(g / 5)
+                    if (magnitude > bestGradient) { bestGradient = magnitude; bestStep = step }
+                    step++
+                }
+                if (bestStep != Int.MIN_VALUE && bestGradient >= 12.0) found += Point(bx + nx * bestStep, by + ny * bestStep)
+            }
+            if (found.size < samples * 0.6) { lines += doubleArrayOf(a[0], a[1], ux, uy); continue }
+
+            val mat = MatOfPoint2f(*found.toTypedArray())
+            val fit = Mat()
+            Imgproc.fitLine(mat, fit, Imgproc.DIST_HUBER, 0.0, 0.01, 0.01)
+            val raw = FloatArray(4)
+            fit.get(0, 0, raw)
+            val v = DoubleArray(4) { raw[it].toDouble() }
+            mat.release()
+            fit.release()
+            var vx = v[0]
+            var vy = v[1]
+            if (vx * ux + vy * uy < 0) { vx = -vx; vy = -vy }
+            // The line must still be close to the side it replaces, and keep most of the sampled points on it.
+            val turned = Math.toDegrees(acos((vx * ux + vy * uy).coerceIn(-1.0, 1.0)))
+            val offset = kotlin.math.abs((v[2] - a[0]) * -uy + (v[3] - a[1]) * ux)
+            val onLine = found.count { kotlin.math.abs((it.x - v[2]) * -vy + (it.y - v[3]) * vx) <= 2.5 }
+            if (turned > 8.0 || offset > reach * 1.5 || onLine < found.size * 0.5) lines += doubleArrayOf(a[0], a[1], ux, uy)
+            else lines += doubleArrayOf(v[2], v[3], vx, vy)
+        }
+
+        // Corner i is where side i-1 meets side i.
+        val corners = ArrayList<Pt>(4)
+        for (i in 0 until 4) {
+            val l1 = lines[(i + 3) % 4]
+            val l2 = lines[i]
+            val cross = l1[2] * l2[3] - l1[3] * l2[2]
+            if (kotlin.math.abs(cross) < 0.2) return null
+            val t = ((l2[0] - l1[0]) * l2[3] - (l2[1] - l1[1]) * l2[2]) / cross
+            val x = l1[0] + l1[2] * t
+            val y = l1[1] + l1[3] * t
+            // A corner may not wander far from where it was.
+            if (hypot(x - px[i][0], y - px[i][1]) > 0.08 * diagonal) return null
+            corners += Pt((x / w).toFloat().coerceIn(0f, 1f), (y / h).toFloat().coerceIn(0f, 1f))
+        }
+        if (!Geometry.isConvexQuad(corners) || !anglesPlausible(corners, w, h)) return null
+        val before = Geometry.area(quad).toDouble()
+        val after = Geometry.area(corners).toDouble()
+        if (after < before * 0.85 || after > before * 1.15) return null
+        return corners
     }
 
     /**

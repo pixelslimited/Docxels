@@ -23,6 +23,9 @@ import kotlin.math.roundToInt
  * colour detection is not equally reliable for every skin tone or lighting condition.
  */
 object HandRemover {
+    /** A flagged piece with more than this share of text-like strokes is part of the page, not an object, and is left alone. */
+    private const val MAX_INK_IN_JUNK = 0.04
+
     class Detection(val mask: Mat, val coverage: Double)
 
     /** [rgb] is the straightened page. The returned mask has the same size as [rgb] (255 = remove). */
@@ -125,6 +128,13 @@ object HandRemover {
         val mask = Mat.zeros(h, w, CvType.CV_8UC1)
         val area = w.toDouble() * h
 
+        // Thin dark strokes (printed or written text). A hand or a pen has almost none; a shaded or colour-cast piece of
+        // the page itself is full of them, and repainting that as blank paper would wipe the writing out.
+        val blackhat = Mat()
+        Imgproc.morphologyEx(channels[0], blackhat, Imgproc.MORPH_BLACKHAT, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(9.0, 9.0)))
+        val strokes = Mat()
+        Imgproc.threshold(blackhat, strokes, 20.0, 255.0, Imgproc.THRESH_BINARY)
+
         // Solid blobs that reach the page edge (hand, pen, desk behind a folded corner). Opening removes text and rules;
         // the border is padded first so blobs on the edge are not eroded away.
         val ko = max(5, (min(w, h) * 0.018).toInt())
@@ -143,7 +153,11 @@ object HandRemover {
             if (fill > 0.9 && pixelArea > area * 0.03 && (box.width > w * 0.6 || box.height > h * 0.6)) return@forEachComponent
             val region = Mat()
             Core.compare(labels, Scalar(index.toDouble()), region, Core.CMP_EQ)
-            Core.bitwise_or(mask, region, mask)
+            val ink = Mat()
+            Core.bitwise_and(region, strokes, ink)
+            val looksLikeText = Core.countNonZero(ink) > pixelArea * MAX_INK_IN_JUNK
+            ink.release()
+            if (!looksLikeText) Core.bitwise_or(mask, region, mask)
             region.release()
         }
         // Grow back over the soft fringe the opening trimmed.
@@ -151,6 +165,8 @@ object HandRemover {
         Imgproc.dilate(mask, grown, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(ko * 2 + 1.0, ko * 2 + 1.0)))
         Core.bitwise_and(grown, nonPaper, grown)
         Core.bitwise_or(mask, grown, mask)
+        blackhat.release()
+        strokes.release()
 
         // Pale skin can look like paper to the test above: keep the dedicated skin detector as well.
         val skin = detectSkinMask(small)
