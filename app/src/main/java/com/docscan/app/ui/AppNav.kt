@@ -170,7 +170,11 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 key = "edit-$pageId",
                 factory = viewModelFactory { initializer { EditViewModel(container, docId, pageId) } },
             )
-            EditScreen(vm = vm, onBack = { nav.popBackStack() })
+            EditScreen(
+                vm = vm,
+                onBack = { nav.popBackStack() },
+                onGoToPage = { id -> nav.navigate("edit/$docId/$id") { popUpTo(EDIT) { inclusive = true } } },
+            )
         }
     }
 }

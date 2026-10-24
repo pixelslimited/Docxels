@@ -21,6 +21,7 @@ import com.docscan.app.ui.UiEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -62,6 +63,11 @@ class EditViewModel(
 
     val page: StateFlow<PageEntity?> = repo.observePage(pageId)
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** The pages of this document in order, so the screen can slide to the next or previous one. */
+    val pageIds: StateFlow<List<String>> = repo.observePages(docId)
+        .map { list -> list.map { it.id } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _source = MutableStateFlow<Bitmap?>(null)
     /** The original photo (uncropped), used by the crop editor. */

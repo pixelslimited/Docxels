@@ -75,6 +75,7 @@ import com.docscan.app.ui.UiEvent
 import kotlin.math.roundToInt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.docscan.app.ui.swipeTabs
 
 // A page opens on Enhance. Crop and the table extractor are reached from buttons there and come back to Enhance.
 private const val CROP = 0
@@ -83,9 +84,11 @@ private const val TABLE = 2
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
+fun EditScreen(vm: EditViewModel, onBack: () -> Unit, onGoToPage: (String) -> Unit = {}) {
     val context = LocalContext.current
     val page by vm.page.collectAsState()
+    val pageIds by vm.pageIds.collectAsState()
+    val pageIndex = pageIds.indexOf(page?.id)
     val source by vm.source.collectAsState()
     val preview by vm.preview.collectAsState()
     val table by vm.table.collectAsState()
@@ -109,7 +112,7 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit page") },
+                title = { Text(if (pageIndex >= 0 && pageIds.size > 1) "Page ${pageIndex + 1} of ${pageIds.size}" else "Edit page") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
@@ -125,7 +128,8 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit) {
             if (current == null) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             } else {
-                Column(Modifier.fillMaxSize()) {
+                // On Enhance, sliding sideways moves to the next or previous page (zooming or painting use their own drags first).
+                Column(Modifier.fillMaxSize().swipeTabs(pageIndex.coerceAtLeast(0), pageIds.size, enabled = tab == ENHANCE && pageIndex >= 0) { onGoToPage(pageIds[it]) }) {
                     if (tab == ENHANCE) {
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
