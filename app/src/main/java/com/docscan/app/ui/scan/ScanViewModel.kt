@@ -174,7 +174,8 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
                     try { HandRemover.detectJunkMask(small) } finally { small.release() }
                 } ?: return@runCatching
                 try {
-                    if (detection.coverage < MIN_CLEAN_COVERAGE) return@runCatching
+                    // Very little is nothing to clean; a third or more means this is probably not a sheet of paper (a scene, an object), and repainting it as paper would wipe it out.
+                    if (detection.coverage < MIN_CLEAN_COVERAGE || detection.coverage > MAX_CLEAN_COVERAGE) return@runCatching
                     val base = container.renderer.warpedBase(page, CLEAN_SIDE) ?: return@runCatching
                     try {
                         val fullMask = org.opencv.core.Mat()
@@ -212,5 +213,6 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
         const val CLEAN_SIDE = 2400
         const val DETECT_SIDE = 900
         const val MIN_CLEAN_COVERAGE = 0.0005
+        const val MAX_CLEAN_COVERAGE = 0.33
     }
 }
