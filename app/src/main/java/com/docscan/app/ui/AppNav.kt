@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 
 private const val HOME = "home"
-private const val SCAN = "scan/{docId}"
+private const val SCAN = "scan/{docId}?replace={replace}"
 private const val SCANS = "scans"
 private const val DOC = "doc/{docId}"
 private const val EDIT = "edit/{docId}/{pageId}"
@@ -132,12 +132,14 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
         }
         composable(SCAN) { entry ->
             val docId = entry.arguments?.getString("docId") ?: return@composable
+            val replace = entry.arguments?.getString("replace")?.takeIf { it.isNotBlank() }
             val vm: ScanViewModel = viewModel(
-                key = "scan-$docId",
-                factory = viewModelFactory { initializer { ScanViewModel(container, docId) } },
+                key = "scan-$docId-${replace.orEmpty()}",
+                factory = viewModelFactory { initializer { ScanViewModel(container, docId, replace) } },
             )
             ScanScreen(
                 vm = vm,
+                onReplaced = { id -> nav.navigate("edit/$docId/$id") { popUpTo(EDIT) { inclusive = true } } },
                 onShowScans = { nav.navigate(SCANS) },
                 onDone = {
                     if (nav.previousBackStackEntry?.destination?.route == DOC) {
@@ -174,6 +176,7 @@ fun AppNav(container: AppContainer, incoming: kotlinx.coroutines.flow.StateFlow<
                 vm = vm,
                 onBack = { nav.popBackStack() },
                 onGoToPage = { id -> nav.navigate("edit/$docId/$id") { popUpTo(EDIT) { inclusive = true } } },
+                onRescan = { id -> nav.navigate("scan/$docId?replace=$id") },
             )
         }
     }

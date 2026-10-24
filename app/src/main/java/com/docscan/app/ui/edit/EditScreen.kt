@@ -84,7 +84,7 @@ private const val TABLE = 2
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditScreen(vm: EditViewModel, onBack: () -> Unit, onGoToPage: (String) -> Unit = {}) {
+fun EditScreen(vm: EditViewModel, onBack: () -> Unit, onGoToPage: (String) -> Unit = {}, onRescan: (String) -> Unit = {}) {
     val context = LocalContext.current
     val page by vm.page.collectAsState()
     val pageIds by vm.pageIds.collectAsState()
@@ -144,7 +144,7 @@ fun EditScreen(vm: EditViewModel, onBack: () -> Unit, onGoToPage: (String) -> Un
                         }
                     }
                     when (tab) {
-                        CROP -> CropTab(vm, current, source)
+                        CROP -> CropTab(vm, current, source, onRescan = { onRescan(current.id) })
                         ENHANCE -> EnhanceTab(vm, current, preview)
                         else -> TableTab(vm, preview, table)
                     }
@@ -211,7 +211,7 @@ private fun turnedCopy(source: Bitmap, degrees: Int): Bitmap {
 }
 
 @Composable
-private fun CropTab(vm: EditViewModel, page: PageEntity, source: Bitmap?) {
+private fun CropTab(vm: EditViewModel, page: PageEntity, source: Bitmap?, onRescan: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
             if (source == null) {
@@ -241,6 +241,10 @@ private fun CropTab(vm: EditViewModel, page: PageEntity, source: Bitmap?) {
             Button(onClick = vm::autoDetectEdges, modifier = Modifier.weight(1f), enabled = source != null) { Text("Auto-detect") }
             OutlinedButton(onClick = vm::useFullImage, modifier = Modifier.weight(1f)) { Text("Whole photo") }
         }
+        OutlinedButton(
+            onClick = onRescan,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        ) { Text("Rescan this page") }
     }
 }
 

@@ -110,6 +110,23 @@ class DocumentRepository(
         dao.touch(page.documentId, System.currentTimeMillis())
     }
 
+    /**
+     * Swaps [old] for freshly added [fresh] pages: they take the old page's place among the other pages and the old
+     * page (with its picture files) is removed.
+     */
+    suspend fun replacePage(old: PageEntity, fresh: List<PageEntity>) {
+        val ids = dao.getPages(old.documentId).map { it.id }.filter { it != old.id && fresh.none { f -> f.id == it } }.toMutableList()
+        val at = dao.getPages(old.documentId).indexOfFirst { it.id == old.id }.coerceAtLeast(0).coerceAtMost(ids.size)
+        ids.addAll(at, fresh.map { it.id })
+        withContext(Dispatchers.IO) {
+            store.file(old.documentId, old.sourcePath).delete()
+            old.cleanedPath?.let { store.file(old.documentId, it).delete() }
+        }
+        dao.deletePage(old)
+        setOrder(ids)
+        dao.touch(old.documentId, System.currentTimeMillis())
+    }
+
     /** Copies [page] (picture files and every setting) and puts the copy right after it. */
     suspend fun duplicatePage(page: PageEntity): PageEntity {
         val id = UUID.randomUUID().toString()

@@ -42,8 +42,31 @@ data class ScanProgress(val label: String, val fraction: Float)
 
 data class CaptureOptions(val mode: ScanMode = ScanMode.DOCUMENT, val removeFingers: Boolean = false)
 
-class ScanViewModel(private val container: AppContainer, val docId: String) : ViewModel() {
+class ScanViewModel(
+    private val container: AppContainer,
+    val docId: String,
+    /** When set, the first photo taken replaces this page, in the same place among the other pages (Rescan). */
+    private val replaceId: String? = null,
+) : ViewModel() {
     private val repo = container.repository
+
+    private var replaced = false
+
+    /** Set once a rescanned page has taken the old page's place: the id of the new page. */
+    private val _replacedBy = MutableStateFlow<String?>(null)
+    val replacedBy: StateFlow<String?> = _replacedBy
+
+    /** Puts the first saved result in the old page's place (only once, and only when rescanning). */
+    private suspend fun swapIfRescan(saved: List<PageEntity>) {
+        val id = replaceId ?: return
+        if (replaced || saved.isEmpty()) return
+        replaced = true
+        runCatching {
+            val old = repo.page(id) ?: return@runCatching
+            repo.replacePage(old, saved)
+            _replacedBy.value = saved.first().id
+        }.onFailure { _message.value = "Could not replace the page. The new scan was added at the end." }
+    }
 
     val pageCount: StateFlow<Int> = repo.observePages(docId)
         .map { it.size }
@@ -88,6 +111,7 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
                 runCatching {
                     val bitmap = withContext(Dispatchers.IO) { ImageIO.decodeFile(file, MAX_SIDE) } ?: error("Unreadable photo")
                     saved = addBitmap(bitmap, options)
+                    swapIfRescan(saved)
                 }.onFailure { _message.value = "Could not save the photo. Please try again." }
             }
             file.delete()
@@ -112,6 +136,7 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
                     }.onFailure { failed++ }
                 }
             }
+            queue.withLock { swapIfRescan(saved) }
             if (failed > 0) _message.value = "$failed image(s) could not be imported."
             polish(saved, options)
             _pending.update { it - 1 }

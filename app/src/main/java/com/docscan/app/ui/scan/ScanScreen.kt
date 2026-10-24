@@ -144,6 +144,7 @@ fun ScanScreen(
     onDone: () -> Unit,
     onBack: () -> Unit,
     onShowScans: () -> Unit = {},
+    onReplaced: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -153,6 +154,9 @@ fun ScanScreen(
     val pending by vm.pending.collectAsState()
     val progress by vm.progress.collectAsState()
     val message by vm.message.collectAsState()
+    val replacedBy by vm.replacedBy.collectAsState()
+    // A rescanned page is in place: carry on to it (once the page is polished, so it opens already upright).
+    LaunchedEffect(replacedBy, pending) { replacedBy?.let { if (pending == 0) onReplaced(it) } }
     val snackbar = remember { SnackbarHostState() }
     val accent = MaterialTheme.colorScheme.secondary
 
