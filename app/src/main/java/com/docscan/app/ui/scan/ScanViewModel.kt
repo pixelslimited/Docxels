@@ -213,7 +213,8 @@ class ScanViewModel(
                                 val confined = HandRemover.confineToEdges(base, repaired)
                                 try {
                                     if (HandRemover.inkLost(base, confined) > MAX_INK_LOST) return@runCatching
-                                    repo.setCleaned(page, confined.toBitmap())
+                                    // Re-read the page: the copy held here predates a rescan's re-ordering, and saving it would put the page back at the end.
+                                    repo.page(page.id)?.let { repo.setCleaned(it, confined.toBitmap()) }
                                 } finally {
                                     confined.release()
                                 }
