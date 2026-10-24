@@ -190,6 +190,25 @@ object HandRemover {
         return Detection(full, coverage)
     }
 
+    /**
+     * Foreign things (a hand, the desk at a folded corner, a staple) come in from the page edge, while the writing is in
+     * the middle. So the repaint is only kept in a band along the edges ([fraction] of each side); everywhere else the page
+     * stays exactly as photographed. Returns a new image; the caller releases it.
+     */
+    fun confineToEdges(base: Mat, repaired: Mat, fraction: Double = EDGE_BAND): Mat {
+        val band = Mat(base.rows(), base.cols(), CvType.CV_8UC1, Scalar.all(255.0))
+        val innerW = (base.cols() * (1 - 2 * fraction)).toInt().coerceAtLeast(1)
+        val innerH = (base.rows() * (1 - 2 * fraction)).toInt().coerceAtLeast(1)
+        band.submat(org.opencv.core.Rect((base.cols() * fraction).toInt(), (base.rows() * fraction).toInt(), innerW, innerH)).setTo(Scalar.all(0.0))
+        val out = base.clone()
+        repaired.copyTo(out, band)
+        band.release()
+        return out
+    }
+
+    /** How far in from each edge an automatic clean-up may repaint. */
+    const val EDGE_BAND = 0.14
+
     /** Dark thin strokes (text, lines) in the middle of the page, counted on a small copy. */
     private fun strokeCount(rgb: Mat): Int {
         val scale = min(1.0, 900.0 / max(rgb.cols(), rgb.rows()))

@@ -105,3 +105,4 @@
 *|FREE|Better page edges and no missing text|Page corners are now fitted to the real paper edge, and automatic clean-up no longer repaints parts of the page that contain text.
 *|FREE|A proper My scans screen|My scans now shows thumbnails, can be a list or a grid, can be sorted (newest, oldest, name, most pages), and each scan can be opened, renamed, exported as a PDF or deleted.
 *|FREE|Clean-up never removes writing|Automatic clean-up now checks its own result and keeps the page as photographed if any writing would be lost.
+*|FREE|Clean-up only touches the page edges|Automatic clean-up now only repaints along the edges of the page, where hands and desk show, and never in the middle where the writing is.

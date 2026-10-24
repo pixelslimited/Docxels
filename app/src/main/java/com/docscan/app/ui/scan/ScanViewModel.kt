@@ -183,9 +183,15 @@ class ScanViewModel(private val container: AppContainer, val docId: String) : Vi
                         try {
                             val repaired = HandRemover.fillPaper(base, fullMask)
                             try {
-                                // Only foreign things may be cleared: if the repaint took writing with it, keep the page as photographed.
-                                if (HandRemover.inkLost(base, repaired) > MAX_INK_LOST) return@runCatching
-                                repo.setCleaned(page, repaired.toBitmap())
+                                // Foreign things come in from the edges, so nothing in the middle of the page is repainted. As a last
+                                // check, if writing was still lost the page is kept as photographed.
+                                val confined = HandRemover.confineToEdges(base, repaired)
+                                try {
+                                    if (HandRemover.inkLost(base, confined) > MAX_INK_LOST) return@runCatching
+                                    repo.setCleaned(page, confined.toBitmap())
+                                } finally {
+                                    confined.release()
+                                }
                             } finally {
                                 repaired.release()
                             }

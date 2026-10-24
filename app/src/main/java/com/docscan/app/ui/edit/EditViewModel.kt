@@ -220,7 +220,15 @@ class EditViewModel(
                     val repaired = repair(base, mask)
                     try {
                         // Automatic clean-up is only for foreign things: a result that loses writing is not used.
-                        if (keepWriting && HandRemover.inkLost(base, repaired) > 0.03) CleanOutcome.NothingFound else CleanOutcome.Done(repaired.toBitmap())
+                        if (!keepWriting) CleanOutcome.Done(repaired.toBitmap())
+                        else {
+                            val confined = HandRemover.confineToEdges(base, repaired)
+                            try {
+                                if (HandRemover.inkLost(base, confined) > 0.03) CleanOutcome.NothingFound else CleanOutcome.Done(confined.toBitmap())
+                            } finally {
+                                confined.release()
+                            }
+                        }
                     } finally {
                         repaired.release()
                     }
